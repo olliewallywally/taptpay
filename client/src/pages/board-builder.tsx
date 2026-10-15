@@ -15,6 +15,9 @@ import {
   Layout, CheckCircle, Loader2, ChevronDown
 } from "lucide-react";
 import jsPDF from "jspdf";
+import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo, wholeNumber } from "@shared/api-path";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 type LayoutKey = "taptpay-a5-portrait" | "taptpay-a5-landscape";
 
@@ -58,9 +61,9 @@ interface TaptStoneData {
   isActive: boolean | null;
 }
 
-async function fetchAsDataUrl(url: string, authToken?: string): Promise<string> {
-  const headers: HeadersInit = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-  const res = await fetch(url, { headers });
+// R1-T4 phase E: the business's own image, read with its session cookie (sent by the browser itself).
+async function fetchAsDataUrl(url: string): Promise<string> {
+  const res = await sessionFetch(url);
   if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
   const blob = await res.blob();
   return new Promise((resolve, reject) => {
@@ -308,18 +311,15 @@ export default function BoardBuilder() {
   const captureRef = useRef<HTMLDivElement>(null);
 
   const merchantId = getCurrentMerchantId();
-  const token = localStorage.getItem("authToken") ?? "";
 
   useEffect(() => {
     if (!merchantId) setLocation("/login?returnTo=/board-builder");
   }, [merchantId, setLocation]);
 
   const merchantQuery = useQuery<MerchantData>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch merchant");
       return res.json() as Promise<MerchantData>;
     },
@@ -327,11 +327,9 @@ export default function BoardBuilder() {
   });
 
   const stonesQuery = useQuery<TaptStoneData[]>({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}/tapt-stones`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch stones");
       return res.json() as Promise<TaptStoneData[]>;
     },
@@ -340,8 +338,9 @@ export default function BoardBuilder() {
 
   // Board state
   const [layout, setLayout] = useState<LayoutKey>("taptpay-a5-portrait");
-  const [primaryColor, setPrimaryColor] = useState("#00f1d7");
-  const [hexInput, setHexInput] = useState("#00f1d7");
+  // The scaled preview's instruction text needs the small-text 4.5:1 floor.
+  const [primaryColor, setPrimaryColor] = useState("#ffffff");
+  const [hexInput, setHexInput] = useState("#ffffff");
   const [backgroundColor, setBackgroundColor] = useState("#0055FF");
   const [bgHexInput, setBgHexInput] = useState("#0055FF");
   const [backgroundImageDataUrl, setBackgroundImageDataUrl] = useState("");
@@ -418,12 +417,12 @@ export default function BoardBuilder() {
       return;
     }
     setFetchingQr(true);
-    const url = `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
-    fetchAsDataUrl(url, token)
+    const url = `${apiPath("GET /api/merchants/:id/stone/:stoneId/qr", { id: merchantId, stoneId: wholeNumber(selectedStoneId) })}?size=600`;
+    fetchAsDataUrl(url)
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(""))
       .finally(() => setFetchingQr(false));
-  }, [merchantId, selectedStoneId, token]);
+  }, [merchantId, selectedStoneId]);
 
   const svgOpts: BuildSvgOpts = {
     svgTemplate,
@@ -547,7 +546,7 @@ export default function BoardBuilder() {
       if (!pdfBase64) throw new Error("This board is too detailed to send. Try a smaller background image.");
 
       // The business comes from the sign-in; the board is one of its own (server/board-print.ts).
-      await apiRequest("POST", "/api/board-builder/submit", {
+      await apiRequest(...apiTo("POST /api/board-builder/submit"), {
         pdf: pdfBase64,
         stoneId: Number(selectedStoneId),
         layout: dim.label,
@@ -603,7 +602,7 @@ export default function BoardBuilder() {
         </Button>
         <div className="h-5 w-px bg-gray-200" />
         <h1 className="font-semibold text-gray-900">Payment Board Builder</h1>
-        <span className="text-xs bg-[#0055FF]/10 text-[#0055FF] px-2 py-0.5 rounded-full font-medium ml-1">Beta</span>
+        <span className="text-xs bg-[#0055FF]/10 text-[#040D6D] px-2 py-0.5 rounded-full font-medium ml-1">Beta</span>
       </div>
 
       <div className="p-4 lg:p-6 flex flex-col lg:flex-row gap-4 lg:gap-6 min-h-[calc(100vh-57px)] items-start">
@@ -637,7 +636,7 @@ export default function BoardBuilder() {
                   dangerouslySetInnerHTML={{ __html: previewSvg }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">
                   No preview available
                 </div>
               )}
@@ -662,7 +661,7 @@ export default function BoardBuilder() {
                   "Send to Print"
                 )}
               </Button>
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-gray-600 text-center">
                 Your design will be emailed to our print team. We'll be in touch.
               </p>
             </div>
@@ -675,12 +674,12 @@ export default function BoardBuilder() {
 
             <ControlSection anchor="bb-qr" icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
               <div className="space-y-2">
-                <Label className="text-xs text-gray-500">Select which Tapt Stone's QR code to show</Label>
+                <Label htmlFor="board-payment-stone" className="text-xs text-gray-500">Select which Tapt Stone's QR code to show</Label>
                 {stonesQuery.isSuccess && !stones.some((s) => s.isActive) && (
                   <p className="text-xs text-gray-500">No payment boards yet. Add one from the terminal first; its QR code goes on your print.</p>
                 )}
                 <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
-                  <SelectTrigger className="border-gray-200 focus:border-[#0055FF]">
+                  <SelectTrigger id="board-payment-stone" className="border-gray-200 focus:border-[#0055FF]">
                     <SelectValue placeholder="Select stone…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -692,7 +691,7 @@ export default function BoardBuilder() {
                   </SelectContent>
                 </Select>
                 {fetchingQr && <p className="text-xs text-[#0055FF] flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Loading QR code…</p>}
-                {!fetchingQr && qrDataUrl && <p className="text-xs text-green-600">✓ QR code loaded</p>}
+                {!fetchingQr && qrDataUrl && <p className="text-xs text-green-700">✓ QR code loaded</p>}
               </div>
             </ControlSection>
 
@@ -782,15 +781,15 @@ export default function BoardBuilder() {
                         <img src={backgroundImageDataUrl} className="h-10 w-16 object-cover rounded border border-gray-200 flex-shrink-0" alt="Background preview" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-600 font-medium">Background image set</p>
-                          <p className="text-[10px] text-gray-400">Image overrides colour</p>
+                          <p className="text-[10px] text-gray-600">Image overrides colour</p>
                         </div>
                         <Button variant="ghost" size="sm" className="text-gray-500 text-xs flex-shrink-0" onClick={() => setBackgroundImageDataUrl("")}>Remove</Button>
                       </div>
                     ) : (
                       <label className="block border-2 border-dashed border-gray-200 rounded-xl p-3 text-center cursor-pointer hover:border-[#0055FF] hover:bg-[#0055FF]/5 transition-all">
-                        <Upload size={16} className="mx-auto text-gray-400 mb-1" />
+                        <Upload size={16} className="mx-auto text-gray-600 mb-1" />
                         <p className="text-xs text-gray-500">or upload a background image</p>
-                        <p className="text-xs text-gray-400">PNG, JPG · max 10MB</p>
+                        <p className="text-xs text-gray-600">PNG, JPG · max 10MB</p>
                         <input type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleBgImageUpload} />
                       </label>
                     )}
@@ -848,7 +847,7 @@ export default function BoardBuilder() {
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: iconColor || primaryColor }} />
                     <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Tints the QR code and Paywave/NFC icon images</p>
+                  <p className="text-[10px] text-gray-600 mt-1">Tints the QR code and Paywave/NFC icon images</p>
                 </div>
 
               </div>
@@ -863,9 +862,9 @@ export default function BoardBuilder() {
                   </div>
                 )}
                 <label className="block border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer hover:border-[#0055FF] hover:bg-[#0055FF]/5 transition-all">
-                  <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+                  <Upload size={20} className="mx-auto text-gray-600 mb-1" />
                   <p className="text-xs text-gray-500">{logoDataUrl ? "Replace logo" : "Upload logo"}</p>
-                  <p className="text-xs text-gray-400">PNG, JPG, SVG · max 5MB</p>
+                  <p className="text-xs text-gray-600">PNG, JPG, SVG · max 5MB</p>
                   <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                 </label>
               </div>
@@ -890,7 +889,7 @@ export default function BoardBuilder() {
                     rows={3}
                     className="border-gray-200 focus:border-[#0055FF] resize-none text-base md:text-sm"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Press Enter to add a new line — text will be centred</p>
+                  <p className="text-[10px] text-gray-600 mt-1">Press Enter to add a new line — text will be centred</p>
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Footer Note</Label>
@@ -902,9 +901,9 @@ export default function BoardBuilder() {
             <ControlSection icon={<Type size={16} />} title="Font" isOpen={openSection === "font"} onToggle={() => toggle("font")}>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Google Fonts</Label>
+                  <Label htmlFor="board-google-font" className="text-xs text-gray-500 mb-1 block">Google Fonts</Label>
                   <Select value={selectedFont} onValueChange={(v) => { setSelectedFont(v); setCustomFontDataUrl(""); }}>
-                    <SelectTrigger className="border-gray-200 focus:border-[#0055FF]">
+                    <SelectTrigger id="board-google-font" className="border-gray-200 focus:border-[#0055FF]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -917,7 +916,7 @@ export default function BoardBuilder() {
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Or upload a custom font</Label>
                   <label className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:border-[#0055FF] transition-all">
-                    <Upload size={14} className="text-gray-400" />
+                    <Upload size={14} className="text-gray-600" />
                     <span className="text-sm text-gray-600">
                       {customFontDataUrl ? "Custom font loaded ✓" : "Upload .ttf / .otf / .woff"}
                     </span>
@@ -967,15 +966,16 @@ function ControlSection({
     <div data-tutorial-id={anchor} className="border border-gray-100 rounded-xl overflow-hidden">
       <button
         onClick={onToggle}
+        aria-expanded={isOpen}
         className="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-2 font-medium text-sm text-gray-800">
           <span className="text-[#0055FF]">{icon}</span>
           {title}
         </div>
-        <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown size={16} className={`text-gray-600 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
-      <div style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.22s ease" }}>
+      <div aria-hidden={!isOpen} {...inertWhen(!isOpen)} style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.22s ease" }}>
         <div style={{ overflow: "hidden" }}>
           <div className="px-4 pb-4 pt-2 bg-white border-t border-gray-50">
             {children}

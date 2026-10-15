@@ -10,9 +10,10 @@ jest.mock("../email-service-multi", () => ({
 import * as emailService from "../email-service-multi";
 import { resetTestStorage, storage } from "./support/http-harness";
 import {
+  as,
   expectServed,
+  familyRows,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -48,7 +49,18 @@ const merchant = async (id: number) => (await storage.getMerchant(id))!;
 const RECIPES: Record<string, ServedRecipe> = {
   "GET /api/admin/auth/me": (_ctx, who) => ({
     req: { method: "get", path: "/api/admin/auth/me" }, status: 200,
-    check: (res) => expect(res.body).toEqual({ user: { id: who.user.id, email: who.user.email, merchantId: 0, role: "admin" } }),
+    check: (res) => expect(res.body).toEqual({
+      csrfToken: who.csrf, user: { id: who.user.id, email: who.user.email, merchantId: 0, role: "admin" },
+    }),
+  }),
+  // The admin area's Log Out ends its own cookie session.
+  "POST /api/admin/auth/logout": (ctx, who) => ({
+    req: { method: "post", path: "/api/admin/auth/logout" }, status: 204,
+    check: async (res) => {
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect((await as(ctx, who).get("/api/admin/auth/me")).status).toBe(401);
+      expect((await as(ctx, ctx.owner).get("/api/auth/me")).status).toBe(200);
+    },
   }),
   "GET /api/admin/request-origin": () => ({
     req: { method: "get", path: "/api/admin/request-origin" }, status: 200,
@@ -177,7 +189,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   }),
 };
 
-const ROWS = servedRows(/^[A-Z]+ \/api\/admin\//, "admin");
+const ROWS = familyRows("admin");
 const SERVED = servedPairs(ROWS);
 
 beforeEach(() => {

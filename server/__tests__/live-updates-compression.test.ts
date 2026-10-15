@@ -3,7 +3,7 @@ import "./support/test-env";
 import request from "supertest";
 import { sseBroker } from "../sse-broker";
 import {
-  bearer,
+  signedIn,
   createOwnerPrincipal,
   createTestApp,
   openEventStream,
@@ -33,7 +33,7 @@ describe("live updates reach a browser", () => {
 
     const stream = await openEventStream(app, `/api/merchants/${owner.merchantId}/events`, {
       ...CHROME_ACCEPT_ENCODING,
-      ...bearer(owner),
+      ...signedIn(owner),
     });
     try {
       expect(stream.status).toBe(200);

@@ -4,6 +4,8 @@
    business details there refreshes report headers with no extra fetch. */
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { sessionFetch } from "./session";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 export interface MerchantProfile {
   id: number;
@@ -22,14 +24,11 @@ export function useMerchantProfile() {
      the default mode. */
   const merchantId = getCurrentMerchantId();
   return useQuery<MerchantProfile>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     enabled: !!merchantId,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
+      const r = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!r.ok) throw new Error("Failed to load merchant profile");
       return r.json();
     },

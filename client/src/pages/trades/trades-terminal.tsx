@@ -17,6 +17,7 @@ import {
   type QuoteDraftLine,
   type TradesTerminalScreen,
 } from "@/features/terminal/trades/TradesTerminalView";
+import { apiPath } from "@shared/api-path";
 
 /* ═══ TOKENS (trades palette via TRADES_THEME — see trades-theme.ts) ═══ */
 const NAVY  = TRADES_THEME.INK;    // charcoal base (was property NAVY)
@@ -52,12 +53,12 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
   const [error, setError]                   = useState('');
 
   const { data: clients = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/clients'],
-    queryFn: () => tradesFetch('/api/trades/clients').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/trades/clients")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/clients")).then(r => r.ok ? r.json() : []),
   });
   const { data: auth } = useQuery<any>({
-    queryKey: ['/api/auth/me', 'trades-quote'],
-    queryFn: () => tradesFetch('/api/auth/me').then(r => r.ok ? r.json() : null),
+    queryKey: [apiPath("GET /api/auth/me"), 'trades-quote'],
+    queryFn: () => tradesFetch(apiPath("GET /api/auth/me")).then(r => r.ok ? r.json() : null),
   });
 
   const gstMode = auth?.user?.tradeGstMode === 'exclusive' ? 'exclusive' : 'inclusive';
@@ -103,14 +104,14 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
         validUntil: validUntil.toISOString(),
         notes: notes.trim() || undefined,
       };
-      const response = await fetch('/api/trades/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() }, body: JSON.stringify(body) });
+      const response = await fetch(apiPath("POST /api/trades/quotes"), { method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() }, body: JSON.stringify(body) });
       if (!response.ok) {
         if (notifyIfBillingCardRequired(response)) throw new BillingCardRequiredError();
         throw new Error(await response.json().then((d: any) => d.message).catch(() => 'Could not create quote'));
       }
       return response.json();
     },
-    onSuccess: quote => { queryClient.invalidateQueries({ queryKey: ['/api/trades/quotes'] }); setCreated(quote); },
+    onSuccess: quote => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/quotes")] }); setCreated(quote); },
     /* A billing 402 is stated once, by the billing banner; nothing more here, and
        the quote stays to create again (R1-T9). */
     onError: (err: any) => { if (!isBillingCardRequired(err)) setError(err?.message || 'Could not create quote'); },
@@ -122,7 +123,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
   const publicUrl = created ? `${window.location.origin}/trades/quote/${created.token}` : '';
   const downloadPdf = async () => {
     if (!created?.id) return;
-    const response = await fetch(`/api/trades/quotes/${created.id}/pdf`, { headers: tradesHeaders() });
+    const response = await fetch(apiPath("GET /api/trades/quotes/:id/pdf", { id: created.id }), { headers: tradesHeaders() });
     if (!response.ok) { setError(await response.json().then((d: any) => d.message).catch(() => 'Could not download PDF')); return; }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -215,20 +216,20 @@ export default function TradesTerminal() {
 
   /* Data */
   const { data: clients = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/clients'],
-    queryFn: () => tradesFetch('/api/trades/clients').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/trades/clients")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/clients")).then(r => r.ok ? r.json() : []),
     staleTime: 60000, retry: false,
   });
 
   const { data: rawInvoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/invoices'],
-    queryFn: () => tradesFetch('/api/trades/invoices').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/trades/invoices")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/invoices")).then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
   const { data: rawQuotes = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/quotes'],
-    queryFn: () => tradesFetch('/api/trades/quotes').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/trades/quotes")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/quotes")).then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
@@ -252,7 +253,7 @@ export default function TradesTerminal() {
   const invoiceMutation = useMutation({
     mutationFn: async ({ clientId, recipient, amountCents, channel, jobDetails, splitEnabled }: any) => {
       const due = new Date(); due.setDate(due.getDate() + 7);
-      const r = await fetch('/api/trades/invoices', {
+      const r = await tradesFetch(apiPath("POST /api/trades/invoices"), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
         body: JSON.stringify({
           // Quick invoice sends inline recipient details; the server creates a
@@ -274,8 +275,8 @@ export default function TradesTerminal() {
       return r.json();
     },
     onSuccess: (data: any, vars: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/trades/clients'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/invoices")] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients")] });
       setSplitEnabled(false);
       setSuccessLabel(vars.recipient
         ? (vars.recipient.email || vars.recipient.phone || '')
@@ -294,17 +295,17 @@ export default function TradesTerminal() {
   // prospect profile into a real directory client.
   const promoteMutation = useMutation({
     mutationFn: async (clientProfileId: string) => {
-      const r = await fetch(`/api/trades/clients/${clientProfileId}/promote`, { method: 'POST', headers: tradesHeaders() });
+      const r = await fetch(apiPath("POST /api/trades/clients/:id/promote", { id: clientProfileId }), { method: 'POST', headers: tradesHeaders() });
       if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Could not save client'));
       return r.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/trades/clients'] }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients")] }); },
     onError: (e: any) => toast(e?.message || 'Could not save client'),
   });
 
   const markMutation = useMutation({
     mutationFn: async ({ invoiceId, ref }: any) => {
-      const r = await fetch(`/api/trades/invoices/${invoiceId}/mark-paid-external`, {
+      const r = await fetch(apiPath("POST /api/trades/invoices/:id/mark-paid-external", { id: invoiceId }), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
         body: JSON.stringify({ externalPaymentReference: ref || null }),
       });
@@ -312,7 +313,7 @@ export default function TradesTerminal() {
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/invoices")] });
       setBanner('Marked as received');
       triggerConveyor(screen, 'down');
       setScreen('home');
@@ -326,17 +327,19 @@ export default function TradesTerminal() {
   // Cancel (void) a single job invoice — from the row action sheet.
   const voidMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const r = await fetch(`/api/trades/invoices/${invoiceId}/void`, { method: 'POST', headers: tradesHeaders() });
+      const r = await fetch(apiPath("POST /api/trades/invoices/:id/void", { id: invoiceId }), { method: 'POST', headers: tradesHeaders() });
       if (!r.ok) throw new Error('Failed to cancel');
       return r.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] }); setBanner('Invoice cancelled'); setRowAction(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/invoices")] }); setBanner('Invoice cancelled'); setRowAction(null); },
     onError: (e: any) => { toast(e?.message || 'Could not cancel'); },
   });
 
   const jobActionMutation = useMutation({
     mutationFn: async ({ invoiceId, action, splitEnabled }: { invoiceId: string; action: 'send-balance' | 'complete'; splitEnabled?: boolean }) => {
-      const r = await fetch(`/api/trades/invoices/${invoiceId}/${action}`, {
+      const r = await fetch(action === 'send-balance'
+        ? apiPath("POST /api/trades/invoices/:id/send-balance", { id: invoiceId })
+        : apiPath("POST /api/trades/invoices/:id/complete", { id: invoiceId }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
         body: action === 'send-balance' ? JSON.stringify({ splitEnabled: !!splitEnabled }) : undefined,
@@ -346,7 +349,7 @@ export default function TradesTerminal() {
       return r.json();
     },
     onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/invoices")] });
       setBanner(vars.action === 'send-balance' ? 'Balance invoice created' : 'Job completed');
       setRowAction(null);
     },

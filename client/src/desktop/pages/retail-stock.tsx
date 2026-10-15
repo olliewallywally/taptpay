@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +10,8 @@ import {
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
+import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -78,12 +81,9 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
   const [emojiOpen, setEmojiOpen] = useState(false);
 
   const stockQuery = useQuery<StockItem[]>({
-    queryKey: ["/api/merchants", merchantId, "stock-items"],
+    queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/stock-items`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(apiPath("GET /api/merchants/:merchantId/stock-items", { merchantId }));
       if (!res.ok) throw new Error("Failed to fetch stock items");
       return res.json();
     },
@@ -91,12 +91,9 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
   });
 
   const txQuery = useQuery<Tx[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch transactions");
       return res.json();
     },
@@ -116,15 +113,14 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: ["/api/merchants", merchantId, "stock-items"],
+      queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
     });
 
   const addMutation = useMutation({
     mutationFn: async (item: Draft) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+      const res = await sessionFetch(apiPath("POST /api/merchants/:merchantId/stock-items", { merchantId }), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
       });
       if (!res.ok) throw new Error("Failed to add");
@@ -140,12 +136,11 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (item: Draft) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(
-        `/api/merchants/${merchantId}/stock-items/${item.id}`,
+      const res = await sessionFetch(
+        apiPath("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId, itemId: item.id }),
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: item.name,
             cost: item.cost,
@@ -168,11 +163,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(
-        `/api/merchants/${merchantId}/stock-items/${id}`,
-        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
-      );
+      const res = await sessionFetch(apiPath("DELETE /api/merchants/:merchantId/stock-items/:itemId", { merchantId, itemId: id }), { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       return res.json();
     },
@@ -260,6 +251,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const busy =
     addMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const modalRef = useAccessibleModal(!!draft, () => { if (!busy) setDraft(null); });
 
   return (
     <DesktopPageScaffold {...props} vertical="retail" page="directory" showScope={false}>
@@ -394,7 +386,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
       {/* ── add/edit modal ── */}
       {draft && (
         <div className="rs-modal-scrim" onClick={() => !busy && setDraft(null)}>
-          <div className="rs-modal" onClick={(e) => e.stopPropagation()}>
+          <div ref={modalRef} className="rs-modal" role="dialog" aria-modal="true" aria-label={isAdd ? 'Add product' : 'Edit product'} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="rs-modal-head">
               <span className="rs-modal-title">{isAdd ? "add product" : "edit product"}</span>
               <button type="button" className="rs-modal-x" aria-label="close" onClick={() => setDraft(null)}>
@@ -431,7 +423,6 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
               <input
                 className="rs-input"
                 value={draft.name}
-                autoFocus
                 onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
                 placeholder="flat white"
               />
@@ -527,7 +518,7 @@ const RS_CSS = `
 .rs-card-ico { width:36px; height:36px; border-radius:11px; background:#EEF1F8; display:flex; align-items:center; justify-content:center; }
 .rs-emoji { font-size:19px; line-height:1; }
 .rs-card-name { margin-top:auto; font-weight:700; font-size:14.5px; color:${INK}; text-transform:lowercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.rs-card-sub { margin-top:2px; font-weight:500; font-size:11px; color:#8A90A4; }
+.rs-card-sub { margin-top:2px; font-weight:500; font-size:11px; color:#586079; }
 .rs-card-price { position:absolute; top:16px; right:16px; font-family:'Outfit',sans-serif; font-weight:800; font-size:15px; color:${DEEP_BLUE}; }
 
 .rs-modal-scrim { position:absolute; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(0,6,26,0.62); backdrop-filter:blur(3px); animation:reportIn var(--m-dur-ui) var(--m-ease-out) both; }
@@ -543,7 +534,7 @@ const RS_CSS = `
 .rs-emoji-opt { height:26px; border-radius:7px; font-size:16px; cursor:pointer; transition:background .12s ease; }
 .rs-emoji-opt:hover { background:rgba(94,158,255,0.18); }
 .rs-label { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; font-weight:600; font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:${ACCENT_SOFT}; }
-.rs-optional { text-transform:none; letter-spacing:normal; font-weight:400; font-size:11px; color:rgba(191,209,255,0.5); }
+.rs-optional { text-transform:none; letter-spacing:normal; font-weight:400; font-size:11px; color:rgba(191,209,255,0.7); }
 .rs-input { display:flex; align-items:center; gap:6px; height:44px; padding:0 15px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(94,158,255,0.28); color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:14px; letter-spacing:normal; text-transform:none; }
 .rs-input:focus-within { border-color:${ACCENT}; }
 .rs-input input, .rs-label > input.rs-input { flex:1; width:100%; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:14px; }

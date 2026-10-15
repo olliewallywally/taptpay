@@ -8,13 +8,14 @@ import { MerchantsPage } from './MerchantsPage';
 import { MerchantDetail } from './MerchantDetail';
 import { APIManagement } from './APIManagement';
 import { Analytics } from './Analytics';
+import { logOutAdmin } from "@/lib/session";
 
 export default function AdminDashboard() {
   const [location, setLocation] = useLocation();
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminAuthToken');
-    localStorage.removeItem('adminUser');
+  // R1-T4 phase E: the server ends this admin session; the page forgets it.
+  const handleLogout = async () => {
+    await logOutAdmin();
     window.location.href = '/login';
   };
 
@@ -25,14 +26,14 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#1a1b2e] overflow-x-hidden">
+    <div className="admin-workspace relative min-h-screen bg-[#1a1b2e] overflow-x-hidden">
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#24263a] border-t border-[#1d1e2c] z-50 pb-safe">
         <div className="grid grid-cols-5 h-16">
           <button
             onClick={() => setLocation('/')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/') ? 'text-[#93BAFF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-home"
           >
@@ -42,7 +43,7 @@ export default function AdminDashboard() {
           <button
             onClick={() => setLocation('/merchants')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/merchants') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/merchants') ? 'text-[#93BAFF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-merchants"
           >
@@ -52,7 +53,7 @@ export default function AdminDashboard() {
           <button
             onClick={() => setLocation('/analytics')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/analytics') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/analytics') ? 'text-[#93BAFF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-analytics"
           >
@@ -62,7 +63,7 @@ export default function AdminDashboard() {
           <button
             onClick={() => setLocation('/api')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/api') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/api') ? 'text-[#93BAFF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-api"
           >
@@ -72,7 +73,7 @@ export default function AdminDashboard() {
           <button
             onClick={() => setLocation('/settings')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/settings') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/settings') ? 'text-[#93BAFF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-settings"
           >
@@ -156,7 +157,7 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="md:ml-[180px] pb-20 md:pb-0">
+      <main className="md:ml-[180px] pb-20 md:pb-0" tabIndex={0} aria-label="Admin workspace">
         <Switch>
           <Route path="/" component={GridDashboard} />
           <Route path="/merchants" component={MerchantsPage} />

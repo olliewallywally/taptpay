@@ -11,6 +11,8 @@ import {
   PropertyTerminalView,
   type PropertyTerminalScreen,
 } from "@/features/terminal/property/PropertyTerminalView";
+import { businessCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 const PROPERTY_TERMINAL_FONT_CSS =
   "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');";
@@ -35,9 +37,9 @@ function addInterval(from: Date, frequency: string): Date {
   return date;
 }
 
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie.
 function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return businessCsrfHeader();
 }
 
 export default function PropertyTerminal() {
@@ -52,6 +54,7 @@ export default function PropertyTerminal() {
   const [toastMsg, setToastMsg]           = useState<string | null>(null);
   const [banner, setBanner]               = useState<string | null>(null);
   const [successLabel, setSuccessLabel]   = useState('');
+  const [successDelivered,setSuccessDelivered]=useState(false);
   const [frequency, setFrequency]         = useState('once');
   const [splitMode, setSplitMode]         = useState(false);
   const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
@@ -82,14 +85,14 @@ export default function PropertyTerminal() {
   const { data: invoices = [] } = usePropertyInvoices();
 
   const { data: schedules = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/schedules'],
-    queryFn: () => propFetch('/api/property/schedules').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/property/schedules")],
+    queryFn: () => propFetch(apiPath("GET /api/property/schedules")).then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
   const { data: reminderSettings } = useQuery<any>({
-    queryKey: ['/api/property/reminder-settings'],
-    queryFn: () => propFetch('/api/property/reminder-settings').then(r => r.ok ? r.json() : null),
+    queryKey: [apiPath("GET /api/property/reminder-settings")],
+    queryFn: () => propFetch(apiPath("GET /api/property/reminder-settings")).then(r => r.ok ? r.json() : null),
     staleTime: 60000, retry: false,
   });
 
@@ -99,7 +102,7 @@ export default function PropertyTerminal() {
       const now = new Date();
       const due = new Date(now); due.setDate(due.getDate() + 7);
       // 1. Send the first request immediately
-      const r = await fetch('/api/property/invoices', {
+      const r = await propFetch(apiPath("POST /api/property/invoices"), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
       });
@@ -112,7 +115,7 @@ export default function PropertyTerminal() {
       // 2. If recurring, set up the automation starting one interval from now
       if (freq && freq !== 'once') {
         const startDate = addInterval(now, freq);
-        const sr = await fetch(`/api/property/tenants/${tenantId}/schedules`, {
+        const sr = await fetch(apiPath("POST /api/property/tenants/:tenantId/schedules", { tenantId }), {
           method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
           body: JSON.stringify({ amountCents, frequency: freq, deliveryChannel: channel, startDate: startDate.toISOString() }),
         });
@@ -123,9 +126,10 @@ export default function PropertyTerminal() {
       }
       return invoice;
     },
-    onSuccess: (_, vars: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
-      if (vars?.freq && vars.freq !== 'once') queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] });
+    onSuccess: (invoice, vars: any) => {
+      setSuccessDelivered(invoice.delivered===true);
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] });
+      if (vars?.freq && vars.freq !== 'once') queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/schedules")] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
       setSuccessKind('rent');
       setContentKey(k => k + 1);
@@ -144,7 +148,7 @@ export default function PropertyTerminal() {
   const billMutation = useMutation({
     mutationFn: async ({ tenantId, amountCents, channel, chargeType, description, dueDays, split, documentUrl, documentName }: any) => {
       const due = new Date(); due.setDate(due.getDate() + (dueDays || 0));
-      const r = await fetch('/api/property/invoices', {
+      const r = await propFetch(apiPath("POST /api/property/invoices"), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({
           tenantProfileId: tenantId, amountCents, deliveryChannel: channel,
@@ -159,8 +163,9 @@ export default function PropertyTerminal() {
       }
       return r.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+    onSuccess: (invoice) => {
+      setSuccessDelivered(invoice.delivered===true);
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
       setSuccessKind('bill');
       setContentKey(k => k + 1);
@@ -178,22 +183,22 @@ export default function PropertyTerminal() {
     mutationFn: async ({ id, action, status }: any) => {
       setBusyScheduleId(id);
       const r = action === 'cancel'
-        ? await fetch(`/api/property/schedules/${id}`, { method: 'DELETE', headers: propHeaders() })
-        : await fetch(`/api/property/schedules/${id}`, {
+        ? await fetch(apiPath("DELETE /api/property/schedules/:id", { id }), { method: 'DELETE', headers: propHeaders() })
+        : await fetch(apiPath("PUT /api/property/schedules/:id", { id }), {
             method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() },
             body: JSON.stringify({ status }),
           });
       if (!r.ok) throw new Error('Action failed');
       return r.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/schedules")] }); },
     onError: () => { toast('Could not update automation'); },
     onSettled: () => { setBusyScheduleId(null); },
   });
 
   const reminderMutation = useMutation({
     mutationFn: async (patch: any) => {
-      const r = await fetch('/api/property/reminder-settings', {
+      const r = await fetch(apiPath("PUT /api/property/reminder-settings"), {
         method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify(patch),
       });
@@ -201,21 +206,21 @@ export default function PropertyTerminal() {
       return r.json();
     },
     onMutate: async (patch: any) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/property/reminder-settings'] });
-      const prev = queryClient.getQueryData(['/api/property/reminder-settings']);
-      queryClient.setQueryData(['/api/property/reminder-settings'], (old: any) => ({ ...(old || {}), ...patch }));
+      await queryClient.cancelQueries({ queryKey: [apiPath("GET /api/property/reminder-settings")] });
+      const prev = queryClient.getQueryData([apiPath("GET /api/property/reminder-settings")]);
+      queryClient.setQueryData([apiPath("GET /api/property/reminder-settings")], (old: any) => ({ ...(old || {}), ...patch }));
       return { prev };
     },
     onError: (_e, _v, ctx: any) => {
-      if (ctx?.prev !== undefined) queryClient.setQueryData(['/api/property/reminder-settings'], ctx.prev);
+      if (ctx?.prev !== undefined) queryClient.setQueryData([apiPath("GET /api/property/reminder-settings")], ctx.prev);
       toast('Could not save reminders');
     },
-    onSuccess: (data: any) => { queryClient.setQueryData(['/api/property/reminder-settings'], data); },
+    onSuccess: (data: any) => { queryClient.setQueryData([apiPath("GET /api/property/reminder-settings")], data); },
   });
 
   const markMutation = useMutation({
     mutationFn: async ({ invoiceId, ref }: any) => {
-      const r = await fetch(`/api/property/invoices/${invoiceId}/mark-paid-external`, {
+      const r = await fetch(apiPath("POST /api/property/invoices/:id/mark-paid-external", { id: invoiceId }), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({ externalPaymentReference: ref || null }),
       });
@@ -223,7 +228,7 @@ export default function PropertyTerminal() {
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] });
       setBanner('Marked as received');
       triggerConveyor(screen, 'down');
       setScreen('home');
@@ -243,7 +248,7 @@ export default function PropertyTerminal() {
           .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
         if (!inv) return 'skipped';
         try {
-          const r = await fetch(`/api/property/invoices/${inv.id}/resend`, { method: 'POST', headers: propHeaders() });
+          const r = await fetch(apiPath("POST /api/property/invoices/:id/resend", { id: inv.id }), { method: 'POST', headers: propHeaders() });
           if (notifyIfBillingCardRequired(r)) return 'billing';
           return r.ok ? 'sent' : 'failed';
         } catch { return 'failed'; }
@@ -254,7 +259,7 @@ export default function PropertyTerminal() {
       return outcomes.map(outcome => outcome === 'billing' ? 'failed' : outcome);
     },
     onSuccess: (outcomes: string[]) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] });
       const sent = outcomes.filter(o => o === 'sent').length;
       const skipped = outcomes.filter(o => o === 'skipped').length;
       const failed = outcomes.filter(o => o === 'failed').length;
@@ -274,28 +279,28 @@ export default function PropertyTerminal() {
   // Cancel (void) a single invoice/charge — from the row action sheet.
   const voidMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const r = await fetch(`/api/property/invoices/${invoiceId}/void`, { method: 'POST', headers: propHeaders() });
+      const r = await fetch(apiPath("POST /api/property/invoices/:id/void", { id: invoiceId }), { method: 'POST', headers: propHeaders() });
       if (!r.ok) {
         const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to cancel');
         throw new Error(msg);
       }
       return r.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Invoice cancelled'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] }); setBanner('Invoice cancelled'); },
     onError: (e: any) => { toast(e?.message || 'Could not cancel invoice'); },
   });
 
   // Resend a single invoice's link — from the row action sheet.
   const resendOneMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const r = await fetch(`/api/property/invoices/${invoiceId}/resend`, { method: 'POST', headers: propHeaders() });
+      const r = await fetch(apiPath("POST /api/property/invoices/:id/resend", { id: invoiceId }), { method: 'POST', headers: propHeaders() });
       if (!r.ok) {
         if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
         throw new Error('Failed to resend');
       }
       return r.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Link resent'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] }); setBanner('Link resent'); },
     onError: (e) => {
       if (isBillingCardRequired(e)) return;
       toast('Could not resend link');
@@ -409,7 +414,7 @@ export default function PropertyTerminal() {
     try {
       const fd = new FormData();
       fd.append('document', file);
-      const r = await fetch('/api/property/invoices/document', { method: 'POST', headers: propHeaders(), body: fd });
+      const r = await fetch(apiPath("POST /api/property/invoices/document"), { method: 'POST', headers: propHeaders(), body: fd });
       if (!r.ok) {
         const msg = await r.json().then((d: any) => d.message).catch(() => 'Upload failed');
         throw new Error(msg);
@@ -548,6 +553,7 @@ export default function PropertyTerminal() {
     feedOpen={feedOpen}
     successLabel={successLabel}
     successKind={successKind}
+    successDelivered={successDelivered}
     banner={banner}
     toastMessage={toastMsg}
     rowAction={rowAction}

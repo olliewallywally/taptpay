@@ -1,3 +1,4 @@
+import { apiPath } from "@shared/api-path";
 export interface SSEMessage {
   type: string;
   transaction?: any;
@@ -8,20 +9,19 @@ export interface SSEMessage {
 
 type Listener = (data: SSEMessage) => void;
 
-function readStoredToken(): string | null {
-  try {
-    return localStorage.getItem("authToken");
-  } catch {
-    return null;
-  }
-}
-
 export class SSEClient {
   private eventSource: EventSource | null = null;
   private abortController: AbortController | null = null;
+  private pageHide: (() => void) | null = null;
+  private pageShow: ((event: PageTransitionEvent) => void) | null = null;
   private listeners = new Map<string, Listener[]>();
+  private seen=new Set<string>();
 
   private closeTransport() {
+    if (this.pageHide) window.removeEventListener('pagehide', this.pageHide);
+    if (this.pageShow) window.removeEventListener('pageshow', this.pageShow);
+    this.pageHide = null;
+    this.pageShow = null;
     this.eventSource?.close();
     this.eventSource = null;
     this.abortController?.abort();
@@ -31,6 +31,14 @@ export class SSEClient {
   private dispatch(raw: string) {
     try {
       const message: SSEMessage = JSON.parse(raw);
+      if(typeof message.eventId==='string'&&/^[0-9a-f-]{36}$/i.test(message.eventId)){
+        try{const saved=JSON.parse(sessionStorage.getItem('taptpay/realtime-events/v1')||'[]');
+          if(Array.isArray(saved))for(const id of saved.slice(-500))if(typeof id==='string')this.seen.add(id);
+        }catch{/* Storage is optional; in-memory replay protection still applies. */}
+        if(this.seen.has(message.eventId))return;
+        this.seen.add(message.eventId);while(this.seen.size>500)this.seen.delete(this.seen.values().next().value!);
+        try{sessionStorage.setItem('taptpay/realtime-events/v1',JSON.stringify([...this.seen]));}catch{/* No credentials or receipt data are stored here. */}
+      }
       const callbacks = this.listeners.get(message.type) || [];
       callbacks.forEach((callback) => callback(message));
     } catch (error) {
@@ -44,7 +52,7 @@ export class SSEClient {
     if (stoneId !== undefined && stoneId !== null) params.set("stoneId", String(stoneId));
     const query = params.toString();
     this.eventSource = new EventSource(
-      `/api/merchants/${merchantId}/events${query ? `?${query}` : ""}`,
+      `${apiPath("GET /api/merchants/:id/events", { id: merchantId })}${query ? `?${query}` : ""}`,
     );
     this.eventSource.onmessage = (event) => this.dispatch(event.data);
     this.eventSource.onerror = (error) => {
@@ -52,11 +60,23 @@ export class SSEClient {
     };
   }
 
-  connectMerchant(merchantId: number, token: string) {
+  /**
+   * The business's own stream. R1-T4 phase E: the session cookie signs it in, sent by the browser itself;
+   * no token is read or sent. A password change replaces this device's session, and the server ends the
+   * login's streams: the next attempt goes with the new cookie.
+   */
+  connectMerchant(merchantId: number) {
     this.closeTransport();
     const controller = new AbortController();
     this.abortController = controller;
-    void this.consumeMerchantStream(merchantId, token, controller.signal);
+    // Document departure need not unmount React. Stop its fetch before the
+    // browser cancels the network; a cached page restoration needs a fresh
+    // cookie-authenticated stream rather than the aborted transport.
+    this.pageHide = () => controller.abort();
+    this.pageShow = event => { if (event.persisted) this.connectMerchant(merchantId); };
+    window.addEventListener('pagehide', this.pageHide);
+    window.addEventListener('pageshow', this.pageShow);
+    void this.consumeMerchantStream(merchantId, controller.signal);
   }
 
   // Compatibility for anonymous customer callers while call sites migrate to
@@ -65,26 +85,17 @@ export class SSEClient {
     this.connectCustomer(merchantId, stoneId);
   }
 
-  private async consumeMerchantStream(merchantId: number, token: string, signal: AbortSignal) {
+  private async consumeMerchantStream(merchantId: number, signal: AbortSignal) {
     const decoder = new TextDecoder();
-    let current = token;
     while (!signal.aborted) {
-      // R1-T4 phase D: a password change ends this login's streams and hands this
-      // device a fresh token, so reconnect with the token the device now holds.
-      current = readStoredToken() ?? current;
       try {
-        const response = await fetch(`/api/merchants/${merchantId}/events`, {
-          headers: {
-            Accept: "text/event-stream",
-            Authorization: `Bearer ${current}`,
-          },
-          credentials: "include",
+        const response = await fetch(apiPath("GET /api/merchants/:id/events", { id: merchantId }), {
+          headers: { Accept: "text/event-stream" },
+          credentials: "same-origin",
           cache: "no-store",
           signal,
         });
         if (response.status === 401 || response.status === 403) {
-          const latest = readStoredToken();
-          if (latest && latest !== current) continue; // a fresh token arrived meanwhile
           console.error("Merchant SSE authentication expired or was revoked");
           return;
         }

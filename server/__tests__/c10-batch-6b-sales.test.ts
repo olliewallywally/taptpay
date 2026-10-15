@@ -11,7 +11,7 @@ process.env.ENV_VALIDATION_MODE = "enforce";
 
 import request from "supertest";
 import {
-  bearer, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
+  signedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
 } from "./support/http-harness";
 
 /**
@@ -49,7 +49,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     const owner = await createOwnerPrincipal();
     billingInOrder();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(bearer(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50" });
 
     expect(res.status).toBe(200);
@@ -62,7 +62,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     const board = await storage.createNextTaptStone(owner.merchantId);
     billingInOrder();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(bearer(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", stoneId: board.id });
 
     expect(res.status).toBe(200);
@@ -83,7 +83,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     billingInOrder();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(bearer(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", ...change });
 
     expect(res.status).toBe(400);
@@ -98,7 +98,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     billingInOrder();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(bearer(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", stoneId: theirs.id });
 
     expect(res.status).toBe(400);
@@ -110,11 +110,11 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const board = await storage.createNextTaptStone(owner.merchantId);
-    await storage.deleteTaptStone(board.id);
+    await storage.deleteTaptStoneForMerchant(board.id, owner.merchantId);
     billingInOrder();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(bearer(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", stoneId: board.id });
 
     expect(res.status).toBe(400);
@@ -137,10 +137,10 @@ describe("a refund's amount is a plain amount of money", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const sale = await completedSale(owner.merchantId);
-    const reserve = jest.spyOn(storage, "reserveRefundAmount");
+    const reserve = jest.spyOn(storage, "reserveRefundAmountForMerchant");
     const before = storageSnapshot();
 
-    const res = await request(app).post(`/api/transactions/${sale.id}/refunds`).set(bearer(owner))
+    const res = await request(app).post(`/api/transactions/${sale.id}/refunds`).set(signedIn(owner))
       .send({ refundAmount, refundReason: "Changed their mind" });
 
     expect(res.status).toBe(400);
@@ -153,7 +153,7 @@ describe("a refund's amount is a plain amount of money", () => {
     const owner = await createOwnerPrincipal();
     const sale = await completedSale(owner.merchantId);
 
-    const res = await request(app).post(`/api/transactions/${sale.id}/refunds`).set(bearer(owner))
+    const res = await request(app).post(`/api/transactions/${sale.id}/refunds`).set(signedIn(owner))
       .send({ refundAmount: "5.00", refundReason: "Changed their mind" });
 
     // No provider in the harness: the request gets past the amount to the provider check.

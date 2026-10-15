@@ -7,6 +7,14 @@
  * awaited `/api/auth/me` and only cleared its loading flag in `.finally()`, so a
  * backend that accepted the connection and never answered left every device on
  * a full-screen loader with no error and no way out.
+ *
+ * R1-T4 phase E: the session is an HttpOnly cookie the page can neither read nor
+ * delete, and the start-up check is GET /api/auth/session. "Costing the session"
+ * can now only mean the page giving it up itself: treating an outage as signed
+ * out, or asking the server to end the session. A deliberate sign-out the server
+ * could not be reached for is finished by the next load, and until then no load
+ * signs the browser back in. What the page kept in storage before the switch is
+ * removed on every load.
  */
 
 // App.tsx statically imports the public pages. None of them are under test, and
@@ -27,12 +35,20 @@ import {
   AuthProvider,
   ProtectedRoute,
 } from "../App";
+import { SIGN_OUT_PENDING_KEY, heldSession, releaseSession } from "@/lib/session";
 
 // jsdom serves a real Storage here, so spy on the prototype rather than trusting
-// the global stub in jest.setup.js. The spies are backed by a real map: whether
-// a later read still finds the token is the whole subject of these tests.
+// the global stub in jest.setup.js. The spies are backed by a real map.
 let store: Record<string, string>;
-let removeItem: jest.SpyInstance;
+
+const requests = () =>
+  (global.fetch as jest.Mock).mock.calls.map(([url, init]) => `${(init as RequestInit | undefined)?.method ?? "GET"} ${String(url)}`);
+
+/** The page never gave the session up: it asked no one to end it, and marked no sign-out as begun. */
+function expectSessionKept() {
+  expect(requests().filter((request) => request !== "GET /api/auth/session")).toEqual([]);
+  expect(store[SIGN_OUT_PENDING_KEY]).toBeUndefined();
+}
 
 function renderProtectedApp() {
   return render(
@@ -54,6 +70,8 @@ function jsonResponse(status: number, body: unknown) {
 
 function validAuthBody(overrides: Record<string, unknown> = {}) {
   return {
+    signedIn: true,
+    csrfToken: "c".repeat(43),
     user: {
       id: 7,
       email: "owner@example.test",
@@ -106,13 +124,15 @@ async function flush() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  store = { authToken: "a-stored-session-token" };
+  releaseSession("business");
+  store = { authToken: "a-token-stored-before-the-switch", user: "{}", merchantId: "22" };
   jest.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => store[key] ?? null);
-  removeItem = jest
-    .spyOn(Storage.prototype, "removeItem")
-    .mockImplementation((key: string) => {
-      delete store[key];
-    });
+  jest.spyOn(Storage.prototype, "setItem").mockImplementation((key: string, value: string) => {
+    store[key] = value;
+  });
+  jest.spyOn(Storage.prototype, "removeItem").mockImplementation((key: string) => {
+    delete store[key];
+  });
 });
 
 afterEach(() => {
@@ -148,7 +168,7 @@ describe("a backend that never answers", () => {
 
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 
   it("stops after a bounded number of attempts when aborts do work", async () => {
@@ -162,7 +182,7 @@ describe("a backend that never answers", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(AUTH_MAX_ATTEMPTS);
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 
   it("keeps waiting no longer than the deadline even if timers keep running", async () => {
@@ -178,19 +198,19 @@ describe("a backend that never answers", () => {
 });
 
 describe("infrastructure failure never costs the session", () => {
-  it("keeps the token through repeated 503s and shows the recovery screen", async () => {
+  it("keeps the session through repeated 503s and shows the recovery screen", async () => {
     jest.useFakeTimers();
     global.fetch = jest.fn(async () => jsonResponse(503, { code: "AUTH_BACKEND_UNAVAILABLE" })) as any;
     renderProtectedApp();
 
     await advance(AUTH_TOTAL_DEADLINE_MS);
 
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
   });
 
-  it("keeps the token through a network error", async () => {
+  it("keeps the session through a network error", async () => {
     jest.useFakeTimers();
     global.fetch = jest.fn(async () => {
       throw new TypeError("Failed to fetch");
@@ -199,7 +219,7 @@ describe("infrastructure failure never costs the session", () => {
 
     await advance(AUTH_TOTAL_DEADLINE_MS);
 
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
   });
 
@@ -217,12 +237,10 @@ describe("infrastructure failure never costs the session", () => {
     await advance(AUTH_TOTAL_DEADLINE_MS);
 
     expect(screen.getByTestId("protected-content")).toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 
-  it("rejects a 404 principal once instead of presenting it as an outage", async () => {
-    // `/api/auth/me` uses 404 only when the signed token's user or merchant no
-    // longer exists. Retaining that token can never recover the principal.
+  it("takes a 404 as a refusal, once, instead of presenting it as an outage", async () => {
     jest.useFakeTimers();
     const fetchSpy = jest.fn(async () => jsonResponse(404, { message: "User not found" }));
     global.fetch = fetchSpy as any;
@@ -231,8 +249,9 @@ describe("infrastructure failure never costs the session", () => {
     await flush();
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(removeItem).toHaveBeenCalledWith("authToken");
+    expect(heldSession("business")).toBeNull();
     expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
   });
 
   it("never authenticates a malformed 200 response", async () => {
@@ -246,24 +265,46 @@ describe("infrastructure failure never costs the session", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(AUTH_MAX_ATTEMPTS);
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 });
 
-describe("a rejected credential is still a rejected credential", () => {
-  it.each([401, 403])("clears the stored session on %i", async (status) => {
-    global.fetch = jest.fn(async () => jsonResponse(status, { message: "nope" })) as any;
+describe("a reply that is not a whole session reply", () => {
+  it("is never a sign-in when it names the login but carries no CSRF token", async () => {
+    jest.useFakeTimers();
+    const { csrfToken: _withheld, ...withoutToken } = validAuthBody();
+    const fetchSpy = jest.fn(async () => jsonResponse(200, withoutToken));
+    global.fetch = fetchSpy as any;
+    renderProtectedApp();
+
+    await advance(AUTH_TOTAL_DEADLINE_MS);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(AUTH_MAX_ATTEMPTS);
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
+    expect(heldSession("business")).toBeNull();
+  });
+});
+
+describe("a refused session is still a refused session", () => {
+  it.each([
+    ["the start-up check's ordinary 'not signed in'", () => jsonResponse(200, { signedIn: false })],
+    ["a 401", () => jsonResponse(401, { message: "nope" })],
+    ["a 403", () => jsonResponse(403, { message: "nope" })],
+  ])("is signed out on %s, asked once, and holds nothing", async (_name, answer) => {
+    const fetchSpy = jest.fn(async () => answer());
+    global.fetch = fetchSpy as any;
     renderProtectedApp();
     await flush();
 
-    expect(removeItem).toHaveBeenCalledWith("authToken");
-    expect(removeItem).toHaveBeenCalledWith("user");
-    expect(removeItem).toHaveBeenCalledWith("merchantId");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(heldSession("business")).toBeNull();
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
   });
 
-  it("signs a valid session in without touching storage", async () => {
+  it("signs a valid session in, holding who it is and its CSRF token in memory only", async () => {
     global.fetch = jest.fn(async () =>
       jsonResponse(200, validAuthBody()),
     ) as any;
@@ -271,16 +312,23 @@ describe("a rejected credential is still a rejected credential", () => {
     await flush();
 
     expect(screen.getByTestId("protected-content")).toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expect(heldSession("business")).toMatchObject({ user: { id: 7, merchantId: 22, role: "owner" }, csrfToken: "c".repeat(43) });
+    expectSessionKept();
+    // Nothing of the sign-in is in storage: what the page kept there before the switch is removed.
+    expect(store).toEqual({});
   });
 
-  it("resolves straight to signed out when there is no token at all", async () => {
-    delete store.authToken;
-    global.fetch = neverAnswers() as any;
+  it("always asks: the page cannot tell on its own whether the browser holds a session", async () => {
+    store = {};
+    const fetchSpy = jest.fn(async (_url: string, _init?: RequestInit) => jsonResponse(200, { signedIn: false }));
+    global.fetch = fetchSpy as any;
     renderProtectedApp();
     await flush();
 
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/auth/session");
+    expect(fetchSpy.mock.calls[0][1]).toMatchObject({ credentials: "same-origin" });
+    expect(new Headers(fetchSpy.mock.calls[0][1]?.headers).get("Authorization")).toBeNull();
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
     expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
   });
@@ -306,9 +354,9 @@ describe("the recovery screen is a way out, not a dead end", () => {
     });
     await advance(1000);
 
-    // The same token that was never discarded is what signs them back in.
+    // The same session, never given up, is what signs them back in.
     expect(screen.getByTestId("protected-content")).toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 
   it("cannot get stuck on a loader when a retry fails too", async () => {
@@ -329,10 +377,10 @@ describe("the recovery screen is a way out, not a dead end", () => {
     await advance(AUTH_TOTAL_DEADLINE_MS + 1000);
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
-    expect(removeItem).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 
-  it("lets the user sign out deliberately from the recovery screen", async () => {
+  it("lets the user sign out deliberately from the recovery screen, though the server cannot be reached to end the session", async () => {
     jest.useFakeTimers();
     global.fetch = neverAnswers() as any;
     renderProtectedApp();
@@ -341,24 +389,28 @@ describe("the recovery screen is a way out, not a dead end", () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId("auth-unavailable-signout"));
     });
+    await flush();
 
-    expect(removeItem).toHaveBeenCalledWith("authToken");
-    expect(store.authToken).toBeUndefined();
+    // The page is signed out at once. Ending the session is owed: only the server can do it.
+    expect(store[SIGN_OUT_PENDING_KEY]).toBe("1");
+    expect(heldSession("business")).toBeNull();
     expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
   });
 
   it("does not let a late retry undo a deliberate sign-out", async () => {
     jest.useFakeTimers();
     let calls = 0;
-    let release: ((response: Response) => void) | null = null;
+    let releaseRetry: ((response: Response) => void) | null = null;
     global.fetch = jest.fn(() => {
       calls += 1;
       // The first check fails outright; the retry is left hanging so the user
-      // can sign out while it is still in the air.
-      if (calls <= AUTH_MAX_ATTEMPTS) return Promise.resolve(jsonResponse(503, { message: "down" }));
+      // can sign out while it is still in the air. The sign-out's own requests
+      // find the server still down.
+      if (calls <= AUTH_MAX_ATTEMPTS || releaseRetry) return Promise.resolve(jsonResponse(503, { message: "down" }));
       return new Promise<Response>((resolve) => {
-        release = resolve;
+        releaseRetry = resolve;
       });
     }) as any;
     renderProtectedApp();
@@ -374,13 +426,45 @@ describe("the recovery screen is a way out, not a dead end", () => {
     // The backend recovers a moment too late — it must not resurrect a session
     // the user has explicitly ended.
     await act(async () => {
-      release?.(jsonResponse(200, validAuthBody()));
+      releaseRetry?.(jsonResponse(200, validAuthBody()));
     });
     await advance(1000);
 
-    expect(store.authToken).toBeUndefined();
+    expect(releaseRetry).not.toBeNull();
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
     expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
+    // Nor does the page take the late answer for its sign-in: it holds no session, and the sign-out is still owed.
+    expect(heldSession("business")).toBeNull();
+    expect(store[SIGN_OUT_PENDING_KEY]).toBe("1");
+  });
+
+  it("a load that finds a sign-out still owed signs no one in, and has the server end the session", async () => {
+    store[SIGN_OUT_PENDING_KEY] = "1";
+    const fetchSpy = jest.fn(async (url: string, _init?: RequestInit) =>
+      url === "/api/auth/session" ? jsonResponse(200, validAuthBody()) : jsonResponse(204, {}));
+    global.fetch = fetchSpy as any;
+    renderProtectedApp();
+    await flush();
+    await flush();
+
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("page-loader")).not.toBeInTheDocument();
+    expect(heldSession("business")).toBeNull();
+    expect(requests()).toEqual(["GET /api/auth/session", "POST /api/auth/logout"]);
+    expect(new Headers(fetchSpy.mock.calls[1][1]?.headers).get("X-CSRF-Token")).toBe("c".repeat(43));
+    expect(store[SIGN_OUT_PENDING_KEY]).toBeUndefined();
+  });
+
+  it("a load that still cannot reach the server stays signed out, with the sign-out still owed", async () => {
+    store[SIGN_OUT_PENDING_KEY] = "1";
+    global.fetch = jest.fn(async () => jsonResponse(503, { message: "down" })) as any;
+    renderProtectedApp();
+    await flush();
+    await flush();
+
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
+    expect(store[SIGN_OUT_PENDING_KEY]).toBe("1");
   });
 });

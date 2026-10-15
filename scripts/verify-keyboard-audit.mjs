@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { CHROMIUM_PATH } from './desktop-shots/retail-fixtures.mjs';
+import { auditKeyboard } from './keyboard-audit.mjs';
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, headless: true });
+const page = await browser.newPage();
+try {
+  const clean = '<style>button:focus-visible{outline:3px solid navy}</style><main><button aria-label="PRIVATE-NAME">PRIVATE-TEXT</button><button>Continue</button></main>';
+  await page.setContent(clean);
+  const good = await auditKeyboard(page);
+  assert.equal(good.nodes.length, 2); assert.equal(good.completed, true); assert.deepEqual(good.faults, []);
+  assert.ok(!JSON.stringify(good).includes('PRIVATE-'));
+  await page.setContent(clean + '<style>button:focus-visible{outline:none!important;box-shadow:none}</style>');
+  assert.ok((await auditKeyboard(page)).faults.some(x => x.includes('indicator')));
+  await page.setContent('<button disabled>Later stop</button>' + clean + '<script>document.querySelectorAll("button")[2].addEventListener("blur",()=>{const later=document.querySelector("button:disabled");if(later)later.disabled=false})</script>');
+  assert.deepEqual((await auditKeyboard(page)).faults, []);
+  await page.setContent(clean + '<button style="position:fixed;top:-100px">Hidden</button>');
+  assert.ok((await auditKeyboard(page)).faults.some(x => x.includes('visible')));
+  await page.setContent('<style>button:focus-visible{outline:3px solid navy}</style><main style="opacity:0"><button>Hidden ancestor</button></main>');
+  assert.ok((await auditKeyboard(page)).faults.some(x => x.includes('visible')));
+  await page.setContent(clean + '<div style="position:fixed;inset:0;z-index:100;background:white"></div>');
+  assert.ok((await auditKeyboard(page)).faults.some(x => x.includes('hit')));
+  await page.setContent(clean + '<script>document.querySelector("button").addEventListener("keydown",e=>{if(e.key==="Tab")e.preventDefault()})</script>');
+  assert.ok((await auditKeyboard(page)).faults.some(x => x.includes('missed')));
+  await page.setContent('<style>a:focus-visible{outline:3px solid navy}</style><main style="width:90px"><a href="#">A wrapped link with multiple painted fragments</a></main>');
+  assert.deepEqual((await auditKeyboard(page)).faults, []);
+  await page.setContent('<style>input:focus-within,button:focus-visible{outline:3px solid navy}</style><main><input type="date" aria-label="Date"/><button>Continue</button></main>');
+  const date = await auditKeyboard(page);
+  assert.equal(date.nodes.length, 2); assert.deepEqual(date.faults, []);
+  await page.addStyleTag({ content: 'input:focus-within{outline:none!important;box-shadow:none!important}' });
+  assert.ok((await auditKeyboard(page)).faults.some(x => x.includes('indicator')));
+  console.log('PASS real Tab traversal, visible indicators, hidden/covered stops and privacy controls');
+} finally { await browser.close(); }

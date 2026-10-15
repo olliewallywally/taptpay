@@ -1,7 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
+import { signedIn, createOwnerPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
 
 /**
  * R1-T3 domain 5, finding UPL-2: POST /api/property/invoices/document's only
@@ -25,7 +25,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", Buffer.from("not actually a pdf"), {
         filename: "bill.pdf",
         contentType: "application/pdf",
@@ -40,7 +40,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", Buffer.from("not actually a png"), {
         filename: "bill.png",
         contentType: "image/png",
@@ -55,7 +55,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", Buffer.from("not actually a jpeg"), {
         filename: "bill.jpg",
         contentType: "image/jpeg",
@@ -70,7 +70,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", Buffer.from("not actually a webp"), {
         filename: "bill.webp",
         contentType: "image/webp",
@@ -86,7 +86,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", realPdf, { filename: "bill.pdf", contentType: "application/pdf" });
 
     expect(res.status).toBe(200);
@@ -100,7 +100,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", realPng, { filename: "bill.png", contentType: "image/png" });
 
     expect(res.status).toBe(200);
@@ -113,7 +113,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", realJpeg, { filename: "bill.jpg", contentType: "image/jpeg" });
 
     expect(res.status).toBe(200);
@@ -130,7 +130,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", realWebp, { filename: "bill.webp", contentType: "image/webp" });
 
     expect(res.status).toBe(200);
@@ -142,7 +142,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", Buffer.from("not a real heic but declared as one"), {
         filename: "bill.heic",
         contentType: "image/heic",
@@ -157,7 +157,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
 
     const res = await request(app)
       .post("/api/property/invoices/document")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("document", Buffer.from("<script>alert(1)</script>"), {
         filename: "bill.html",
         contentType: "text/html",

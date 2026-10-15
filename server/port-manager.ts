@@ -2,6 +2,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import type { Server } from "http";
 import { config } from "./config";
+import { closeSecurityAuditLog } from "./security-audit-log";
 
 const execAsync = promisify(exec);
 
@@ -129,7 +130,9 @@ export function setupGracefulShutdown(server: Server, port: number): void {
     // Set a timeout for forced shutdown
     const forceShutdownTimeout = setTimeout(() => {
       console.log(`⏰ Shutdown timeout reached, forcing exit...`);
-      process.exit(1);
+      // Even when an HTTP connection never closes, give accepted audit events
+      // a bounded chance to finish before exiting.
+      void closeSecurityAuditLog(500).finally(() => process.exit(1));
     }, 10000); // 10 second timeout
 
     try {
@@ -146,13 +149,14 @@ export function setupGracefulShutdown(server: Server, port: number): void {
         });
       });
 
-      // Additional cleanup if needed
+      const auditFlushed = await closeSecurityAuditLog();
       console.log(`🧹 Cleanup completed for port ${port}`);
       
       clearTimeout(forceShutdownTimeout);
-      process.exit(0);
+      process.exit(auditFlushed ? 0 : 1);
     } catch (error) {
       console.error(`❌ Error during graceful shutdown:`, error);
+      await closeSecurityAuditLog();
       clearTimeout(forceShutdownTimeout);
       process.exit(1);
     }

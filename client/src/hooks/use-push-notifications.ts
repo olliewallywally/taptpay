@@ -11,6 +11,8 @@ import {
   readNativeDeviceToken,
   rememberNativeDeviceToken,
 } from "@/lib/push-device";
+import { businessCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 export type PushNotificationPreferences = {
   paymentReceived: boolean;
@@ -60,13 +62,11 @@ function applicationServerKeysMatch(
   return actual.every((value, index) => value === expected[index]);
 }
 
-const authHeaders = (json = false) => {
-  const token = localStorage.getItem("authToken");
-  return {
-    ...(json ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie, which the browser sends itself.
+const authHeaders = (json = false) => ({
+  ...(json ? { "Content-Type": "application/json" } : {}),
+  ...businessCsrfHeader(),
+});
 
 /**
  * Keep an already-opted-in browser subscribed after a VAPID key rotation.
@@ -89,7 +89,7 @@ export async function reconcileExistingWebPushSubscription(
   const staleEndpoint = existing.endpoint;
   await existing.unsubscribe();
   try {
-    await request("/api/push/unsubscribe", {
+    await request(apiPath("POST /api/push/unsubscribe"), {
       method: "POST",
       headers: authHeaders(true),
       body: JSON.stringify({ endpoint: staleEndpoint }),
@@ -103,7 +103,7 @@ export async function reconcileExistingWebPushSubscription(
     userVisibleOnly: true,
     applicationServerKey,
   });
-  const response = await request("/api/push/subscribe", {
+  const response = await request(apiPath("POST /api/push/subscribe"), {
     method: "POST",
     headers: authHeaders(true),
     body: JSON.stringify({ subscription: replacement.toJSON() }),
@@ -152,7 +152,7 @@ export function usePushNotifications(): PushNotifications {
         setEnabled(state === "on");
         return;
       }
-      const res = await fetch("/api/push/status", { headers: authHeaders() });
+      const res = await fetch(apiPath("GET /api/push/status"), { headers: authHeaders() });
       if (res.ok) {
         const status = await res.json();
         setEnabled(!!status.nativeSubscribed);
@@ -172,7 +172,7 @@ export function usePushNotifications(): PushNotifications {
         setEnabled(false);
         return;
       }
-      const keyResponse = await fetch("/api/push/vapid-key");
+      const keyResponse = await fetch(apiPath("GET /api/push/vapid-key"));
       if (!keyResponse.ok) {
         setAvailable(false);
         setEnabled(false);
@@ -194,7 +194,7 @@ export function usePushNotifications(): PushNotifications {
     let cancelled = false;
     if (isNativeIOS()) {
       setSupported(true);
-      fetch("/api/push/capabilities")
+      fetch(apiPath("GET /api/push/capabilities"))
         .then((r) => r.json())
         .then((caps) => {
           if (cancelled) return;
@@ -207,7 +207,7 @@ export function usePushNotifications(): PushNotifications {
         "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
       setSupported(canPush);
       if (!canPush) return;
-      fetch("/api/push/capabilities")
+      fetch(apiPath("GET /api/push/capabilities"))
         .then((r) => r.json())
         .then((caps) => {
           if (cancelled) return;
@@ -224,7 +224,7 @@ export function usePushNotifications(): PushNotifications {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/push/preferences", { headers: authHeaders() })
+    fetch(apiPath("GET /api/push/preferences"), { headers: authHeaders() })
       .then(async (response) => {
         if (!response.ok) throw new Error("Push preferences unavailable");
         return response.json();
@@ -254,7 +254,7 @@ export function usePushNotifications(): PushNotifications {
           return false;
         }
         const registration = await navigator.serviceWorker.ready;
-        const keyRes = await fetch("/api/push/vapid-key");
+        const keyRes = await fetch(apiPath("GET /api/push/vapid-key"));
         if (!keyRes.ok) {
           setAvailable(false);
           throw new Error("VAPID key unavailable — push notifications not configured on server");
@@ -266,7 +266,7 @@ export function usePushNotifications(): PushNotifications {
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
-        const res = await fetch("/api/push/subscribe", {
+        const res = await fetch(apiPath("POST /api/push/subscribe"), {
           method: "POST",
           headers: authHeaders(true),
           body: JSON.stringify({ subscription: subscription.toJSON() }),
@@ -285,7 +285,7 @@ export function usePushNotifications(): PushNotifications {
       if (subscription) {
         const endpoint = subscription.endpoint;
         await subscription.unsubscribe();
-        await fetch("/api/push/unsubscribe", {
+        await fetch(apiPath("POST /api/push/unsubscribe"), {
           method: "POST",
           headers: authHeaders(true),
           body: JSON.stringify({ endpoint }),
@@ -303,7 +303,7 @@ export function usePushNotifications(): PushNotifications {
       const { PushNotifications: Native } = await import("@capacitor/push-notifications");
       if (!enable) {
         const deviceToken = readNativeDeviceToken();
-        const res = await fetch("/api/push/native-unsubscribe", {
+        const res = await fetch(apiPath("POST /api/push/native-unsubscribe"), {
           method: "POST",
           headers: authHeaders(true),
           // This iPhone only. Set up before tokens were remembered, it has none,
@@ -336,7 +336,7 @@ export function usePushNotifications(): PushNotifications {
         const regHandle = Native.addListener("registration", async (token) => {
           cleanup();
           try {
-            const res = await fetch("/api/push/native-subscribe", {
+            const res = await fetch(apiPath("POST /api/push/native-subscribe"), {
               method: "POST",
               headers: authHeaders(true),
               body: JSON.stringify({ deviceToken: token.value }),
@@ -384,7 +384,7 @@ export function usePushNotifications(): PushNotifications {
           if (!registered) return;
         }
         const next = { ...preferences, [key]: value };
-        const response = await fetch("/api/push/preferences", {
+        const response = await fetch(apiPath("PUT /api/push/preferences"), {
           method: "PUT",
           headers: authHeaders(true),
           body: JSON.stringify(next),

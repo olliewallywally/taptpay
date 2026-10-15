@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 
 import * as propertyCron from "../property-cron";
@@ -5,8 +6,8 @@ import { resetTestStorage, storage } from "./support/http-harness";
 import {
   as,
   expectServed,
+  familyRows,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -174,7 +175,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     check: async (res) => {
       expect(res.body).toEqual({ documentUrl: expect.stringMatching(/^\/uploads\/invoices\/invoice-\d+-[0-9a-f]{16}\.pdf$/), documentName: "bill.pdf" });
       // Kept for the business that uploaded it: the invoice create checks the reference against it.
-      const stored = await storage.getUploadedFileForMerchant(res.body.documentUrl.replace(/^\/uploads\//, ""), ctx.merchantId);
+      const stored = await storage.getCleanUploadedFileForMerchant(res.body.documentUrl.replace(/^\/uploads\//, ""), ctx.merchantId);
       expect(stored).toBeTruthy();
     },
   }),
@@ -183,7 +184,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     fake.invoices.clear();
     return {
       req: {
-        method: "post", path: "/api/property/invoices",
+        method: "post", path: "/api/property/invoices", headers: {"Idempotency-Key":requestCommandKey()},
         body: { tenantProfileId: TENANT, amountCents: 12_000, deliveryChannel: "email", dueAt: inDays(14).toISOString(), kind: "charge", chargeType: "cleaning", description: "End of tenancy clean" },
       },
       status: 201,
@@ -193,7 +194,7 @@ const RECIPES: Record<string, ServedRecipe> = {
           status: "pending_dispatch", resent: false, delivered: true,
         });
         expect(fake.invoices.get(MADE_INVOICE)?.token).toEqual(expect.any(String));
-        expect(propertyCron.resendInvoiceEmail).toHaveBeenCalledWith(MADE_INVOICE, expect.any(String));
+        expect(propertyCron.resendInvoiceEmailForMerchant).toHaveBeenCalledWith(MADE_INVOICE, ctx.merchantId, expect.any(String));
         expect(eventTypes()).toEqual(["Charge_Created"]);
       },
     };
@@ -204,7 +205,7 @@ const RECIPES: Record<string, ServedRecipe> = {
       req: { method: "post", path: `/api/property/invoices/${INVOICE}/resend` }, status: 200,
       check: (res) => {
         expect(res.body).toMatchObject({ id: INVOICE, status: "dispatched" });
-        expect(propertyCron.resendInvoiceEmail).toHaveBeenCalledWith(INVOICE, expect.any(String));
+        expect(propertyCron.resendInvoiceEmailForMerchant).toHaveBeenCalledWith(INVOICE, ctx.merchantId, expect.any(String));
       },
     };
   },
@@ -243,8 +244,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   }),
 };
 
-const FAMILY = /^[A-Z]+ \/api\/property\//;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("property");
 const SERVED = servedPairs(ROWS);
 
 beforeEach(() => {

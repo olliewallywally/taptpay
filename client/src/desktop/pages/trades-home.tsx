@@ -17,6 +17,7 @@ import {
 } from "../DesktopPageScaffold";
 import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -375,7 +376,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
                     data-seg-id={r}
                     aria-pressed={on}
                     style={{
-                      color: on ? NAVY : "#6B7BB8",
+                      color: on ? NAVY : "#93BAFF",
                       fontWeight: on ? 700 : 600,
                     }}
                     onClick={() => {
@@ -461,13 +462,14 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
                     type="button"
                     className="th-stat"
                     aria-label={`view ${st.label}`}
+                    aria-describedby={`th-health-${st.id}-values`}
                     style={{
                       borderLeft: i ? "1px solid rgba(94,158,255,0.2)" : "none",
                       paddingLeft: i ? 22 : 0,
                     }}
                     onClick={() => setHealthBox(st.id)}
                   >
-                    <span className="th-stat-top">
+                    <span className="th-stat-top" id={`th-health-${st.id}-values`}>
                       <span className="th-stat-v" style={{ color: st.id === "overdue" ? ACCENT : TEXT_SOFT }}>{isLoading ? "—" : st.id === "awaiting-reply" ? String(st.count) : fmtDollars(st.amountCents)}</span>
                       <span className="th-stat-n">{isLoading ? "" : st.id === "awaiting-reply" ? fmtDollars(st.amountCents) : String(st.count)}</span>
                     </span>
@@ -485,7 +487,8 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
           <button
             type="button"
             className="th-notif-prev"
-            aria-label="open notifications"
+            aria-hidden={notifOpen} tabIndex={notifOpen ? -1 : 0} aria-expanded={notifOpen}
+            aria-label={`open ${notifications.length} notifications`}
             style={{ opacity: notifOpen ? 0 : 1, pointerEvents: notifOpen ? "none" : "auto" }}
             onClick={() => setNotifOpen(true)}
           >
@@ -508,6 +511,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
           </button>
           <div
             className="th-notif-list"
+            aria-hidden={!notifOpen} {...inertWhen(!notifOpen)}
             style={{ opacity: notifOpen ? 1 : 0, pointerEvents: notifOpen ? "auto" : "none" }}
           >
             <button type="button" className="th-notif-listhead" aria-label="close notifications" onClick={() => setNotifOpen(false)}>
@@ -517,7 +521,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
               </span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(191,209,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
             </button>
-            <div className="th-notif-rows">
+            <div className="th-notif-rows" tabIndex={0} role="region" aria-label="Notifications">
               {notifications.length === 0 ? (
                 <div className="th-empty">you're all caught up</div>
               ) : (
@@ -561,14 +565,15 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
                 type="button"
                 className="th-client"
                 aria-label={`view ${t.name}`}
+                aria-describedby={`th-client-${t.id}-site th-client-${t.id}-summary`}
                 onClick={go(`/trades/clients/${t.id}`)}
               >
-                <span className="th-client-avatar">{t.initials}</span>
+                <span className="th-client-avatar" aria-hidden="true">{t.initials}</span>
                 <span className="th-client-mid">
                   <span className="th-client-name">{t.name}</span>
-                  <span className="th-client-sub">{t.siteAddress || "no site address"}</span>
+                  <span className="th-client-sub" id={`th-client-${t.id}-site`}>{t.siteAddress || "no site address"}</span>
                 </span>
-                <span className="th-client-right">
+                <span className="th-client-right" id={`th-client-${t.id}-summary`}>
                   <span className="th-client-amt">{t.amountCents === null ? "—" : money2(t.amountCents)}</span>
                   <span className="th-client-label">{clientStatusLabel(t)}</span>
                   <span className="th-client-due">{clientDueLabel(t)}</span>
@@ -618,7 +623,7 @@ const TH_CSS = `
 .th-amount { font-family:'Outfit',sans-serif; font-weight:700; font-size:84px; line-height:0.92; letter-spacing:-0.015em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .th-pct { margin-top:8px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:13.5px; color:${ACCENT_SOFT}; white-space:nowrap; }
 .th-hero-sub { display:block; margin-top:8px; font-weight:300; font-size:16px; color:; }
-.th-hero-sub2 { display:block; margin-top:4px; font-weight:300; font-size:13px; color:rgba(74,134,240,.78); }
+.th-hero-sub2 { display:block; margin-top:4px; font-weight:300; font-size:13px; color:#93BAFF; }
 .th-error { display:flex; align-items:center; justify-content:space-between; gap:12px; height:78px; padding:0 18px; border-radius:14px; background:rgba(240,101,108,0.14); border:1px solid rgba(240,101,108,0.32); }
 .th-error span { color:#FFB3B8; font-size:13.5px; }
 .th-error button { background:${ACCENT}; color:${NAVY}; border-radius:10px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; }
@@ -639,13 +644,13 @@ const TH_CSS = `
 .th-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; }
 .th-bd-head { display:flex; align-items:center; justify-content:space-between; }
 .th-bd-title { font-weight:300; font-size:11px; letter-spacing:0.22em; color:${ACCENT_SOFT}; }
-.th-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.4); }
+.th-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.65); }
 .th-bd-body { display:flex; align-items:flex-end; gap:26px; }
 .th-bd-col { display:flex; flex-direction:column; gap:3px; }
 .th-bd-amt { font-family:'Outfit',sans-serif; font-weight:800; font-size:30px; line-height:1; color:${TEXT_SOFT}; }
 .th-bd-label { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; text-transform:capitalize; }
 .th-bd-avg { font-family:'Outfit',sans-serif; font-weight:800; font-size:20px; line-height:1; color:rgba(244,246,255,0.75); }
-.th-bd-muted { font-weight:300; font-size:11px; color:rgba(244,246,255,0.45); }
+.th-bd-muted { font-weight:300; font-size:11px; color:rgba(244,246,255,0.65); }
 .th-bd-share { flex:1; display:flex; flex-direction:column; gap:7px; }
 .th-bd-share-top { display:flex; align-items:baseline; justify-content:space-between; }
 .th-bd-pct { font-weight:800; font-size:13px; color:${ACCENT}; }

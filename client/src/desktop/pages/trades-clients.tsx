@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import { fmtNZD } from "@/lib/report-utils";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import {
   TRADES_CLIENTS_QUERY_KEY,
   buildTradesClientRows,
@@ -17,6 +18,7 @@ import {
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopDirectoryProfile } from "../DesktopDirectoryProfile";
+import { apiPath } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -67,6 +69,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const modalRef = useAccessibleModal(addOpen, () => { if (!createMutation.isPending) setAddOpen(false); });
 
   const clientsQuery = useTradesClientsQuery();
   const invoicesQuery = useTradesInvoicesQuery();
@@ -112,7 +115,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
-      const res = await tradesFetch("/api/trades/clients", {
+      const res = await tradesFetch(apiPath("POST /api/trades/clients"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -276,7 +279,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
             aria-label="close"
             onClick={() => setAddOpen(false)}
           />
-          <div className="tc-modal" role="dialog" aria-modal="true" aria-label="add client">
+          <div ref={modalRef} className="tc-modal" role="dialog" aria-modal="true" aria-label="add client" tabIndex={-1}>
             <div className="tc-modal-head">
               <span className="tc-modal-title">Add client</span>
               <button type="button" className="tc-modal-x" aria-label="close" onClick={() => setAddOpen(false)}>
@@ -339,7 +342,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
               )}
             </div>
 
-            {saveError && <div className="tc-error">{saveError}</div>}
+            {saveError && <div className="tc-error" role="alert">{saveError}</div>}
 
             <div className="tc-modal-actions">
               <button type="button" className="tc-ghost" onClick={() => setAddOpen(false)}>Cancel</button>
@@ -471,7 +474,7 @@ const TC_CSS = `
 .tc-grid { margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .tc-field { display:flex; flex-direction:column; gap:7px; }
 .tc-field-wide { grid-column:1 / -1; }
-.tc-field > span, .tc-field-label { font-weight:700; font-size:10px; letter-spacing:0.16em; color:rgba(244,246,255,0.45); }
+.tc-field > span, .tc-field-label { font-weight:700; font-size:10px; letter-spacing:0.16em; color:rgba(244,246,255,0.65); }
 .tc-field input { height:46px; box-sizing:border-box; border-radius:12px; border:1px solid rgba(94,158,255,0.35); background:rgba(94,158,255,0.08); padding:0 16px; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; color:#fff; outline:none; transition:border-color .15s ease; }
 .tc-field input:focus { border-color:${ACTIVE}; }
 

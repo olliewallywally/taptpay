@@ -9,6 +9,12 @@ export function apiErrorStatus(error: unknown): number | null {
  * `apiRequest` throws `"409: {\"message\":\"…\"}"` before callers can read
  * the Response body. Turn that back into the safe, actionable server message.
  */
+export function apiErrorCode(error:unknown):string|null {
+  if(!(error instanceof Error))return null;
+  const start=error.message.indexOf('{');if(start<0)return null;
+  try{const body=JSON.parse(error.message.slice(start));return typeof body?.code==='string'?body.code:null;}catch{return null;}
+}
+
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   const raw = error.message.trim();

@@ -2,7 +2,7 @@ import "./support/test-env";
 import crypto from "node:crypto";
 import request from "supertest";
 import express from "express";
-import { bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
+import { signedIn, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
 import * as billing from "../billing-card";
 import * as delivery from "../trades-delivery";
 import { DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS } from "../invoice-document-security";
@@ -14,17 +14,19 @@ it.each(["bill.", "bill.abcdefghijklmnop", "bill.p-df", "bill.PDF", "bill"])(
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
-    jest.spyOn(storage, "createClientProfile").mockImplementation(async (data: any) => ({ ...data, id: "client" }));
-    jest.spyOn(storage, "createQuote").mockImplementation(async (data: any) => ({ ...data, id: "quote" }));
-    jest.spyOn(storage, "createJobEvent").mockResolvedValue({} as any);
-    jest.spyOn(delivery, "sendTradeQuote").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
+    jest.spyOn(storage, "createQuoteForMerchant").mockImplementation(async (merchantId, _client, data) => ({
+      kind: "ok", quote: { ...data, id: "quote", merchantId, clientProfileId: "client" } as any, client: { id: "client", merchantId } as any,
+    }));
+    jest.spyOn(storage, "recordQuoteDeliveryForMerchant").mockResolvedValue(true);
+    jest.spyOn(storage, "getQuoteDeliveryForMerchant").mockImplementation(async (id, merchantId) => ({ quote: { id, merchantId } as any, client: { id: "client", merchantId } as any }));
+    jest.spyOn(delivery, "sendTradeQuoteForMerchant").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
     const uploaded = await request(app).post("/api/property/invoices/document")
-      .set(bearer(owner)).attach("document", Buffer.from("%PDF-1.4\nsynthetic"),
+      .set(signedIn(owner)).attach("document", Buffer.from("%PDF-1.4\nsynthetic"),
         { filename, contentType: "application/pdf" });
     expect(uploaded.status).toBe(200);
     const name = uploaded.body.documentUrl.split("/").pop();
-    const read = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(owner));
-    const attach = await request(app).post("/api/trades/quotes").set(bearer(owner)).send({
+    const read = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(owner));
+    const attach = await request(app).post("/api/trades/quotes").set(signedIn(owner)).send({
       skipClient: true,
       lineItems: [{ description: "Repair", qty: 1, unitPriceCents: 10000, lineTotalCents: 10000 }],
       ...uploaded.body,
@@ -37,9 +39,9 @@ it("does not serve an admin document when its durable audit write fails", async 
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   const name = "invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf";
-  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-secret"), owner.merchantId);
+  await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-secret"), owner.merchantId, { scanner: "simulation" });
   jest.spyOn(storage, "recordInvoiceDocumentAdminRead").mockRejectedValue(new Error("synthetic audit outage"));
-  const response = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(createAdminPrincipal()));
+  const response = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(await createAdminPrincipal()));
   expect(response.status).toBe(503);
   expect(JSON.stringify(response.body)).not.toContain("secret");
 });
@@ -48,19 +50,19 @@ it("awaits the admin audit commit before sending bytes and does not audit a tena
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   const name = "invoice-1700000000000-dddddddddddddddd.pdf";
-  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-test"), owner.merchantId);
+  await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-test"), owner.merchantId, { scanner: "simulation" });
   let release!: () => void;
   let entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
   const committed = new Promise<void>(resolve => { release = resolve; });
   const audit = jest.spyOn(storage, "recordInvoiceDocumentAdminRead").mockImplementation(async () => { entered(); await committed; });
-  const own = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(owner));
+  const own = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(owner));
   expect(own.status).toBe(200);
   expect(audit).not.toHaveBeenCalled();
   const send = jest.spyOn(express.response, "send");
   let responded = false;
-  const admin = createAdminPrincipal();
-  const pending = request(app).get(`/api/invoice-documents/${name}`).set(bearer(admin)).then(response => {
+  const admin = await createAdminPrincipal();
+  const pending = request(app).get(`/api/invoice-documents/${name}`).set(signedIn(admin)).then(response => {
     responded = true;
     return response;
   });
@@ -82,7 +84,7 @@ it("awaits the admin audit commit before sending bytes and does not audit a tena
 async function invoiceWithDocument() {
   const owner = await createOwnerPrincipal();
   const name = `invoice-1700000000000-${crypto.randomBytes(8).toString("hex")}.pdf`;
-  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-1.4\nsynthetic"), owner.merchantId);
+  await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-1.4\nsynthetic"), owner.merchantId, { scanner: "simulation" });
   const token = crypto.randomBytes(20).toString("base64url");
   const invoice = { id: "prop-inv-budget", merchantId: owner.merchantId, token, status: "dispatched", kind: "charge",
     amountCents: 5000, documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" };
@@ -113,7 +115,7 @@ it("fails closed for a real invoice when the shared budget is unavailable, befor
   const { app } = await createTestApp();
   const { token } = await invoiceWithDocument();
   jest.spyOn(storage, "consumeInvoiceDocumentReadLimit").mockRejectedValue(new Error("synthetic limiter outage"));
-  const read = jest.spyOn(storage, "getUploadedFileForMerchant");
+  const read = jest.spyOn(storage, "getCleanUploadedFileForMerchant");
   const response = await request(app).get(`/api/checkout/document/${token}`);
   expect(response.status).toBe(503);
   expect(read).not.toHaveBeenCalled();
@@ -123,7 +125,7 @@ it("a link that has used its budget answers 429 with Retry-After, without readin
   const { app } = await createTestApp();
   const { token } = await invoiceWithDocument();
   jest.spyOn(storage, "consumeInvoiceDocumentReadLimit").mockResolvedValue(false);
-  const read = jest.spyOn(storage, "getUploadedFileForMerchant");
+  const read = jest.spyOn(storage, "getCleanUploadedFileForMerchant");
   const response = await request(app).get(`/api/checkout/document/${token}`);
   expect(response.status).toBe(429);
   expect(response.headers["retry-after"]).toBe("60");

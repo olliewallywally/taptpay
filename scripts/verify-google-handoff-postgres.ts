@@ -329,6 +329,304 @@ try {
       assert.deepEqual(await throttleRow(bucket.key), { failures: 1, next_allowed_at: null });
     } finally { blocker.release(); }
   });
+  // Phase E: auth_sessions (0031) — sessions the server keeps, shared by every instance.
+  const { SESSION_RECLAIM_AFTER_MS } = await import("../server/auth-sessions");
+  const HOUR = 3_600_000;
+  const sessionId = () => randomBytes(16).toString("base64url");
+  const secretHash = () => sha(randomBytes(32).toString("base64url"));
+  const sessionRow = async (id: string) => (await pool.query(
+    `SELECT secret_hash, offered_secret_hash, offered_at, previous_secret_hash, previous_valid_until,
+       last_used_at, idle_expires_at, rotated_at, revoked_at, revoked_reason FROM auth_sessions WHERE id=$1`, [id])).rows[0];
+  const startSessionRow = async (userId: number, at: Date, overrides: Record<string, unknown> = {}, via = one) => {
+    const id = sessionId();
+    await via.createAuthSession({
+      id, principal: "business", userId, sessionVersion: 0, adminTag: null, secretHash: secretHash(),
+      deviceLabel: "Chrome on macOS", createdAt: at, lastUsedAt: at, rotatedAt: at,
+      idleExpiresAt: new Date(at.getTime() + 24 * HOUR), absoluteExpiresAt: new Date(at.getTime() + 7 * 24 * HOUR),
+      ...overrides,
+    }, at);
+    return id;
+  };
+  const sessionLogin = await addUser("sessions@r1-t4.test", "member");
+  await check("a session keeps only digests; the table refuses a row whose principal fields disagree", async () => {
+    const id = await startSessionRow(sessionLogin, new Date());
+    const row = (await pool.query("SELECT * FROM auth_sessions WHERE id=$1", [id])).rows[0];
+    assert.equal(row.principal, "business");
+    assert.match(row.secret_hash, /^[0-9a-f]{64}$/);
+    const insert = (principal: string, userId: number | null, version: number | null, tag: string | null) => pool.query(
+      `INSERT INTO auth_sessions(id, principal, user_id, session_version, admin_tag, secret_hash, last_used_at,
+         idle_expires_at, absolute_expires_at, rotated_at) VALUES ($1,$2,$3,$4,$5,'x',now(),now(),now(),now())`,
+      [sessionId(), principal, userId, version, tag]);
+    await assert.rejects(insert("business", null, 0, null), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("business", sessionLogin, null, null), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("admin", sessionLogin, null, "tag"), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("admin", null, null, null), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("someone", null, null, "tag"), /auth_sessions_principal_chk/);
+    await insert("admin", null, null, "tag");
+    await assert.rejects(pool.query("UPDATE auth_sessions SET offered_secret_hash='x' WHERE id=$1", [id]), /auth_sessions_offer_chk/);
+    await assert.rejects(pool.query("UPDATE auth_sessions SET revoked_at=now() WHERE id=$1", [id]), /auth_sessions_revoked_chk/);
+    await assert.rejects(pool.query("UPDATE auth_sessions SET previous_secret_hash='x' WHERE id=$1", [id]),
+      /auth_sessions_previous_chk/);
+  });
+  await check("20 simultaneous offers of the daily swap from two instances: exactly one is made", async () => {
+    const now = new Date();
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const hashes = Array.from({ length: 20 }, secretHash);
+    const results = await Promise.all(hashes.map((hash, i) => (i % 2 ? two : one).offerAuthSessionSecret(id,
+      { secretHash: hash, now, rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) })));
+    assert.equal(results.filter(Boolean).length, 1);
+    assert.equal((await sessionRow(id)).offered_secret_hash, hashes[results.indexOf(true)]);
+  });
+  await check("an offer is made only when the swap is due, not repeated within a minute, and re-made after one", async () => {
+    const now = new Date();
+    const offer = (hash: string, at: Date) => one.offerAuthSessionSecret(id, { secretHash: hash, now: at,
+      rotateBefore: new Date(at.getTime() - 24 * HOUR), reofferBefore: new Date(at.getTime() - 60_000) });
+    const young = await startSessionRow(sessionLogin, new Date(now.getTime() - 23 * HOUR));
+    assert.equal(await one.offerAuthSessionSecret(young, { secretHash: secretHash(), now,
+      rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) }), false,
+      "a secret younger than a day is not swapped");
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const [first, second, third] = [secretHash(), secretHash(), secretHash()];
+    assert.equal(await offer(first, now), true);
+    assert.equal(await offer(second, new Date(now.getTime() + 30_000)), false, "not again within a minute");
+    assert.equal((await sessionRow(id)).offered_secret_hash, first);
+    assert.equal(await offer(third, new Date(now.getTime() + 61_000)), true, "a lost offer is replaced after a minute");
+    assert.equal((await sessionRow(id)).offered_secret_hash, third);
+  });
+  await check("20 simultaneous first uses of the offered secret from two instances: exactly one promotion", async () => {
+    const now = new Date();
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const before = await sessionRow(id);
+    const offered = secretHash();
+    assert.ok(await one.offerAuthSessionSecret(id, { secretHash: offered, now,
+      rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) }));
+    const until = new Date(now.getTime() + 60_000);
+    const results = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+      (i % 2 ? two : one).promoteAuthSessionSecret(id, { offeredSecretHash: offered, now, previousValidUntil: until })));
+    assert.equal(results.filter(Boolean).length, 1);
+    const after = await sessionRow(id);
+    assert.equal(after.secret_hash, offered);
+    assert.equal(after.previous_secret_hash, before.secret_hash, "the replaced secret is kept as the previous one");
+    assert.equal(after.previous_valid_until.getTime(), until.getTime());
+    assert.equal(after.offered_secret_hash, null);
+    assert.equal(after.offered_at, null);
+    assert.equal(after.rotated_at.getTime(), now.getTime());
+    assert.equal(await two.promoteAuthSessionSecret(id, { offeredSecretHash: secretHash(), now, previousValidUntil: until }),
+      false, "an offer that is no longer this one promotes nothing");
+  });
+  await check("a use is recorded only forward in time", async () => {
+    const at = new Date(Date.now() - 10 * 60_000);
+    const id = await startSessionRow(sessionLogin, at);
+    const later = new Date(at.getTime() + 5 * 60_000);
+    await two.touchAuthSession(id, later, new Date(later.getTime() + 24 * HOUR));
+    await one.touchAuthSession(id, new Date(at.getTime() + 60_000), new Date(at.getTime() + 25 * HOUR));
+    const row = await sessionRow(id);
+    assert.equal(row.last_used_at.getTime(), later.getTime());
+    assert.equal(row.idle_expires_at.getTime(), later.getTime() + 24 * HOUR);
+  });
+  await check("a session is ended once, and an ended one is never offered, promoted or touched", async () => {
+    const now = new Date();
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const offered = secretHash();
+    assert.ok(await one.offerAuthSessionSecret(id, { secretHash: offered, now,
+      rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) }));
+    const ends = await Promise.all(Array.from({ length: 10 }, (_, i) => (i % 2 ? two : one).revokeAuthSession(id, "logout", now)));
+    assert.equal(ends.filter(Boolean).length, 1);
+    assert.equal(await one.promoteAuthSessionSecret(id, { offeredSecretHash: offered, now, previousValidUntil: now }), false);
+    assert.equal(await one.offerAuthSessionSecret(id, { secretHash: secretHash(), now: new Date(now.getTime() + HOUR),
+      rotateBefore: new Date(now.getTime()), reofferBefore: new Date(now.getTime() + HOUR) }), false);
+    await one.touchAuthSession(id, new Date(now.getTime() + HOUR), new Date(now.getTime() + 25 * HOUR));
+    const row = await sessionRow(id);
+    assert.equal(row.revoked_reason, "logout");
+    assert.equal(row.secret_hash === offered, false);
+    assert.ok(row.last_used_at.getTime() < now.getTime(), "an ended session records no use");
+  });
+  await check("ending a login's sessions ends its live ones but the kept one, never another login's; another instance sees it at once", async () => {
+    const now = new Date();
+    const [login, other] = [await addUser("sessions-end@r1-t4.test", "member"), await addUser("sessions-other@r1-t4.test", "member")];
+    const [a, b, kept] = [await startSessionRow(login, now), await startSessionRow(login, now), await startSessionRow(login, now)];
+    const expired = await startSessionRow(login, new Date(now.getTime() - 8 * 24 * HOUR));
+    const theirs = await startSessionRow(other, now);
+    assert.equal(await one.revokeAuthSessionsForLogin(login, "sign_out_everywhere", now, kept), 2);
+    for (const id of [a, b]) assert.equal((await two.getAuthSession(id))?.revokedReason, "sign_out_everywhere");
+    for (const id of [kept, expired, theirs]) assert.equal((await two.getAuthSession(id))?.revokedAt, null);
+    assert.equal(await two.revokeAuthSessionsForLogin(login, "password_change", now), 1, "then the kept one");
+  });
+  await check("a deleted login's sessions are deleted with it", async () => {
+    const leaving = await addUser("sessions-leaving@r1-t4.test", "member");
+    const id = await startSessionRow(leaving, new Date());
+    await pool.query("DELETE FROM users WHERE id=$1", [leaving]);
+    assert.equal(await one.getAuthSession(id), undefined);
+  });
+  await check("rows 30 days past their absolute expiry are reclaimed when the next session starts; newer ones stay", async () => {
+    const now = new Date();
+    const lastUseBefore = (ms: number) => new Date(now.getTime() - ms - 7 * 24 * HOUR);
+    const stale = await startSessionRow(sessionLogin, lastUseBefore(SESSION_RECLAIM_AFTER_MS + 60_000), {}, two);
+    const recent = await startSessionRow(sessionLogin, lastUseBefore(SESSION_RECLAIM_AFTER_MS - 60 * 60_000), {}, two);
+    assert.ok(await sessionRow(stale), "the stale session was stored");
+    await startSessionRow(sessionLogin, now);
+    assert.equal(await sessionRow(stale), undefined, "reclaimed");
+    assert.ok(await sessionRow(recent), "not yet 30 days past its expiry");
+  });
+  await check("an admin session has no login and carries the admin's credential tag", async () => {
+    const now = new Date();
+    const id = sessionId();
+    await two.createAuthSession({ id, principal: "admin", userId: null, sessionVersion: null, adminTag: "a".repeat(43),
+      secretHash: secretHash(), lastUsedAt: now, rotatedAt: now, idleExpiresAt: new Date(now.getTime() + 30 * 60_000),
+      absoluteExpiresAt: new Date(now.getTime() + 12 * HOUR) }, now);
+    assert.deepEqual(await one.getAuthSession(id).then((row) => row && [row.principal, row.userId, row.adminTag]),
+      ["admin", null, "a".repeat(43)]);
+  });
+
+  // The external review's fixes (2026-09-29), against real PostgreSQL. A device is registered only while
+  // the login's sessions stand, decided under the login's row lock in the transaction that writes; one
+  // Google sign-in start is taken up once.
+  const { PushSessionEndedError } = await import("../server/storage");
+  const register = (login: number | null, endpoint: string, via = one, sessionVersion = 0, merchantId = merchant) =>
+    via.createPushSubscription({ merchantId, userId: login, sessionVersion, endpoint, p256dh: "synthetic", auth: "synthetic" });
+  const outcomeOf = (pending: Promise<unknown>) =>
+    pending.then((row) => (row ? "stored" : "not stored"), (error) => (error instanceof PushSessionEndedError ? "ended" : error));
+  await check("a device registers under the login's current session version; under a spent one it is refused and nothing is written or switched back on", async () => {
+    const login = await addUser("push-spent@r1-t4.test", "member");
+    assert.equal(await outcomeOf(register(login, push("spent-on-file"))), "stored");
+    assert.ok(await two.advanceUserSessionVersion(login));
+    await two.deactivatePushSubscriptionsForLogin(merchant, login);
+    assert.equal(await outcomeOf(register(login, push("spent-new"))), "ended");
+    assert.equal(await outcomeOf(register(login, push("spent-on-file"))), "ended");
+    assert.deepEqual(await pushRows([push("spent-on-file"), push("spent-new")]),
+      { [push("spent-on-file")]: { active: false, userId: login } });
+    assert.equal(await outcomeOf(register(login, push("spent-new"), two, 1)), "stored", "the login's next sign-in registers it");
+  });
+  await check("a registration naming a disabled login, another business's login or no login is refused", async () => {
+    const disabled = await addUser("push-disabled@r1-t4.test", "member");
+    await pool.query("UPDATE users SET status='disabled' WHERE id=$1", [disabled]);
+    assert.equal(await outcomeOf(register(disabled, push("refused-disabled"))), "ended");
+    assert.equal(await outcomeOf(register(otherLogin, push("refused-other-business"))), "ended");
+    assert.equal(await outcomeOf(register(null, push("refused-no-login"))), "ended");
+    assert.deepEqual(await pushRows([push("refused-disabled"), push("refused-other-business"), push("refused-no-login")]), {});
+  });
+  await check("a registration queued behind 'sign out everywhere' is refused once it holds the login's row", async () => {
+    const login = await addUser("push-queued@r1-t4.test", "member");
+    const blocker = await pool.connect();
+    try {
+      // The sign-out's own statement, not yet committed: it holds the login's row.
+      await blocker.query("BEGIN");
+      await blocker.query("UPDATE users SET session_version = session_version + 1 WHERE id=$1", [login]);
+      const pending = outcomeOf(register(login, push("queued"), two));
+      for (let i = 0; ; i += 1) {
+        const waiting = await pool.query(`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`);
+        if (waiting.rows[0].n > 0) break;
+        assert.ok(i < 100, "the registration never queued behind the login's row");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      assert.deepEqual(await pushRows([push("queued")]), {}, "nothing is written while it waits");
+      await blocker.query("COMMIT");
+      assert.equal(await pending, "ended");
+      assert.deepEqual(await pushRows([push("queued")]), {});
+    } finally { blocker.release(); }
+  });
+  await check("30 logins of one business ending their sessions at once: every device is stopped and no statement is lost to a deadlock", async () => {
+    // Each ending also stops the business's unattributed devices, so the statements share rows.
+    const racePool = new pg.Pool({ connectionString: testDatabaseUrl, max: 30 });
+    const ending = new DatabaseStorage(drizzle(racePool, { schema }) as any);
+    try {
+      const business = (await pool.query(`INSERT INTO merchants(name,business_name,email,status)
+        VALUES ('Busy','Busy','busy@r1-t4.test','active') RETURNING id`)).rows[0].id as number;
+      const logins: number[] = [];
+      for (let i = 0; i < 30; i += 1) {
+        logins.push((await pool.query(`INSERT INTO users(email,password,merchant_id,role)
+          VALUES ($1,'synthetic-not-a-hash',$2,'member') RETURNING id`, [`busy-${i}@r1-t4.test`, business])).rows[0].id as number);
+      }
+      const web = (name: string) => push(`busy-${name}`);
+      const phone = (name: string) => `apns://busy-${name}`;
+      const unattributed = Array.from({ length: 6 }, (_, i) => [web(`unattributed-${i}`), phone(`unattributed-${i}`)]).flat();
+      const owned = logins.flatMap((_, i) => [web(`login-${i}`), phone(`login-${i}`)]);
+      const switchAllOn = async () => {
+        for (const endpoint of unattributed) await subscribe(business, null, endpoint);
+        for (const [i, login] of logins.entries()) {
+          await subscribe(business, login, web(`login-${i}`));
+          await subscribe(business, login, phone(`login-${i}`));
+        }
+      };
+      const lost = (results: PromiseSettledResult<void>[]) =>
+        results.flatMap((result) => (result.status === "rejected" ? [String(result.reason)] : []));
+      const stillOn = async (endpoints: string[]) =>
+        Object.entries(await activeOf(endpoints)).filter(([, active]) => active).map(([endpoint]) => endpoint);
+      await Promise.all(Array.from({ length: 30 }, () => racePool.query("SELECT 1"))); // connections open
+      for (let round = 1; round <= 3; round += 1) {
+        await switchAllOn();
+        const results = await Promise.allSettled(logins.map((login) => ending.deactivatePushSubscriptionsForLogin(business, login)));
+        assert.deepEqual(lost(results), [], `round ${round}: a statement was rolled back, so its login's devices stayed on`);
+        assert.deepEqual(await stillOn([...unattributed, ...owned]), [], `round ${round}`);
+      }
+      // "Turn notifications off" with no device token: this login's iPhones and the unattributed ones only.
+      for (let round = 1; round <= 3; round += 1) {
+        await switchAllOn();
+        const results = await Promise.allSettled(logins.map((login) => ending.deactivateNativePushSubscriptionsForLogin(business, login)));
+        assert.deepEqual(lost(results), [], `iPhone round ${round}: a statement was rolled back`);
+        assert.deepEqual((await stillOn([...unattributed, ...owned])).sort(),
+          [...unattributed, ...owned].filter((endpoint) => !endpoint.startsWith("apns://")).sort(), `iPhone round ${round}`);
+      }
+    } finally {
+      await racePool.end();
+    }
+  });
+  await check("45 registrations racing 'sign out everywhere' across instances: no device of an ended login is left on, whichever held the login's row first", async () => {
+    // Their own pools, so neither side queues behind the other for a connection: the database decides the order.
+    const racePools = [new pg.Pool({ connectionString: testDatabaseUrl, max: 30 }), new pg.Pool({ connectionString: testDatabaseUrl, max: 30 })];
+    const [registering, signingOut] = racePools.map((p) => new DatabaseStorage(drizzle(p, { schema }) as any));
+    try {
+      const logins = await Promise.all(Array.from({ length: 45 }, (_, i) => addUser(`push-race-${i}@r1-t4.test`, "member")));
+      const endpointOf = (i: number) => push(`race-${i}`);
+      // A third already have the device on file, stopped: a late registration would switch it back on.
+      for (const [i, login] of logins.entries()) {
+        if (i % 3 !== 0) continue;
+        assert.equal(await outcomeOf(register(login, endpointOf(i))), "stored");
+        await one.deactivatePushSubscriptionByEndpoint(endpointOf(i));
+      }
+      await Promise.all(racePools.flatMap((p) => Array.from({ length: 15 }, () => p.query("SELECT 1")))); // connections open
+      const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const signOutEverywhere = async (login: number) => {
+        assert.ok(await signingOut.advanceUserSessionVersion(login));
+        await signingOut.deactivatePushSubscriptionsForLogin(merchant, login);
+      };
+      // In fifteens: the registration well ahead, the sign-out well ahead, and both at once.
+      const registrations = await Promise.all(logins.map(async (login, i) => {
+        const order = Math.floor(i / 15);
+        const registered = later(order === 1 ? 25 : 0).then(() => outcomeOf(register(login, endpointOf(i), registering)));
+        const ended = later(order === 0 ? 25 : 0).then(() => signOutEverywhere(login));
+        await ended;
+        return registered;
+      }));
+      const count = (wanted: string, from = 0, to = 45) => registrations.slice(from, to).filter((o) => o === wanted).length;
+      assert.equal(count("stored") + count("ended"), 45,
+        `every registration was stored or refused as ended: ${JSON.stringify(registrations.filter((o) => o !== "stored" && o !== "ended").map(String))}`);
+      const left = Object.entries(await activeOf(logins.map((_, i) => endpointOf(i)))).filter(([, active]) => active).map(([endpoint]) => endpoint);
+      assert.deepEqual(left, [], "a device was left on for a login whose sessions had ended");
+      assert.ok(count("stored") > 0 && count("ended") > 0, "both orders were exercised");
+      console.log(`     (registered first, then stopped: ${count("stored")}; refused: ${count("ended")}. ` +
+        `Registration ahead ${count("stored", 0, 15)}/${count("ended", 0, 15)}, sign-out ahead ${count("stored", 15, 30)}/${count("ended", 15, 30)}, ` +
+        `at once ${count("stored", 30, 45)}/${count("ended", 30, 45)})`);
+    } finally {
+      await Promise.all(racePools.map((p) => p.end()));
+    }
+  });
+  await check("one Google sign-in start is taken up exactly once by 24 simultaneous callbacks from two instances; its key holds no state", async () => {
+    const state = randomBytes(32).toString("base64url");
+    const bucket = throttle.googleStateBucket(state);
+    const started = Date.now();
+    const results = await Promise.all(Array.from({ length: 24 }, (_, i) =>
+      (i % 2 ? two : one).takeAuthThrottleSlot([bucket], new Date())));
+    assert.equal(results.filter((r) => r.allowed).length, 1);
+    const stored = await throttleRow(bucket.key);
+    assert.equal(stored?.failures, 1);
+    const wait = stored!.next_allowed_at!.getTime() - started;
+    assert.ok(wait >= 10 * 60_000 && wait < 10 * 60_000 + 5_000, `refused for as long as a start lasts (${wait} ms)`);
+    assert.ok(!bucket.key.includes(state), "the key holds no state");
+    assert.equal((await one.takeAuthThrottleSlot([throttle.googleStateBucket(randomBytes(32).toString("base64url"))], new Date())).allowed,
+      true, "another start is its own");
+  });
+
   assert.deepEqual(failures, [], "R1-T4 sign-in PostgreSQL verification failed");
   console.log("R1-T4 sign-in PostgreSQL verification passed");
 } finally {

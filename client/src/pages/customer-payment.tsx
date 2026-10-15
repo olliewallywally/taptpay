@@ -5,6 +5,7 @@ import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CheckCircle, XCircle, Loader2, QrCode } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 function redirectToRealBrowser() {
   const ua = navigator.userAgent || "";
@@ -42,9 +43,9 @@ function redirectToRealBrowser() {
  */
 function useBoardBrand(merchantId: number, stoneNumber: number) {
   return useQuery<{ businessName?: string; customLogoUrl?: string | null }>({
-    queryKey: ["/api/merchants", merchantId, "stone", stoneNumber, "brand"],
+    queryKey: [MERCHANTS_KEY, merchantId, "stone", stoneNumber, "brand"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/stone/${stoneNumber}/brand`);
+      const response = await fetch(apiPath("GET /api/merchants/:id/stone/:stoneId/brand", { id: merchantId, stoneId: stoneNumber }));
       if (!response.ok) throw new Error("Failed to fetch the board");
       return response.json();
     },
@@ -104,7 +105,7 @@ function NoBoardNotice(_props: { merchantId: number }) {
             <div className="text-center">
               <QrCode className="w-8 h-8 text-[#00E5CC] mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Ask for your payment link</h2>
-              <p className="text-white/70">
+              <p className="text-white">
                 Each sale now has its own payment link. Ask the business to show you the QR code for your sale.
               </p>
             </div>
@@ -129,9 +130,9 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
   const { data: merchant } = useBoardBrand(id, stoneNumber);
 
   const { data: activeTransaction, isLoading } = useQuery({
-    queryKey: ["/api/merchants", id, "active-transaction", stoneNumber],
+    queryKey: [MERCHANTS_KEY, id, "active-transaction", stoneNumber],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${id}/active-transaction?stoneId=${stoneNumber}`, {
+      const response = await fetch(`${apiPath("GET /api/merchants/:id/active-transaction", { id })}?stoneId=${stoneNumber}`, {
         headers: { "Cache-Control": "no-cache" },
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -152,7 +153,7 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
       if (message.addressingMode !== "board") return;
       if (message.stoneId !== stoneNumber || message.transaction.taptStoneId !== stoneNumber) return;
       setCurrentTransaction(message.transaction);
-      queryClient.setQueryData(["/api/merchants", id, "active-transaction", stoneNumber], message.transaction);
+      queryClient.setQueryData([MERCHANTS_KEY, id, "active-transaction", stoneNumber], message.transaction);
 
       if (message.transaction.status === "completed") {
         setPaymentStatus("success");
@@ -196,13 +197,16 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
   const handleRetry = () => {
     hasRedirected.current = false;
     setPaymentStatus("loading");
-    queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction", stoneNumber] });
+    queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, id, "active-transaction", stoneNumber] });
   };
 
   const logo = <MerchantLogo customLogoUrl={merchant?.customLogoUrl} />;
 
-  // Waiting for a transaction to be created by the merchant
-  if (isLoading || (!currentTransaction && paymentStatus === "loading")) {
+  // Waiting: for the business to open a sale; for a sale someone else is paying, or has just paid, to
+  // give way to the next; or for this page's own move to checkout. The fault screen below is for a
+  // fault: a sale that failed while this page was open. The server hands a board's page its newest
+  // open sale, or one paid in the last three minutes, and neither of those is one.
+  if (isLoading || (paymentStatus !== "success" && paymentStatus !== "error")) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="w-full max-w-sm md:max-w-md">
@@ -212,7 +216,7 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
               <div className="text-center">
                 <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-4" />
                 <h2 className="text-xl font-bold text-white mb-2">Waiting for Payment</h2>
-                <p className="text-white/70">The merchant will send payment details shortly</p>
+                <p className="text-white">The merchant will send payment details shortly</p>
               </div>
             </div>
             <div className="bg-[#00E5CC] px-8 py-4 -mt-4" />
@@ -233,7 +237,7 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
               <div className="text-center">
                 <CheckCircle className="w-16 h-16 text-[#00E5CC] mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-2">Payment Successful!</h2>
-                <p className="text-white/70">Thank you for your payment</p>
+                <p className="text-white">Thank you for your payment</p>
               </div>
             </div>
             <div className="bg-[#00E5CC] px-8 py-4 -mt-4" />
@@ -253,7 +257,7 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
             <div className="text-center">
               <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
-              <p className="text-white/70 text-sm">We couldn't connect to the payment page</p>
+              <p className="text-white text-sm">We couldn't connect to the payment page</p>
             </div>
           </div>
           <div

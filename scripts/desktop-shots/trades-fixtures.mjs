@@ -6,10 +6,10 @@
    the same clients/quotes/invoices, and they must agree on them or the shots
    stop being comparable. */
 import { chromium } from "playwright";
+import { BASE_URL, CHROMIUM_PATH } from "./retail-fixtures.mjs";
+import { installBusinessSessionFixture } from "../browser-session-fixture.mjs";
 
-export const BASE_URL = "http://127.0.0.1:5000";
-export const CHROMIUM_PATH =
-  "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+export { BASE_URL, CHROMIUM_PATH };
 export const MERCHANT_ID = 999999;
 
 /* Freeze the browser at Tuesday 28 July 2026, noon in Auckland. This keeps
@@ -323,7 +323,7 @@ export const MERCHANT = {
 /* Routes registered here are the baseline; a screen script can register its own
    handler for the same URL afterwards, because Playwright matches the most
    recently registered route first. */
-export async function installTradesMocks(page) {
+export async function installTradesMocks(page, { signedIn = true, errors = [], label = "trades" } = {}) {
   await page.addInitScript(
     ({ merchantId, fixedNow }) => {
       const NativeDate = Date;
@@ -338,32 +338,16 @@ export async function installTradesMocks(page) {
       }
       window.Date = FixedDate;
 
-      const payload = window.btoa(
-        JSON.stringify({
-          userId: 1,
-          email: "shot@example.invalid",
-          merchantId,
-          role: "owner",
-        }),
-      );
-      localStorage.setItem("authToken", `shot.${payload}.dummy`);
       localStorage.setItem("merchantId", String(merchantId));
       localStorage.setItem("taptMode", "trades");
     },
     { merchantId: MERCHANT_ID, fixedNow: FIXED_NOW },
   );
 
-  await page.route("**/api/auth/me", (route) =>
-    json(route, {
-      user: {
-        id: 1,
-        email: "shot@example.invalid",
-        merchantId: MERCHANT_ID,
-        role: "owner",
-        onboardingCompleted: true,
-      },
-    }),
-  );
+  await installBusinessSessionFixture(page, {
+    baseUrl: BASE_URL, merchantId: MERCHANT_ID, email: "shot@example.invalid", signedIn, errors, label,
+  });
+  await page.route("**/api/tutorial/**", (route) => json(route, {}));
   await page.route("**/api/tutorial/state", (route) =>
     json(route, {
       generation: 1,
@@ -372,7 +356,6 @@ export async function installTradesMocks(page) {
       progress: {},
     }),
   );
-  await page.route("**/api/tutorial/**", (route) => json(route, {}));
   await page.route("**/api/trades/clients", (route) => json(route, CLIENTS));
   await page.route("**/api/trades/invoices", (route) => json(route, INVOICES));
   await page.route("**/api/trades/quotes", (route) => json(route, QUOTES));
@@ -447,7 +430,7 @@ export async function runTradesShots(shoot) {
 
 /* A context wired the way every trades screenshot needs it: fixed timezone, no
    service worker, page/console errors collected into the returned array. */
-export async function newTradesPage(browser, label, contextOptions) {
+export async function newTradesPage(browser, label, contextOptions, { signedIn = true } = {}) {
   const context = await browser.newContext({
     ...contextOptions,
     deviceScaleFactor: 1,
@@ -462,6 +445,6 @@ export async function newTradesPage(browser, label, contextOptions) {
       errors.push(`${label} console: ${message.text()}`);
     }
   });
-  await installTradesMocks(page);
+  await installTradesMocks(page, { signedIn, errors, label });
   return { context, page, errors };
 }

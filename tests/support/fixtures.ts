@@ -186,9 +186,30 @@ export async function openGoldenPage(
     { width, height },
   );
 
+  // The live terminal records cash before displaying success. Keep this
+  // intercepted fixture synthetic; never let a golden submit to a real server.
+  if (vertical === "retail") await page.route("**/api/transactions/cash-sale", async route => {
+    const request = route.request();
+    const body = request.method() === "POST" ? request.postDataJSON() : null;
+    if (body?.merchantId !== MERCHANT_ID || body.itemName !== "flat white" || body.price !== "12.34") {
+      errors.push("golden cash fixture received an unexpected request");
+      await route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ message: "Unexpected synthetic cash fixture request" }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ transaction: {
+      id: 777001, merchantId: MERCHANT_ID, itemName: body.itemName, price: body.price,
+      status: "completed", paymentMethod: "cash", taptStoneId: null,
+      createdAt: FIXED_TIME_ISO,
+    } }) });
+  });
+
   /* Before the first navigation, so no script ever observes the real clock. */
   await page.clock.setFixedTime(new Date(FIXED_MS));
   await installFontRoutes(page, unpinnedFonts);
+  // Replit's workspace banner is external hosting furniture. Intercept it
+  // before navigation so fixture runs have no ambient network dependency.
+  await page.route("https://replit.com/public/js/replit-dev-banner.js", route =>
+    route.fulfill({ status: 200, contentType: "application/javascript", body: "" }));
 
   if (navigate) {
     await page.goto(`${BASE_URL}${VERTICALS[vertical].route}`, { waitUntil: "domcontentloaded" });

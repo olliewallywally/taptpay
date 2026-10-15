@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { existsSync } from "node:fs";
+import { installBusinessSessionFixture } from "../browser-session-fixture.mjs";
 
 export const BASE_URL = process.env.DESKTOP_SHOT_BASE_URL ?? "http://127.0.0.1:5000";
 /* The bundled Playwright Chromium is broken on this host (missing libnspr4), so
@@ -51,35 +52,22 @@ const merchant = {
 const json = (route, body, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-async function installRetailMocks(page) {
+async function installRetailMocks(page, { signedIn, errors, label }) {
   await page.addInitScript(({ merchantId }) => {
-    const payload = window.btoa(JSON.stringify({
-      userId: 1,
-      email: "retail-shot@example.invalid",
-      merchantId,
-      role: "owner",
-    }));
-    localStorage.setItem("authToken", `shot.${payload}.dummy`);
     localStorage.setItem("merchantId", String(merchantId));
     localStorage.setItem("taptMode", "retail");
   }, { merchantId: MERCHANT_ID });
 
-  await page.route("**/api/auth/me", (route) => json(route, {
-    user: {
-      id: 1,
-      email: "retail-shot@example.invalid",
-      merchantId: MERCHANT_ID,
-      role: "owner",
-      onboardingCompleted: true,
-    },
-  }));
+  await installBusinessSessionFixture(page, {
+    baseUrl: BASE_URL, merchantId: MERCHANT_ID, email: "retail-shot@example.invalid", signedIn, errors, label,
+  });
+  await page.route("**/api/tutorial/**", (route) => json(route, {}));
   await page.route("**/api/tutorial/state", (route) => json(route, {
     generation: 1,
     autoEnabled: false,
     pageCount: 20,
     progress: {},
   }));
-  await page.route("**/api/tutorial/**", (route) => json(route, {}));
   await page.route(`**/api/merchants/${MERCHANT_ID}/**`, (route) => json(route, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}/transactions`, (route) =>
     json(route, RETAIL_TRANSACTIONS));
@@ -136,7 +124,7 @@ async function installRetailMocks(page) {
   }));
 }
 
-export async function newRetailPage(browser, label, contextOptions) {
+export async function newRetailPage(browser, label, contextOptions, { signedIn = true } = {}) {
   const context = await browser.newContext({
     ...contextOptions,
     deviceScaleFactor: 1,
@@ -164,7 +152,7 @@ export async function newRetailPage(browser, label, contextOptions) {
       errors.push(`${label} HTTP ${response.status()}: ${response.url()}`);
     }
   });
-  await installRetailMocks(page);
+  await installRetailMocks(page, { signedIn, errors, label });
   return { context, page, errors };
 }
 

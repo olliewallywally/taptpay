@@ -4,7 +4,7 @@ import request from "supertest";
 import { isDatabaseConnected } from "../database";
 import { sseBroker } from "../sse-broker";
 import {
-  bearer,
+  signedIn,
   createOwnerPrincipal,
   createTestApp,
   mintPaymentCredential,
@@ -58,7 +58,7 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     expect(small.headers["content-encoding"]).toBeUndefined();
   });
 
-  it.each(["/pay/t/abc", "/split/t/abc", "/checkout/t/abc", "/receipt/t/abc", "/pay/return/abc", "/accept-invite"])(
+  it.each(["/pay/t/abc", "/split/t/abc", "/checkout/t/abc", "/receipt/t/abc", "/pay/return/abc", "/accept-invite", "/r/invoice-token?paymentState=return-secret", "/payment/result/12?state=return-secret"])(
     "keeps the bearer page %s out of shared caches and referrers",
     async (path) => {
       const { app } = await createTestApp();
@@ -135,9 +135,9 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(notification.path).toBe("/api/windcave/notification?sessionid=harness-session");
-    expect(response.status).toBe(200);
-    expect(response.text).toBe("OK");
-    // Payments are off in the harness: nothing is reconciled, not even locked.
+    // MemStorage cannot persist a durable receipt. Never falsely acknowledge it.
+    expect(response.status).toBe(503);
+    expect(response.headers['retry-after']).toBe('5');
     expect((await storage.getTransaction(transaction.id))?.windcaveSessionState).toBe("pending");
   });
 
@@ -164,19 +164,22 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     expect(notFound.status).toBe(404);
   });
 
-  it("controls the clock: a session token stops working an hour after it was issued", async () => {
+  it("controls the clock: a session stops working a day after it was last used", async () => {
     const { app } = await createTestApp();
     const clock = useFakeClock(new Date("2026-09-25T00:00:00.000Z"));
     try {
       const owner = await createOwnerPrincipal();
 
-      const fresh = await request(app).get("/api/auth/me").set(bearer(owner));
-      clock.advance(61 * 60 * 1000);
-      const stale = await request(app).get("/api/auth/me").set(bearer(owner));
+      const fresh = await request(app).get("/api/auth/me").set(signedIn(owner));
+      clock.advance(23 * 60 * 60 * 1000);
+      const stillInTheDay = await request(app).get("/api/auth/me").set(signedIn(owner));
+      clock.advance(24 * 60 * 60 * 1000);
+      const stale = await request(app).get("/api/auth/me").set(signedIn(owner));
 
       expect(fresh.status).toBe(200);
+      expect(stillInTheDay.status).toBe(200);
       expect(stale.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
-      expect(stale.body.message).toBe("Invalid or expired token");
+      expect(stale.body.code).toBe("SESSION_ENDED");
     } finally {
       clock.restore();
     }
@@ -186,7 +189,7 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const stream = await openEventStream(app, `/api/merchants/${owner.merchantId}/events`, bearer(owner));
+    const stream = await openEventStream(app, `/api/merchants/${owner.merchantId}/events`, signedIn(owner));
     try {
       expect(stream.status).toBe(200);
       expect(stream.headers["content-type"]).toContain("text/event-stream");

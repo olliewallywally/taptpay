@@ -1,3 +1,4 @@
+import { tabListKeyDown } from '@/lib/tab-list-keyboard';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentMerchantId } from "@/lib/auth";
 import {
@@ -49,8 +50,8 @@ const INK = "#12162E";
 const DEEP_BLUE = "#1D48C8";
 const SHEET_BG = "#F4F5F8";
 const SHEET_INK = "#04103A";
-const SHEET_DIM = "#8A90A4";
-const SHEET_LABEL = "#9AA0B2";
+const SHEET_DIM = "#586079";
+const SHEET_LABEL = "#586079";
 const DONUT_COLORS = ["#5E9EFF", "#93BAFF", "#DCE7FF", "rgba(94,158,255,0.35)", "rgba(94,158,255,0.18)"];
 
 /* Sheet geometry, straight from the prototype. */
@@ -438,7 +439,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
                 )}
               </div>
 
-              <div className="pa-segs" role="tablist" aria-label="revenue range" data-tutorial-id="pa-period">
+              <div className="pa-segs" role="tablist" onKeyDown={tabListKeyDown} aria-label="revenue range" data-tutorial-id="pa-period">
                 {RANGES.map((range) => {
                   const on = range.k === tf;
                   return (
@@ -447,10 +448,11 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
                       type="button"
                       role="tab"
                       aria-selected={on}
+                      tabIndex={on ? 0 : -1}
                       className="pa-seg"
                       style={{
                         background: on ? ACTIVE : "transparent",
-                        color: on ? NAVY : "#6B7BB8",
+                        color: on ? NAVY : "#93BAFF",
                         fontWeight: on ? 700 : 600,
                       }}
                       onClick={() => setTf(range.k)}
@@ -671,7 +673,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
             </div>
           </div>
 
-          <div className="pa-sheet-body">
+          <div className="pa-sheet-body" tabIndex={0} role="region" aria-label="Analytics details">
             {sheetMode === "history" &&
               (invoicesQuery.isLoading || tenantsQuery.isLoading ? (
                 <div className="pa-sheet-empty">loading payments…</div>

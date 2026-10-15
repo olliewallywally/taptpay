@@ -1,21 +1,30 @@
 import bcrypt from 'bcrypt';
 import { config } from './config';
 import { isDemoAccountLoginBlocked } from './demo-safety';
-import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import { sendPasswordResetEmail } from './email-service';
-
-// Security Audit Log File
-const SECURITY_LOG_DIR = path.join(process.cwd(), 'logs');
-const SECURITY_LOG_FILE = path.join(SECURITY_LOG_DIR, 'security-audit.log');
-
-// Ensure logs directory exists
-if (!fs.existsSync(SECURITY_LOG_DIR)) {
-  fs.mkdirSync(SECURITY_LOG_DIR, { recursive: true });
-}
+import {
+  CSRF_HEADER,
+  adminTagMatches,
+  clearSessionCookie,
+  csrfTokenFor,
+  csrfTokenMatches,
+  parseSessionCookie,
+  presentedSecret,
+  readSessionCookie,
+  sessionEnded,
+  settleSession,
+  startSession,
+  type PresentedSecret,
+  type SessionEndReason,
+  type SessionRealm,
+  type StartedSession,
+} from './auth-sessions';
+import { getBaseUrl } from './url-utils';
+import type { AuthSession } from '@shared/schema';
+import type { IStorage } from './storage';
+import { writeSecurityAuditEvent } from './security-audit-log';
 
 export interface User {
   id: number;
@@ -31,8 +40,8 @@ export interface User {
   /** Identity of the users row this principal came from, when there is one. */
   userId?: number;
   /**
-   * R1-T4 phase D: the users row's session version. Tokens carry the version they
-   * were issued under; a password reset or "sign out everywhere" advances it.
+   * R1-T4: the users row's session version. Sessions record the version they
+   * began under; a password reset or "sign out everywhere" advances it.
    */
   sessionVersion?: number;
   resetToken?: string;
@@ -44,17 +53,6 @@ export interface User {
 export function isAccountOwner(user: Pick<User, 'role'> | undefined | null): boolean {
   return user?.role === 'owner' || user?.role === 'merchant' || user?.role === 'admin';
 }
-
-/**
- * Claim marking a token as issued by the team-logins scheme.
- *
- * Before team logins, `userId` in a JWT was the *merchant* id and
- * authenticateToken ignored it entirely. Now that real `users.id` values exist,
- * an old token's `userId` would address a different row, so tokens without this
- * claim are rejected outright. The 1h TTL caps the disruption at one re-login.
- */
-export const TOKEN_PRINCIPAL = 'user' as const;
-const ADMIN_TOKEN_PRINCIPAL = 'admin' as const;
 
 function isMerchantUserRole(role: unknown): role is 'owner' | 'member' {
   return role === 'owner' || role === 'member';
@@ -70,40 +68,16 @@ function isPositiveInteger(value: unknown): value is number {
 // Sign-in and password-reset attempts are throttled in shared storage — slowed
 // down, never locked (R1-T4 phase C): server/auth-throttle.ts, server/sign-in-device.ts.
 
-// Security audit logging - writes to dedicated file with PII redaction
+// Bounded asynchronous audit logging; see security-audit-log.ts for redaction
+// scope and the explicit diagnostics on failed or dropped events.
 export function logSecurityEvent(event: string, details: Record<string, any>) {
-  const timestamp = new Date().toISOString();
-  
-  // Redact sensitive PII for audit log
-  const redactedDetails = { ...details };
-  if (redactedDetails.email) {
-    // Mask email: keep first 2 chars and domain
-    const email = redactedDetails.email;
-    const atIndex = email.indexOf('@');
-    if (atIndex > 2) {
-      redactedDetails.email = email.substring(0, 2) + '***' + email.substring(atIndex);
-    }
-  }
-  
-  const logEntry = {
-    timestamp,
-    event,
-    ...redactedDetails,
-  };
-  
-  const logLine = JSON.stringify(logEntry) + '\n';
-  
-  // Write to dedicated security audit log file
-  try {
-    fs.appendFileSync(SECURITY_LOG_FILE, logLine);
-  } catch (error) {
-    // Fallback to console if file write fails, but don't expose full details
-    console.error(`[SECURITY_LOG_ERROR] Failed to write audit log for event: ${event}`);
-  }
+  writeSecurityAuditEvent(event, details);
 }
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
+  /** R1-T4 phase E: the session the request was signed in by, when it was a session cookie. */
+  authSession?: { id: string; realm: SessionRealm };
 }
 
 // Retained for backwards compatibility with startup and verification call sites.
@@ -111,8 +85,6 @@ export interface AuthenticatedRequest extends Request {
 export async function syncVerifiedMerchants(): Promise<void> {
   // no-op — authentication reads live from the users table
 }
-
-export const JWT_SECRET = config.jwtSecret;
 
 function userRowToUser(row: {
   id: number;
@@ -247,12 +219,14 @@ async function memberWithinSeatLimit(user: User): Promise<boolean> {
 }
 
 /**
- * R1-T4 phase A: an account token for a users row that has just proved itself
+ * R1-T4: the login for a users row that has just proved itself
  * without a password — Google sign-in's one-time code. Every other gate of a
  * password login applies: the row is active, the merchant verified or active, a
  * member within the seat limit.
  */
-export async function issueTokenForUserId(userId: number): Promise<{ token: string; merchantId: number } | null> {
+export async function loginForUserId(
+  userId: number,
+): Promise<{ merchantId: number; userId: number; sessionVersion: number } | null> {
   if (!isPositiveInteger(userId)) return null;
   const { storage } = await import('./storage');
   const userRow = await storage.getUserById(userId);
@@ -263,57 +237,13 @@ export async function issueTokenForUserId(userId: number): Promise<{ token: stri
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) return null;
   if (!(await memberWithinSeatLimit(user))) return null;
   await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
-  return { token: generateToken(user), merchantId: user.merchantId };
+  return { merchantId: user.merchantId, userId: userRow.id, sessionVersion: user.sessionVersion ?? 0 };
 }
 
-/** A token for a users row just read or updated, under its current session version; null if it is not a merchant login. */
-export function tokenForUserRow(row: Parameters<typeof userRowToUser>[0]): string | null {
+/** The login for a users row just read or updated; null if it is not a business login. */
+export function sessionLoginForUserRow(row: Parameters<typeof userRowToUser>[0]): { userId: number; sessionVersion: number } | null {
   const user = userRowToUser(row);
-  return user ? generateToken(user) : null;
-}
-
-export function generateToken(user: User): string {
-  const userId = user.userId ?? user.id;
-  if (!isPositiveInteger(userId) || typeof user.email !== 'string' || !user.email) {
-    throw new Error('Cannot issue a token for an invalid principal');
-  }
-
-  if (user.role === 'admin') {
-    const adminEmail = config.admin.email;
-    if (!adminEmail || user.email.toLowerCase() !== adminEmail.toLowerCase() || user.merchantId !== 0) {
-      throw new Error('Cannot issue an admin token for an unconfigured principal');
-    }
-    return jwt.sign(
-      { principal: ADMIN_TOKEN_PRINCIPAL, userId, email: adminEmail, merchantId: 0, role: 'admin' },
-      JWT_SECRET,
-      { expiresIn: '1h' },
-    );
-  }
-
-  if (!isMerchantUserRole(user.role) || !isPositiveInteger(user.merchantId)) {
-    throw new Error('Cannot issue a token without a users-row principal');
-  }
-
-  return jwt.sign(
-    {
-      principal: TOKEN_PRINCIPAL,
-      userId,
-      email: user.email,
-      merchantId: user.merchantId,
-      role: user.role,
-      sv: user.sessionVersion ?? 0,
-    },
-    JWT_SECRET,
-    { expiresIn: '1h' } // 1 hour as requested
-  );
-}
-
-export function verifyToken(token: string): any {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    return null;
-  }
+  return user ? { userId: user.userId ?? user.id, sessionVersion: user.sessionVersion ?? 0 } : null;
 }
 
 /**
@@ -355,106 +285,262 @@ function respondAuthBackendUnavailable(res: Response) {
   });
 }
 
+/**
+ * R1-T4 phase E3: a request signs in by its session cookie only, whatever Authorization header comes
+ * with it. Keep the middleware's established name for the route inventory. The admin area reads only
+ * its own cookie; other routes read the business cookie, then the admin cookie.
+ */
 export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer ([^\s]+)$/i) : null;
-
-  if (!match) {
-    return res.status(401).json({ message: 'Access token required' });
+  const realms: SessionRealm[] = req.path.startsWith('/api/admin') ? ['admin'] : ['business', 'admin'];
+  for (const realm of realms) {
+    const value = readSessionCookie(req, realm);
+    if (value !== undefined) return authenticateSession(req, res, next, realm, value);
   }
-  const token = match[1];
-  const decoded = verifyToken(token);
-  // P2.2 (R1-T3, owner decision 2026-09-27): a credential that is missing, invalid, expired or disabled
-  // is 401, so every page sends the person to sign in again (it was 403 here and below).
-  if (!decoded) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
-  }
+  return res.status(401).json({ code: 'INVALID_SESSION', message: 'Please sign in again.' });
+}
 
-  // A role string alone is not admin authority. Require the dedicated principal,
-  // the configured email, and a zero merchant scope.
-  if (decoded.role === 'admin') {
-    const adminEmail = config.admin.email;
-    if (
-      decoded.principal !== ADMIN_TOKEN_PRINCIPAL ||
-      !adminEmail ||
-      typeof decoded.email !== 'string' ||
-      decoded.email.toLowerCase() !== adminEmail.toLowerCase() ||
-      decoded.merchantId !== 0 ||
-      !isPositiveInteger(decoded.userId)
-    ) {
-      return res.status(401).json({ message: 'Invalid admin session' });
-    }
-    req.user = {
-      id: decoded.userId,
-      email: adminEmail,
-      password: '',
-      merchantId: 0,
-      role: 'admin',
-      createdAt: new Date(),
-    };
-    return next();
-  }
+// ============================================
+// SESSION COOKIES (R1-T4 phase E)
+// ============================================
 
-  // Reject pre-team-logins tokens: their `userId` is a merchant id, so honouring
-  // one would resolve the wrong users row. See TOKEN_PRINCIPAL.
-  if (decoded.principal !== TOKEN_PRINCIPAL) {
-    return res.status(401).json({ message: 'Session expired. Please sign in again.' });
-  }
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-  // R1-T4 phase D: tokens issued before session versions carry none and count as
-  // version 0, so they last only until the login's sessions are first ended.
-  const tokenSessionVersion = decoded.sv === undefined ? 0 : decoded.sv;
-  if (
-    !isPositiveInteger(decoded.merchantId) ||
-    !isPositiveInteger(decoded.userId) ||
-    !isMerchantUserRole(decoded.role) ||
-    !Number.isInteger(tokenSessionVersion) ||
-    tokenSessionVersion < 0
-  ) {
-    return res.status(401).json({ code: 'INVALID_SESSION', message: 'Invalid session' });
-  }
+type SessionRefusal = { status: 401; body: Record<string, string> };
+type SessionResolution =
+  | { kind: 'ok'; user: User; session: AuthSession; presented: Exclude<PresentedSecret, 'late'> }
+  | { kind: 'refused'; refusal: SessionRefusal }
+  | { kind: 'unavailable' };
+type SessionLoginResolution =
+  | { kind: 'ok'; user: User }
+  | { kind: 'refused'; refusal: SessionRefusal }
+  | { kind: 'unavailable' };
 
-  // Each read is guarded on its own, and the decisions sit outside the guard, so
-  // that only a genuine answer from the database can produce a 401 — a rejection
-  // here is a statement about this principal, never about our uptime.
+const SESSION_REFUSALS = {
+  INVALID_SESSION: { status: 401, body: { code: 'INVALID_SESSION', message: 'Please sign in again.' } },
+  SESSION_ENDED: { status: 401, body: { code: 'SESSION_ENDED', message: 'You were signed out. Please sign in again.' } },
+  ACCESS_REVOKED_LOGIN: { status: 401, body: { message: 'Access revoked' } },
+  ACCESS_REVOKED: { status: 401, body: { code: 'ACCESS_REVOKED', message: 'Access revoked' } },
+} as const satisfies Record<string, SessionRefusal>;
+
+/**
+ * Resolves a session cookie's value to its signed-in principal, or why not. The row is found by the
+ * cookie's id and its secret checked in constant time; a replaced secret presented after its 60 seconds
+ * ends the whole session (someone else holds a copy). The login and business are re-read as for a
+ * token, and the login's session version must still be the session's. Writes nothing else: only a
+ * request let through settles the session (settleSession).
+ */
+async function resolveSessionCookie(realm: SessionRealm, value: string): Promise<SessionResolution> {
+  const refused = (refusal: SessionRefusal): SessionResolution => ({ kind: 'refused', refusal });
+  const parsed = parseSessionCookie(value);
+  if (!parsed) return refused(SESSION_REFUSALS.INVALID_SESSION);
+
   const storageModule = await readForAuth('load the storage module', () => import('./storage'));
-  if (storageModule === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+  if (storageModule === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
   const { storage } = storageModule;
 
-  const userRow = await readForAuth('read the users row', () => storage.getUserById(decoded.userId));
-  if (userRow === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+  const session = await readForAuth('read the session', () => storage.getAuthSession(parsed.id));
+  if (session === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
+  if (!session || session.principal !== realm) return refused(SESSION_REFUSALS.INVALID_SESSION);
 
+  const now = new Date();
+  const presented = presentedSecret(session, parsed.secret, now);
+  if (!presented) return refused(SESSION_REFUSALS.INVALID_SESSION);
+  if (sessionEnded(session, now)) return refused(SESSION_REFUSALS.SESSION_ENDED);
+  if (presented === 'late') {
+    // Someone else holds a copy of a replaced secret: end the session for both of them.
+    const ended = await readForAuth('end a reused session', () => storage.revokeAuthSession(session.id, 'reuse_detected', now));
+    logSecurityEvent('SESSION_REUSE_DETECTED', { sessionId: session.id, realm, userId: session.userId, ended: ended === true });
+    return refused(SESSION_REFUSALS.SESSION_ENDED);
+  }
+
+  const login = await resolveSessionLogin(storage, realm, session);
+  return login.kind === 'ok' ? { kind: 'ok', user: login.user, session, presented } : login;
+}
+
+/**
+ * The login a session stands for, re-read as for a token: the admin's credentials must still be the
+ * session's; a business login must be active, its session version still the session's, and its business
+ * verified or active. Reads only.
+ */
+async function resolveSessionLogin(
+  storage: Pick<IStorage, 'getUserById' | 'getMerchant'>,
+  realm: SessionRealm,
+  session: AuthSession,
+): Promise<SessionLoginResolution> {
+  const refused = (refusal: SessionRefusal): SessionLoginResolution => ({ kind: 'refused', refusal });
+  if (realm === 'admin') {
+    const adminEmail = config.admin.email;
+    // The admin's email or password changed since this session began.
+    if (!adminEmail || !adminTagMatches(session.adminTag)) return refused(SESSION_REFUSALS.SESSION_ENDED);
+    const admin: User = { id: 1, email: adminEmail, password: '', merchantId: 0, role: 'admin', createdAt: new Date() };
+    return { kind: 'ok', user: admin };
+  }
+
+  const userId = session.userId;
+  if (!isPositiveInteger(userId)) return refused(SESSION_REFUSALS.INVALID_SESSION);
+  const userRow = await readForAuth('read the users row', () => storage.getUserById(userId));
+  if (userRow === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
   const user = userRow ? userRowToUser(userRow) : null;
-
-  // Re-check the identity on every request so disabling a teammate takes effect
-  // within the token's remaining lifetime rather than at its natural expiry.
-  if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
-    return res.status(401).json({ message: 'Access revoked' });
-  }
-
-  // A password reset or "sign out everywhere" advanced the version: every token
-  // issued before it is spent. 401, so the client drops it and signs in again.
-  if (tokenSessionVersion !== (userRow.sessionVersion ?? 0)) {
-    return res.status(401).json({ code: 'SESSION_ENDED', message: 'You were signed out. Please sign in again.' });
-  }
-
-  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(decoded.merchantId));
-  if (merchant === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
-
-  // A row that is absent, unverified or suspended — the database answered, and
-  // the answer is that this login has no usable account behind it.
+  if (!userRow || !user || userRow.status !== 'active') return refused(SESSION_REFUSALS.ACCESS_REVOKED_LOGIN);
+  // A password reset or change, or "sign out everywhere", advanced the version.
+  if ((userRow.sessionVersion ?? 0) !== session.sessionVersion) return refused(SESSION_REFUSALS.SESSION_ENDED);
+  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(user.merchantId));
+  if (merchant === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
-    return res.status(401).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
+    return refused(SESSION_REFUSALS.ACCESS_REVOKED);
   }
+  return { kind: 'ok', user };
+}
 
-  // The database role is authoritative; stale JWT role claims are ignored.
-  req.user = user;
+/**
+ * Whether the sign-in a live stream was opened by still stands, read again from shared storage, so an
+ * ending made on another instance closes the stream here (external review 2026-09-29, R1-T4). True only
+ * for a sign-in a request would still be let through on, and for `merchantId`'s own login or the
+ * platform admin. A refusal and a storage fault alike answer false: the stream is closed and the page
+ * asks again.
+ *
+ * A session cookie's stream is checked by its session id: the session must not have been ended or run
+ * out, and its login is re-read. The cookie's secret is not presented again (the daily swap replaces it
+ * while a stream stays open, and a replaced secret presented late would end the session as a stolen
+ * copy), nothing is written, and the check is not a use: an open stream does not keep a session alive.
+ */
+export async function isStreamSessionActive(
+  signIn: { id: string; realm: SessionRealm },
+  merchantId?: number,
+): Promise<boolean> {
+  const user = await userOfLiveSession(signIn);
+  if (!user) return false;
+  return merchantId === undefined || user.role === 'admin' || user.merchantId === merchantId;
+}
+
+/**
+ * The login a business session stands for now, when that session has not been ended or run out and
+ * its login could still be signed in by it; else null (a storage fault included). For a request that
+ * arrives without the session's cookie but names the session under the server's own signature:
+ * Apple's return to a connect (R1-T5c). Like the stream check, it presents no secret, writes nothing
+ * and is not a use of the session.
+ */
+export function liveBusinessSessionLogin(sessionId: string): Promise<User | null> {
+  return userOfLiveSession({ id: sessionId, realm: 'business' });
+}
+
+/** The principal a session stands for now, when it has not been ended or run out; else null. */
+async function userOfLiveSession(signIn: { id: string; realm: SessionRealm }): Promise<User | null> {
+  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
+  if (storageModule === STORAGE_UNAVAILABLE) return null;
+  const { storage } = storageModule;
+  const session = await readForAuth('read the session', () => storage.getAuthSession(signIn.id));
+  if (session === STORAGE_UNAVAILABLE || !session || session.principal !== signIn.realm) return null;
+  if (sessionEnded(session, new Date())) return null;
+  const login = await resolveSessionLogin(storage, signIn.realm, session);
+  return login.kind === 'ok' ? login.user : null;
+}
+
+/**
+ * Signs a request in by its session cookie: a refusal clears the cookie; a change needs the page's CSRF
+ * token; a request let through takes up an offered secret, is offered the daily swap, and is recorded
+ * as a use.
+ */
+async function authenticateSession(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+  realm: SessionRealm,
+  value: string,
+) {
+  const resolved = await resolveSessionCookie(realm, value);
+  if (resolved.kind === 'unavailable') return respondAuthBackendUnavailable(res);
+  if (resolved.kind === 'refused') {
+    clearSessionCookie(res, realm);
+    return res.status(resolved.refusal.status).json(resolved.refusal.body);
+  }
+  if (!SAFE_METHODS.has(req.method) && !csrfTokenMatches(req.headers[CSRF_HEADER], resolved.session.id, getBaseUrl(req))) {
+    return res.status(403).json({
+      code: 'CSRF_REJECTED',
+      message: 'This request could not be verified. Please reload the page and try again.',
+    });
+  }
+  await settleSession(res, realm, resolved.session, resolved.presented, new Date());
+  req.user = resolved.user;
+  req.authSession = { id: resolved.session.id, realm };
   return next();
 }
 
+/**
+ * The start-up check's half of a business sign-in (GET /api/auth/session): the signed-in login, or
+ * null — never a refusal, so a visitor who is not signed in gets an ordinary answer. An invalid cookie
+ * is cleared; a valid session is settled like any request it signs in.
+ */
+export async function readBusinessSession(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<'unavailable' | { user: User; csrfToken: string } | null> {
+  const value = readSessionCookie(req, 'business');
+  if (value === undefined) return null;
+  const resolved = await resolveSessionCookie('business', value);
+  if (resolved.kind === 'unavailable') return 'unavailable';
+  if (resolved.kind === 'refused') {
+    clearSessionCookie(res, 'business');
+    return null;
+  }
+  await settleSession(res, 'business', resolved.session, resolved.presented, new Date());
+  req.user = resolved.user;
+  req.authSession = { id: resolved.session.id, realm: 'business' };
+  return { user: resolved.user, csrfToken: csrfTokenFor(resolved.session.id, getBaseUrl(req)) };
+}
+
+export { respondAuthBackendUnavailable };
+
+/** Whether the request carries a business or admin session cookie at all, valid or not. */
+export function hasSessionCookie(req: Request): boolean {
+  return readSessionCookie(req, 'business') !== undefined || readSessionCookie(req, 'admin') !== undefined;
+}
+
+/** The page's CSRF token for the session a request was signed in by. */
+export function csrfTokenForRequest(req: AuthenticatedRequest): string | undefined {
+  return req.authSession ? csrfTokenFor(req.authSession.id, getBaseUrl(req)) : undefined;
+}
+
+/** Starts a business session for a login that has just proved itself, and sets its cookie. */
+export function startBusinessSession(
+  req: Request,
+  res: Response,
+  login: { userId: number; sessionVersion: number },
+): Promise<StartedSession> {
+  return startSession(req, res, { realm: 'business', userId: login.userId, sessionVersion: login.sessionVersion });
+}
+
+/** Starts an admin session for the admin who has just proved themselves, and sets its cookie. */
+export function startAdminSession(req: Request, res: Response): Promise<StartedSession> {
+  return startSession(req, res, { realm: 'admin' });
+}
+
+/** Ends one session (Log Out), clears its cookie and records why. False when it had already ended. */
+export async function endAuthSession(
+  res: Response,
+  session: { id: string; realm: SessionRealm },
+  reason: SessionEndReason,
+): Promise<boolean> {
+  const { storage } = await import('./storage');
+  const ended = await storage.revokeAuthSession(session.id, reason, new Date());
+  clearSessionCookie(res, session.realm);
+  logSecurityEvent('SESSION_REVOKED', { sessionId: session.id, realm: session.realm, reason });
+  return ended;
+}
+
+/** Ends every live session of a login (but `keepId`) and records why; how many ended. */
+export async function endLoginSessions(userId: number, reason: SessionEndReason, keepId?: string): Promise<number> {
+  const { storage } = await import('./storage');
+  const count = await storage.revokeAuthSessionsForLogin(userId, reason, new Date(), keepId);
+  logSecurityEvent('SESSION_REVOKED', { userId, reason, sessions: count });
+  return count;
+}
+
+export { clearSessionCookie };
+
 // Enable the owner's login and return the real users-row principal. The merchant
 // hash writer synchronises/creates that owner row; re-reading it prevents Google
-// OAuth from minting a token whose uid is accidentally the merchant id.
+// OAuth from starting a session whose login id is accidentally the merchant id.
 export async function createUser(email: string, password: string, merchantId: number, role: 'merchant' | 'admin' = 'merchant'): Promise<User> {
   if (role === 'admin') {
     throw new Error('Admin identities cannot be created in the merchant users table');

@@ -1,51 +1,22 @@
-import "./support/test-env";
-
-import request from "supertest";
-import { createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
-import type { TransactionStorageInput } from "../storage";
-
-/**
- * Route review, batch 2b (C10): the Windcave browser callback read its
- * transactionId with parseInt, so "12abc" found sale 12 — the permissive parse
- * R1-T6 retired everywhere else (its source guard looks for parseInt(req.…)
- * directly and missed this one, read through a variable first). A malformed
- * id now finds nothing, like an unknown one.
- */
-async function settledSale() {
-  const owner = await createOwnerPrincipal();
-  const sale = await storage.createTransaction({
-    merchantId: owner.merchantId,
-    itemName: "Coffee",
-    price: "5.00",
-    status: "pending",
-    paymentMethod: "qr_code",
-    splitEnabled: false,
-  } as TransactionStorageInput);
-  await storage.updateTransactionSessionState(sale.id, "approved");
-  return sale;
-}
-
-describe("the Windcave browser callback's transactionId", () => {
-  beforeEach(() => resetTestStorage());
-
-  it("finds a sale by its exact number", async () => {
-    const sale = await settledSale();
-    const { app } = await createTestApp();
-    const response = await request(app).get(`/api/windcave/callback?transactionId=${sale.id}`);
-    expect(response.status).toBe(302);
-    expect(response.headers.location).toBe(`/receipt/${sale.id}`);
-  });
-
-  it.each([
-    ["trailing text", (id: number) => `${id}abc`],
-    ["a decimal", (id: number) => `${id}.0`],
-    ["a sign", (id: number) => `+${id}`],
-    ["an exponent", (id: number) => `${id}e0`],
-  ])("finds nothing for a number with %s, as for an unknown one", async (_label, form) => {
-    const sale = await settledSale();
-    const { app } = await createTestApp();
-    const response = await request(app).get(`/api/windcave/callback?transactionId=${encodeURIComponent(form(sale.id))}`);
-    expect(response.status).toBe(302);
-    expect(response.headers.location).toBe("/");
-  });
+import './support/durable-payments-env';
+import request from 'supertest';import {randomUUID} from 'node:crypto';
+import {PaymentAttemptService} from '../payment-attempt-service';import {syntheticRetailRuntime} from './support/retail-runtime';
+import {createOwnerPrincipal,createTestApp,resetTestStorage,storage} from './support/http-harness';
+beforeEach(()=>resetTestStorage());
+async function fixture(){const owner=await createOwnerPrincipal(),sale=await storage.createTransaction({merchantId:owner.merchantId,itemName:'Callback',price:'5.00',status:'pending',paymentMethod:'qr_code',splitEnabled:false} as any);
+  const port=syntheticRetailRuntime(storage,new PaymentAttemptService(storage)),{app}=await createTestApp({paymentRuntime:port.runtime});
+  const opened=await request(app).post(`/api/transactions/${sale.id}/pay`).send({idempotencyKey:randomUUID(),shareIndex:0});expect(opened.status).toBe(200);return {sale,port,app,state:opened.body.returnState};}
+test('the exact number plus its owned hashed state reaches its verified receipt',async()=>{
+  const f=await fixture();f.port.setObservation('approved');const response=await request(f.app).get('/api/windcave/callback').query({transactionId:String(f.sale.id),state:f.state});
+  expect(response.status).toBe(303);expect(response.headers.location).toBe(`/receipt/${f.sale.id}`);expect((await storage.getTransaction(f.sale.id))?.status).toBe('completed');
+});
+test('a cached legacy approval without return state cannot redirect to a paid receipt',async()=>{
+  const f=await fixture();await storage.updateTransactionSessionState(f.sale.id,'approved');
+  const response=await request(f.app).get('/api/windcave/callback').query({transactionId:String(f.sale.id)});
+  expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();expect(f.port.client.querySession).not.toHaveBeenCalled();expect((await storage.getTransaction(f.sale.id))?.status).toBe('pending');
+});
+test.each(['abc','.0','+','e0'])('malformed number (%s) cannot use another valid return state',async form=>{
+  const f=await fixture(),id=form==='+'?`+${f.sale.id}`:`${f.sale.id}${form}`;
+  const response=await request(f.app).get('/api/windcave/callback').query({transactionId:id,state:f.state});
+  expect(response.status).toBe(404);expect(response.headers.location).toBeUndefined();expect(f.port.client.querySession).not.toHaveBeenCalled();expect((await storage.getTransaction(f.sale.id))?.status).toBe('pending');
 });

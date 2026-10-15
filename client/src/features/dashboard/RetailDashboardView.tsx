@@ -212,6 +212,7 @@ function TimeframeBar({
             }}
             className="rd-tap"
             data-demo-id={"retail-dashboard-timeframe-" + option}
+            aria-pressed={timeframe === option}
             onPointerDown={pulse}
             onClick={() => onPick(option)}
             style={{
@@ -227,7 +228,7 @@ function TimeframeBar({
               fontWeight: timeframe === option ? 700 : 600,
               fontSize: 12,
               textTransform: "capitalize",
-              color: timeframe === option ? BLUE : "rgba(0,229,204,0.55)",
+              color: timeframe === option ? "#040D6D" : "#FFFFFF",
               transition: "color 0.25s ease",
               WebkitTapHighlightColor: "transparent",
             }}
@@ -327,7 +328,7 @@ function SalesBarChart({
             fontFamily="Outfit, system-ui"
             fontWeight="600"
             fontSize={count > 8 ? 11 : 13}
-            fill={TEAL}
+            fill="#FFFFFF"
           >
             {bucket.label}
           </text>
@@ -587,7 +588,7 @@ export function RetailDashboardView({
                   padding: "5px 12px",
                   borderRadius: 999,
                   border: "1.5px solid " + TEAL,
-                  color: TEAL,
+                  color: "#FFFFFF",
                   fontWeight: 600,
                   fontSize: 12.5,
                 }}
@@ -599,7 +600,7 @@ export function RetailDashboardView({
           <div
             style={{
               marginTop: 10,
-              color: TEAL,
+              color: "#FFFFFF",
               fontWeight: 500,
               fontSize: 15,
             }}
@@ -622,7 +623,7 @@ export function RetailDashboardView({
               data-demo-id="retail-dashboard-completed-sales"
               style={{
                 marginTop: 4,
-                color: "rgba(0,229,204,0.6)",
+                color: "#FFFFFF",
                 fontWeight: 400,
                 fontSize: 13,
               }}
@@ -805,7 +806,7 @@ export function RetailDashboardView({
                 style={{
                   fontWeight: 700,
                   fontSize: 11,
-                  color: TEAL,
+                  color: "#FFFFFF",
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
                 }}

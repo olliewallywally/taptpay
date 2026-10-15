@@ -15,6 +15,7 @@ import {
 import SplitPaymentView, {
   type SplitPaymentSelection,
 } from '@/features/checkout/SplitPaymentView';
+import { TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 
 export default function SplitPayment({
   sourceKind = 'retail-legacy',
@@ -41,7 +42,7 @@ export default function SplitPayment({
   } = useQuery({
     queryKey: isTokenSource
       ? ['token-payment', token]
-      : ['/api/transactions', txnId],
+      : [TRANSACTIONS_KEY, txnId],
     queryFn: async () => {
       const endpoint = isTokenSource
         ? checkoutResolveEndpoint({ kind: 'retail-token', token })
@@ -78,7 +79,7 @@ export default function SplitPayment({
       if (message.transaction?.id === txnId) {
         setCurrentTransaction(message.transaction);
         // The live copy carries no business details: keep those read with the sale.
-        queryClient.setQueryData(['/api/transactions', txnId], (previous: any) => ({
+        queryClient.setQueryData([TRANSACTIONS_KEY, txnId], (previous: any) => ({
           ...message.transaction,
           merchant: previous?.merchant,
         }));
@@ -125,7 +126,7 @@ export default function SplitPayment({
           'POST',
           isTokenSource
             ? tokenSplitEndpoint(token)
-            : `/api/transactions/${txnId}/split`,
+            : apiPath("POST /api/transactions/:id/split", { id: txnId }),
           {
             totalSplits: splitCount,
           }
@@ -133,7 +134,7 @@ export default function SplitPayment({
         const data = await response.json();
         if (!isTokenSource && data.transaction) {
           setCurrentTransaction(data.transaction);
-          queryClient.setQueryData(['/api/transactions', txnId], (previous: any) => ({
+          queryClient.setQueryData([TRANSACTIONS_KEY, txnId], (previous: any) => ({
             ...data.transaction,
             merchant: previous?.merchant,
           }));
@@ -147,7 +148,7 @@ export default function SplitPayment({
         return;
       }
 
-      const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
+      const payRes = await fetch(apiPath("POST /api/transactions/:id/pay", { id: txnId }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,7 +178,7 @@ export default function SplitPayment({
       return;
     }
     try {
-      const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
+      const payRes = await fetch(apiPath("POST /api/transactions/:id/pay", { id: txnId }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ merchantId: txn.merchantId }),

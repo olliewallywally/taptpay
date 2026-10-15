@@ -7,7 +7,7 @@ import crypto from "crypto";
 import request from "supertest";
 import { config } from "../config";
 import {
-  VALID_PASSWORD, bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage,
+  VALID_PASSWORD, signedIn, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage,
 } from "./support/http-harness";
 
 /**
@@ -75,9 +75,9 @@ async function googleCallback(app: App, from: Record<string, string>) {
 describe("the address the app takes as the visitor's", () => {
   it("is the one the trusted proxy appended: whatever the visitor wrote before it is ignored", async () => {
     const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
 
-    const seen = await request(app).get("/api/admin/request-origin").set(bearer(admin))
+    const seen = await request(app).get("/api/admin/request-origin").set(signedIn(admin))
       .set(via("203.0.113.9", "198.51.100.7")).set("X-Forwarded-Proto", "https");
 
     expect(seen.status).toBe(200);
@@ -99,7 +99,8 @@ describe("the address the app takes as the visitor's", () => {
     const owner = await createOwnerPrincipal();
 
     expect((await request(app).get("/api/admin/request-origin")).status).toBe(401);
-    expect((await request(app).get("/api/admin/request-origin").set(bearer(owner))).status).toBe(403);
+    // A business cookie is not a sign-in to the admin area, which reads only its own cookie.
+    expect((await request(app).get("/api/admin/request-origin").set(signedIn(owner))).status).toBe(401);
   });
 });
 

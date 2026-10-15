@@ -3,6 +3,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Download, Share2, FileText, ArrowRight, CheckCircle, Loader2, Phone, Mail, User } from "lucide-react";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 import { PLANS, formatPlanPrice } from "@shared/plans";
+import { apiPath } from "@shared/api-path";
 
 const LS_KEY = "infoPackUnlocked";
 
@@ -62,7 +63,7 @@ export default function InfoPage() {
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) { setError("Please enter a valid email address."); return; }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/info-pack-leads", {
+      const res = await fetch(apiPath("POST /api/info-pack-leads"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), email: email.trim() }),
@@ -113,11 +114,11 @@ export default function InfoPage() {
           className="w-full max-w-sm rounded-3xl p-7"
           style={{ background: cardBg, border }}
         >
-          <p className="text-[#00f1d7] text-xs uppercase tracking-[0.2em] mb-2">info pack 2026</p>
+          <p className="text-white text-xs uppercase tracking-[0.2em] mb-2">info pack 2026</p>
           <h1 className="text-white text-2xl font-semibold leading-snug mb-1">
             Get the TaptPay info pack
           </h1>
-          <p className="text-white/55 text-sm mb-6 leading-relaxed">
+          <p className="text-white text-sm mb-6 leading-relaxed">
             Enter your details below to access our full info pack — no spam, ever.
           </p>
 
@@ -131,7 +132,7 @@ export default function InfoPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
+                className="w-full bg-[#040D6D] text-white placeholder-white/85 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
                 style={{ border: "1px solid rgba(255,255,255,0.15)" }}
               />
             </div>
@@ -145,7 +146,7 @@ export default function InfoPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
+                className="w-full bg-[#040D6D] text-white placeholder-white/85 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
                 style={{ border: "1px solid rgba(255,255,255,0.15)" }}
               />
             </div>
@@ -168,7 +169,7 @@ export default function InfoPage() {
           </form>
         </div>
 
-        <p className="text-white/20 text-xs mt-8 text-center">
+        <p className="text-white/90 text-xs mt-8 text-center">
           © 2026 TaptPay · 100% Kiwi owned & operated
         </p>
       </div>
@@ -197,7 +198,7 @@ export default function InfoPage() {
 
         {/* Hero */}
         <div className="px-5 pt-6 pb-8">
-          <p className="text-[#00f1d7] text-xs uppercase tracking-[0.2em] mb-3">info pack 2026</p>
+          <p className="text-white text-xs uppercase tracking-[0.2em] mb-3">info pack 2026</p>
           <h1 className="text-white text-4xl font-light leading-tight mb-4">
             the smarter<br />way to take<br />payments.
           </h1>
@@ -211,7 +212,7 @@ export default function InfoPage() {
           <ul className="space-y-3">
             {highlights.map((item, i) => (
               <li key={i} className="flex items-start gap-3">
-                <CheckCircle className="w-4 h-4 text-[#00f1d7] flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
                 <span className="text-white/90 text-sm leading-snug">{item}</span>
               </li>
             ))}
@@ -242,21 +243,21 @@ export default function InfoPage() {
 
         {/* Contact block */}
         <div className="mx-5 mb-6 bg-white/10 rounded-3xl p-5">
-          <p className="text-[#00f1d7] text-xs uppercase tracking-[0.15em] mb-3">Get in touch</p>
+          <p className="text-white text-xs uppercase tracking-[0.15em] mb-3">Get in touch</p>
           <p className="text-white font-semibold text-base mb-3">Oliver Leonard</p>
           <div className="space-y-2">
             <a
               href="tel:+64212094672"
               className="flex items-center gap-3 text-white/80 hover:text-white text-sm transition-colors"
             >
-              <Phone className="w-4 h-4 text-[#00f1d7] flex-shrink-0" />
+              <Phone className="w-4 h-4 text-white flex-shrink-0" />
               021 209 4672
             </a>
             <a
               href="mailto:oliverleonard@taptpay.co.nz"
               className="flex items-center gap-3 text-white/80 hover:text-white text-sm transition-colors break-all"
             >
-              <Mail className="w-4 h-4 text-[#00f1d7] flex-shrink-0" />
+              <Mail className="w-4 h-4 text-white flex-shrink-0" />
               oliverleonard@taptpay.co.nz
             </a>
           </div>

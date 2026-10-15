@@ -8,12 +8,13 @@ process.env.ENV_VALIDATION_MODE = "enforce";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import {
-  bearer,
+  signedIn,
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
   resetTestStorage,
 } from "./support/http-harness";
+import { ADMIN_COOKIE, BUSINESS_COOKIE } from "./support/session-browser";
 import { config } from "../config";
 
 // A minimal buffer that passes this route's PNG magic-byte check
@@ -33,13 +34,13 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
 
     const memberAttempt = await request(app)
       .put(`/api/merchants/${owner.merchantId}/theme`)
-      .set(bearer(member))
+      .set(signedIn(member))
       .send({ themeId: "midnight" });
     expect(memberAttempt.status).toBe(403);
 
     const ownerAttempt = await request(app)
       .put(`/api/merchants/${owner.merchantId}/theme`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send({ themeId: "midnight" });
     expect(ownerAttempt.status).toBe(200);
   });
@@ -51,13 +52,13 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
 
     const memberAttempt = await request(app)
       .put(`/api/merchants/${owner.merchantId}/daily-goal`)
-      .set(bearer(member))
+      .set(signedIn(member))
       .send({ dailyGoal: "750.00" });
     expect(memberAttempt.status).toBe(403);
 
     const ownerAttempt = await request(app)
       .put(`/api/merchants/${owner.merchantId}/daily-goal`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send({ dailyGoal: "750.00" });
     expect(ownerAttempt.status).toBe(200);
   });
@@ -69,13 +70,13 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
 
     const memberAttempt = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(member))
+      .set(signedIn(member))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
     expect(memberAttempt.status).toBe(403);
 
     const ownerAttempt = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
     expect(ownerAttempt.status).toBe(200);
   });
@@ -87,12 +88,12 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
 
     const memberAttempt = await request(app)
       .delete(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(member));
+      .set(signedIn(member));
     expect(memberAttempt.status).toBe(403);
 
     const ownerAttempt = await request(app)
       .delete(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner));
+      .set(signedIn(owner));
     expect(ownerAttempt.status).not.toBe(403);
   });
 
@@ -103,13 +104,13 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
 
     const memberAttempt = await request(app)
       .post("/api/transactions/999999/refunds")
-      .set(bearer(member))
+      .set(signedIn(member))
       .send({ refundAmount: "1.00", refundReason: "test", refundMethod: "original_payment_method" });
     expect(memberAttempt.status).toBe(403);
 
     const ownerAttempt = await request(app)
       .post("/api/transactions/999999/refunds")
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send({ refundAmount: "1.00", refundReason: "test", refundMethod: "original_payment_method" });
     expect(ownerAttempt.status).not.toBe(403);
   });
@@ -145,7 +146,7 @@ describe("R1-T3 UPL-1 — logo upload authorizes before multer parses the body",
     // so the caller gets the same 403 regardless of what the body contains.
     const res = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(member))
+      .set(signedIn(member))
       .attach("logo", Buffer.from("not a png"), { filename: "logo.png", contentType: "image/jpeg" });
 
     expect(res.status).toBe(403);
@@ -158,7 +159,7 @@ describe("R1-T3 UPL-1 — logo upload authorizes before multer parses the body",
 
     const res = await request(app)
       .post(`/api/merchants/${ownerA.merchantId}/logo`)
-      .set(bearer(ownerB))
+      .set(signedIn(ownerB))
       .attach("logo", Buffer.from("not a png"), { filename: "logo.png", contentType: "image/jpeg" });
 
     expect(res.status).toBe(403);
@@ -174,7 +175,7 @@ describe("R1-T3 UPL-1 — logo upload authorizes before multer parses the body",
 
     const res = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", Buffer.from("not a png"), { filename: "logo.png", contentType: "image/jpeg" });
 
     // Not asserting a specific status here (multer's own fileFilter error
@@ -185,35 +186,52 @@ describe("R1-T3 UPL-1 — logo upload authorizes before multer parses the body",
   });
 });
 
-describe("R1-T3 safe-default role gates — admin requires the validated principal, not a role claim alone", () => {
+describe("R1-T3 safe-default role gates — admin requires the admin area's own session, not a claim", () => {
   beforeEach(() => {
     resetTestStorage();
   });
 
-  it("rejects a role:'admin' JWT claim whose email does not match config.admin.email", async () => {
+  it("rejects a token that claims to be the admin, however well it is signed", async () => {
     const { app } = await createTestApp();
 
-    // generateToken() itself refuses to mint this (see auth.ts) — that is the
-    // point: proving the server-side check, not just the client-side helper,
-    // rejects a forged claim requires signing one directly.
-    const forged = jwt.sign(
-      { principal: "admin", userId: 1, email: "not-the-real-admin@harness.test", merchantId: 0, role: "admin" },
-      config.jwtSecret,
-      { expiresIn: "1h" },
-    );
+    // Each is signed with the server's own secret. The first claims an email that is not the admin's.
+    // The second is the very token the server once issued to the admin: R1-T4 phase E3 retired it, and
+    // the sign-in to the admin area is the admin's session cookie and nothing else.
+    for (const email of ["not-the-real-admin@harness.test", config.admin.email]) {
+      const claimed = jwt.sign(
+        { principal: "admin", userId: 1, email, merchantId: 0, role: "admin" },
+        config.jwtSecret,
+        { expiresIn: "1h" },
+      );
 
-    const response = await request(app).get("/api/admin/merchants").set({ Authorization: `Bearer ${forged}` });
+      const response = await request(app).get("/api/admin/merchants").set({ Authorization: `Bearer ${claimed}` });
 
-    expect(response.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
+      expect({ email, status: response.status }).toEqual({ email, status: 401 }); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
+    }
   });
 
-  it("rejects a merchant owner token on an admin-only route", async () => {
+  it("rejects a business owner's session on an admin-only route: it is no sign-in to the admin area", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const response = await request(app).get("/api/admin/merchants").set(bearer(owner));
+    const response = await request(app).get("/api/admin/merchants").set(signedIn(owner));
 
-    expect(response.status).toBe(403);
+    // The admin area reads only its own cookie (R1-T4 phase E), so the business's session is not
+    // looked at there: 401, as for anyone not signed in to the admin area. (The owner's token, which
+    // every route read, was answered 403.)
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects a business owner's session presented under the admin's cookie name, and leaves it as it was", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const asAdmin = { cookie: owner.cookie.replace(`${BUSINESS_COOKIE}=`, `${ADMIN_COOKIE}=`), csrf: owner.csrf };
+    expect(asAdmin.cookie.startsWith(`${ADMIN_COOKIE}=`)).toBe(true);
+
+    const response = await request(app).get("/api/admin/merchants").set(signedIn(asAdmin));
+
+    expect(response.status).toBe(401);
+    expect((await request(app).get("/api/auth/me").set(signedIn(owner))).status).toBe(200);
   });
 });
 
@@ -241,7 +259,7 @@ describe("R1-T3 safe-default: password change proves the path merchant is the ca
 
     const response = await request(app)
       .put(`/api/merchants/${ownerB.merchantId}/change-password`)
-      .set(bearer(ownerA))
+      .set(signedIn(ownerA))
       .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
 
     expect(response.status).toBe(403);
@@ -267,7 +285,7 @@ describe("R1-T3 safe-default: password change proves the path merchant is the ca
 
     const response = await request(app)
       .put(`/api/merchants/${owner.merchantId}/change-password`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
 
     expect(response.status).toBe(200);
@@ -287,7 +305,7 @@ describe("R1-T3 safe-default: password change proves the path merchant is the ca
 
     const response = await request(app)
       .put(`/api/merchants/${owner.merchantId}/change-password`)
-      .set(bearer(member))
+      .set(signedIn(member))
       .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
 
     expect(response.status).toBe(200);
@@ -307,7 +325,7 @@ describe("R1-T3 safe-default: password change proves the path merchant is the ca
 
     const response = await request(app)
       .put(`/api/merchants/1abc/change-password`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
 
     expect(response.status).toBe(400);
@@ -336,7 +354,7 @@ describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining set
 
     const attack = await request(app)
       .put(`/api/merchants/${ownerB.merchantId}/details`)
-      .set(bearer(ownerA))
+      .set(signedIn(ownerA))
       .send({
         businessName: "Hijacked Business",
         contactEmail: "hijacked@harness.test",
@@ -345,13 +363,13 @@ describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining set
       });
     expect(attack.status).toBe(403);
 
-    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(bearer(ownerB));
+    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(signedIn(ownerB));
     expect(bProfile.status).toBe(200);
     expect(bProfile.body.businessName).not.toBe("Hijacked Business");
 
     const legit = await request(app)
       .put(`/api/merchants/${ownerB.merchantId}/details`)
-      .set(bearer(ownerB))
+      .set(signedIn(ownerB))
       .send({
         businessName: "B's Real Business",
         contactEmail: "b@harness.test",
@@ -371,17 +389,17 @@ describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining set
 
     const attack = await request(app)
       .put(`/api/merchants/${ownerB.merchantId}`)
-      .set(bearer(ownerA))
+      .set(signedIn(ownerA))
       .send({ businessName: "Hijacked Business" });
     expect(attack.status).toBe(403);
 
-    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(bearer(ownerB));
+    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(signedIn(ownerB));
     expect(bProfile.status).toBe(200);
     expect(bProfile.body.businessName).not.toBe("Hijacked Business");
 
     const legit = await request(app)
       .put(`/api/merchants/${ownerB.merchantId}`)
-      .set(bearer(ownerB))
+      .set(signedIn(ownerB))
       .send({ businessName: "B's Real Business" });
     expect(legit.status).toBe(200);
   });
@@ -412,12 +430,12 @@ describe("R1-T3 UPL-7 — cross-tenant regression coverage for the export/analyt
 
     const attack = await request(app)
       .get(`/api/merchants/${ownerB.merchantId}/export/pdf`)
-      .set(bearer(ownerA));
+      .set(signedIn(ownerA));
     expect(attack.status).toBe(403);
 
     const legit = await request(app)
       .get(`/api/merchants/${ownerB.merchantId}/export/pdf`)
-      .set(bearer(ownerB));
+      .set(signedIn(ownerB));
     expect(legit.status).toBe(200);
   });
 });

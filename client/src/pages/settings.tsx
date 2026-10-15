@@ -1,9 +1,10 @@
+import {creationFetch} from '@/lib/creation-command';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
-import { stopThisDevicePush } from "@/lib/push-device";
+import { forgetThisDeviceSignIn, logOut } from "@/lib/log-out";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { MerchantGate } from "@/components/merchant-gate";
 import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
+import {billingCardCommandKey} from '@/lib/billing-card-command';
 import { isNativeApp } from "@/lib/native";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { useAppleConnection } from "@/hooks/use-apple-connection";
 import {
   BILLING_CARD_SESSION_KEY,
   useBillingCardReturn,
@@ -79,6 +82,8 @@ const billingTypeLabel = (value: string) =>
 import {
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, Wrench, BookOpen, RotateCcw, SlidersHorizontal, UserCircle
 } from "lucide-react";
+import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tutorial";
 
@@ -88,7 +93,7 @@ type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tut
    was: inside the untouched sub-page body content and the untouched bottom
    cluster (payment button, mode buttons, log out). */
 const APPLE_INK = '#1C1C1E';
-const APPLE_MUTED = '#8E8E93';
+const APPLE_MUTED = '#586079';
 const APPLE_FILL = '#F2F2F7';
 
 /* iOS-style push/pop: the entering page slides in from the right over
@@ -143,7 +148,7 @@ function SettingsItem({ icon, title, value, onClick, delay = 0, testId, tutorial
       data-testid={testId}
       data-tutorial-id={tutorialId}
       data-settings-section={settingsSection}
-      aria-label={title}
+      aria-label={value ? `${title}: ${value}` : title}
       className="pt-bounce w-full flex items-center justify-between px-5 py-4 text-left"
       style={{ '--pt-d': `${delay}ms`, borderBottom: last ? 'none' : '1px solid rgba(0,0,0,0.06)' } as any}
     >
@@ -154,7 +159,7 @@ function SettingsItem({ icon, title, value, onClick, delay = 0, testId, tutorial
         <span style={{ fontWeight: 600, fontSize: 16, color: APPLE_INK, lineHeight: 1.2 }}>{title}</span>
       </span>
       <span className="flex items-center gap-2 flex-shrink-0 ml-3">
-        {value && <span className="text-sm text-gray-400">{value}</span>}
+        {value && <span className="text-sm text-gray-600">{value}</span>}
         <ArrowRight className="w-5 h-5" style={{ color: APPLE_MUTED }} />
       </span>
     </button>
@@ -190,7 +195,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { confirmingCard } = useBillingCardReturn();
+  const { confirmingCard } = useBillingCardReturn(merchantId);
   const {
     restartTutorials,
     visitedPages: tutorialVisitedPages,
@@ -204,9 +209,13 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
      Windcave hosted-card return still lands on /settings?section=billing&card=…
      (server/routes.ts:7014, not changed here) — landing straight on the billing
      page instead of an inline scroll target is the same behavior, new shape. */
-  const [activeSection, setActiveSection] = useState<SectionKey | null>(() =>
-    new URLSearchParams(window.location.search).get("section") === "billing" ? "billing" : null,
-  );
+  const [activeSection, setActiveSection] = useState<SectionKey | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    // Apple's return to a connect lands on /settings?apple=<word> (R1-T5d): back on the Account
+    // page the owner left from, as the card return lands on Billing.
+    if (params.has("apple")) return "account";
+    return params.get("section") === "billing" ? "billing" : null;
+  });
   /* Slide-out is a real CSS animation, not an instant unmount — `leaving` keeps
      the section rendered (with the exit class applied) for the animation's
      duration, then the state actually clears. 260ms matches SETTINGS_LEAVE_MS
@@ -259,7 +268,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
 
   useEffect(() => {
-    apiRequest("GET", "/api/trades/gst-settings")
+    apiRequest(...apiTo("GET /api/trades/gst-settings"))
       .then(r => r.json())
       .then(data => {
         setGstRegistered(!!data.gstRegistered);
@@ -271,18 +280,15 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const saveGst = (patch: { gstRegistered?: boolean; tradeGstMode?: "inclusive" | "exclusive" }) => {
     if (patch.gstRegistered !== undefined) setGstRegistered(patch.gstRegistered);
     if (patch.tradeGstMode) setTradeGstMode(patch.tradeGstMode);
-    apiRequest("PUT", "/api/trades/gst-settings", patch).catch(() => {
+    apiRequest(...apiTo("PUT /api/trades/gst-settings"), patch).catch(() => {
       toast({ title: "Could not save GST setting", variant: "destructive" });
     });
   };
 
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch merchant");
       const data = await response.json();
       setBusinessDetails({
@@ -303,31 +309,31 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   });
 
   const { data: authData } = useQuery<AuthMeResponse>({
-    queryKey: ["/api/auth/me"],
+    queryKey: [apiPath("GET /api/auth/me")],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/auth/me");
+      const response = await apiRequest(...apiTo("GET /api/auth/me"));
       if (!response.ok) throw new Error("Failed to load account access");
       return response.json();
     },
   });
   const isOwner = authData?.user?.role === "owner" || authData?.user?.role === "admin";
+  // R1-T5d: the owner's own "Sign in with Apple" row (Account). The server refuses everyone else.
+  const apple = useAppleConnection(authData?.user?.role === "owner");
 
   const { data: billingCardStatus } = useQuery<{
     ready: boolean;
     card: { last4: string; brand: string | null; expiry: string | null } | null;
   }>({
-    queryKey: ["/api/billing/card"],
+    queryKey: [apiPath("GET /api/billing/card")],
     enabled: isOwner,
   });
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (details: MerchantDetails) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await sessionFetch(apiPath("PUT /api/merchants/:id", { id: merchantId }), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(details),
       });
@@ -335,7 +341,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       toast({ title: "Business details saved successfully" });
     },
     onError: () => {
@@ -345,12 +351,10 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const updateDailyGoalMutation = useMutation({
     mutationFn: async (goalAmount: string) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/daily-goal`, {
+      const response = await sessionFetch(apiPath("PUT /api/merchants/:id/daily-goal", { id: merchantId }), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({ dailyGoal: goalAmount }),
       });
@@ -358,7 +362,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       toast({ title: "Daily goal updated successfully" });
     },
     onError: () => {
@@ -368,14 +372,12 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (file: File) => {
-      const token = localStorage.getItem("authToken");
       const formData = new FormData();
       formData.append('logo', file);
       
-      const response = await fetch(`/api/merchants/${merchantId}/logo`, {
+      const response = await sessionFetch(apiPath("POST /api/merchants/:id/logo", { id: merchantId }), {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
         },
         body: formData,
       });
@@ -383,7 +385,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       setLogoFile(null);
       setLogoPreview(null);
       toast({ title: "Logo uploaded successfully" });
@@ -395,18 +397,16 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const deleteLogoMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/logo`, {
+      const response = await sessionFetch(apiPath("DELETE /api/merchants/:id/logo", { id: merchantId }), {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${token}`,
         },
       });
       if (!response.ok) throw new Error("Failed to delete logo");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       setLogoPreview(null);
       toast({ title: "Logo deleted successfully" });
     },
@@ -417,9 +417,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   // Fetch subscription data
   const { data: subscriptionData } = useQuery({
-    queryKey: ["/api/subscription"],
+    queryKey: [apiPath("GET /api/subscription")],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/subscription');
+      const response = await apiRequest(...apiTo("GET /api/subscription"));
       if (!response.ok) throw new Error("Failed to fetch subscription");
       return response.json();
     },
@@ -433,9 +433,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     isLoading: teamLoading,
     error: teamError,
   } = useQuery<{ members: TeamMember[]; seatLimit: number; seatsInUse: number }>({
-    queryKey: ["/api/team"],
+    queryKey: [apiPath("GET /api/team")],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/team');
+      const response = await apiRequest(...apiTo("GET /api/team"));
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to fetch team");
       return body;
@@ -448,9 +448,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     isLoading: billingHistoryLoading,
     error: billingHistoryError,
   } = useQuery<{ history: BillingHistoryEntry[] }>({
-    queryKey: ["/api/subscription/billing-history"],
+    queryKey: [apiPath("GET /api/subscription/billing-history")],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/subscription/billing-history?limit=12");
+      const response = await apiRequest("GET", `${apiPath("GET /api/subscription/billing-history")}?limit=12`);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to load billing history");
       return body;
@@ -459,17 +459,17 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   });
 
   const refreshBilling = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/team"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription/billing-history")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/team")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] });
   };
 
   // Reads the server's message so a refused downgrade explains itself ("Crew ->
   // Solo needs 1 login; you have 4") instead of showing a generic failure.
   const changePlanMutation = useMutation({
     mutationFn: async (planId: PlanId) => {
-      const response = await apiRequest('PUT', '/api/subscription/plan', { planId });
+      const response = await apiRequest(...apiTo("PUT /api/subscription/plan"), { planId });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to change plan");
       return body;
@@ -485,7 +485,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async (reason: string) => {
-      const response = await apiRequest('POST', '/api/subscription/cancel', { reason });
+      const response = await apiRequest(...apiTo("POST /api/subscription/cancel"), { reason });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to cancel subscription");
       return body;
@@ -503,7 +503,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const resumeSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/subscription/resume', {});
+      const response = await apiRequest(...apiTo("POST /api/subscription/resume"), {});
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to resume subscription");
       return body;
@@ -517,7 +517,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const inviteMutation = useMutation({
     mutationFn: async (payload: { email: string; name: string }) => {
-      const response = await apiRequest('POST', '/api/team/invite', payload);
+      const response = await apiRequest(...apiTo("POST /api/team/invite"), payload);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to send invite");
       return body;
@@ -535,7 +535,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const memberStatusMutation = useMutation({
     mutationFn: async (payload: { userId: number; status: 'active' | 'disabled' }) => {
-      const response = await apiRequest('PUT', `/api/team/${payload.userId}/status`, { status: payload.status });
+      const response = await apiRequest(...apiTo("PUT /api/team/:userId/status", { userId: payload.userId }), { status: payload.status });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to update login");
       return body;
@@ -549,7 +549,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const removeMemberMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest('DELETE', `/api/team/${userId}`, undefined);
+      const response = await apiRequest(...apiTo("DELETE /api/team/:userId", { userId }), undefined);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to remove login");
       return body;
@@ -563,7 +563,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const resendInviteMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest("POST", `/api/team/${userId}/resend`, {});
+      const response = await apiRequest(...apiTo("POST /api/team/:userId/resend", { userId }), {});
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to resend invite");
       return body;
@@ -577,7 +577,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const revokeInviteMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest("DELETE", `/api/team/${userId}/invite`, undefined);
+      const response = await apiRequest(...apiTo("DELETE /api/team/:userId/invite", { userId }), undefined);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to revoke invite");
       return body;
@@ -627,16 +627,17 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     deleteLogoMutation.mutate();
   };
 
+  // After "Sign out of all devices" the server has already ended this session too.
   const signOutThisDevice = () => {
-    localStorage.removeItem("authToken");
+    forgetThisDeviceSignIn();
     setLocation('/login');
   };
 
-  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
-  // notifications, with the token it is discarding.
-  const handleLogout = () => {
-    void stopThisDevicePush(localStorage.getItem("authToken"));
-    signOutThisDevice();
+  // R1-T4: Log Out stops this device's notifications (owner decision 2026-09-22), then ends this
+  // session on the server (phase E).
+  const handleLogout = async () => {
+    await logOut();
+    setLocation('/login');
   };
 
   const handleSignOutAllDevices = async () => {
@@ -664,7 +665,10 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     if (!confirmed) return;
     try {
       await restartTutorials();
-      setActiveSection("tutorial");
+      // The phone walkthrough targets the grouped Settings controls. Its
+      // tutorial detail section replaces those controls rather than showing
+      // them alongside the restart button.
+      setActiveSection(null);
       toast({
         title: "Tutorials restarted",
         description: "Open each page normally to see its tutorial again.",
@@ -694,8 +698,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleStartCardSetup = async () => {
     setCardSaving(true);
     try {
-      const resp = await apiRequest('POST', '/api/billing/card/session', {});
+      const resp = await apiRequest(...apiTo("POST /api/billing/card/session"), {},{idempotencyKey:billingCardCommandKey(merchantId)});
       const body = await resp.json().catch(() => ({}));
+      if(body?.pending){if(body.sessionId)sessionStorage.setItem(BILLING_CARD_SESSION_KEY,body.sessionId);throw new Error('Your original card setup is still being confirmed. Refresh shortly.');}
       if (!resp.ok || !body?.redirectUrl) {
         throw new Error(body?.message || 'Could not start card setup');
       }
@@ -711,16 +716,14 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleRemoveCard = async () => {
     setCardRemoving(true);
     try {
-      const authToken = localStorage.getItem("authToken");
-      const resp = await fetch('/api/billing/card', {
+      const resp = await creationFetch(apiPath("DELETE /api/billing/card"), {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${authToken}` },
       });
       const body = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(body?.message || 'Failed to remove card');
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
-        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
+        queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] }),
+        queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/auth/me")] }),
       ]);
       toast({ title: "Card removed" });
     } catch (error: unknown) {
@@ -1387,7 +1390,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
                   <Button
                     onClick={handleCancelSubscription}
                     disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                     data-testid="button-confirm-cancel"
                   >
                     {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm cancellation"}
@@ -1423,6 +1426,51 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
                 <AlertCircle className="text-amber-500 shrink-0" size={24} />
               )}
             </div>
+
+            {/* R1-T5d: Sign in with Apple for this login. Drawn for the owner, where Apple can be
+                connected or already is; connecting and disconnecting ask for the current password. */}
+            {apple.visible && (
+              <div className="p-4 rounded-xl" style={{ background: APPLE_FILL }} data-testid="apple-connection">
+                <p className="text-gray-700 font-medium">Sign in with Apple</p>
+                <p className="text-sm break-words" style={{ color: APPLE_MUTED }}>
+                  {apple.connected
+                    ? `Connected${apple.email ? ` · ${apple.email}` : ''}${apple.isPrivateEmail ? ' (Hide My Email)' : ''}`
+                    : 'Not connected'}
+                </p>
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={apple.password}
+                  onChange={(e) => apple.setPassword(e.target.value)}
+                  placeholder="Current password"
+                  aria-label="Current password for Apple"
+                  className="mt-3 !border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
+                  style={{ minHeight: 44 }}
+                />
+                <WireframeLiquidButton
+                  onClick={apple.submit}
+                  busy={apple.busy}
+                  disabled={!apple.password}
+                  accent="#040D6D"
+                  filledTextColor="#58ABFF"
+                  style={{ width: '100%', marginTop: 12, padding: '12px 27px', fontSize: 14 }}
+                  data-testid="button-apple-connection"
+                >
+                  {apple.connected ? 'Disconnect Apple' : 'Connect Apple'}
+                </WireframeLiquidButton>
+                {!apple.connected && (
+                  <button
+                    type="button"
+                    onClick={() => setLocation('/forgot-password')}
+                    className="w-full mt-1 text-sm font-semibold"
+                    style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44 }}
+                    data-testid="link-apple-set-password"
+                  >
+                    No password yet? Set one first
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         )}
@@ -1509,20 +1557,20 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             <button
               type="button"
               onClick={() => setActiveSection('account')}
-              aria-label="Account"
+              aria-label={`Account: ${businessName}, ${statusActive ? 'active' : 'pending'}`}
               data-testid="settings-row-account"
               className="pt-bounce w-full bg-white p-5 flex items-center justify-between mb-4 text-left"
               style={{ '--pt-d': '0ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
             >
               <div className="flex items-center gap-4 min-w-0">
                 <div style={{ width: 52, height: 52, borderRadius: 999, background: APPLE_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ fontWeight: 700, fontSize: 17, color: APPLE_INK }}>{initials}</span>
+                  <span aria-hidden="true" style={{ fontWeight: 700, fontSize: 17, color: APPLE_INK }}>{initials}</span>
                 </div>
                 <div className="min-w-0">
                   <div style={{ fontWeight: 700, fontSize: 16, color: APPLE_INK, letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {businessName}
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: statusActive ? '#13C29A' : '#FFB02E' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: statusActive ? '#087F5B' : '#92400E' }}>
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
                     {statusActive ? 'active' : 'pending'}
                   </div>
@@ -1614,8 +1662,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#00E5CC" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#00E5CC', letterSpacing: '-0.2px' }}>Retail</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(0,229,204,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal · sales</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Retail</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: '#FFFFFF', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal · sales</div>
             </div>
           </button>
           <button
@@ -1627,7 +1675,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(88,171,255,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants · rent</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: '#93BAFF', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants · rent</div>
             </div>
           </button>
           <button
@@ -1648,7 +1696,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
         <div className="pt-bounce mb-8" style={{ '--pt-d': '445ms' } as any}>
           <Button
             onClick={handleLogout}
-            className="w-full bg-red-500 hover:bg-red-600 text-white py-6 rounded-2xl text-lg flex items-center justify-center gap-2"
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-6 rounded-2xl text-lg flex items-center justify-center gap-2"
+            style={{ scrollMarginBottom: 'calc(var(--dock-h-max, 76px) + 24px)' }}
             data-testid="button-logout"
           >
             <LogOut size={20} />
@@ -1658,7 +1707,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             type="button"
             onClick={handleSignOutAllDevices}
             className="w-full mt-2 py-3 text-sm font-semibold"
-            style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44 }}
+            style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44, scrollMarginBottom: 'calc(var(--dock-h-max, 76px) + 24px)' }}
             data-testid="button-sign-out-everywhere"
           >
             Sign out of all devices

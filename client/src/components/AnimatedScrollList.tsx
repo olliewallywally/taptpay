@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type KeyboardEvent,
   type MutableRefObject,
   type ReactNode,
@@ -47,21 +48,28 @@ export function AnimatedListRow({ as = "button", children, ...props }: AnimatedL
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { amount: 0.5, once: false });
   const reducedMotion = useReducedMotion();
+  const [focused, setFocused] = useState(false);
   const Component = as === "div" ? motion.div : motion.button;
   return (
     <Component
       {...(props as any)}
       ref={ref as any}
       initial={reducedMotion ? RESTING : POPPED_OUT}
-      animate={reducedMotion || inView ? RESTING : POPPED_OUT}
-      transition={reducedMotion ? { duration: 0 } : { duration: 0.2, delay: 0.1 }}
+      animate={reducedMotion || focused || inView ? RESTING : POPPED_OUT}
+      transition={reducedMotion || focused ? { duration: 0 } : { duration: 0.2, delay: 0.1 }}
+      onFocus={(event: any) => {
+        setFocused(true);
+        props.onFocus?.(event);
+        requestAnimationFrame(() => ref.current?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' }));
+      }}
+      onBlur={(event: any) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); props.onBlur?.(event); }}
     >
       {children}
     </Component>
   );
 }
 
-interface AnimatedScrollListProps {
+interface AnimatedScrollListProps extends Pick<HTMLAttributes<HTMLDivElement>, 'tabIndex' | 'role' | 'aria-label'> {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -105,6 +113,9 @@ export function AnimatedScrollList({
   fadeColor,
   showGradients = true,
   enableArrowNavigation = true,
+  tabIndex,
+  role,
+  'aria-label': ariaLabel,
 }: AnimatedScrollListProps) {
   const innerRef = useRef<HTMLDivElement | null>(null);
   const [topOpacity, setTopOpacity] = useState(0);
@@ -135,6 +146,7 @@ export function AnimatedScrollList({
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!enableArrowNavigation) return;
+    if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable="true"]')) return;
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     const container = innerRef.current;
     if (!container) return;
@@ -168,6 +180,9 @@ export function AnimatedScrollList({
         ref={setInnerRef}
         className={className}
         style={style}
+        tabIndex={tabIndex}
+        role={role}
+        aria-label={ariaLabel}
         onScroll={measure}
         onKeyDown={handleKeyDown}
       >

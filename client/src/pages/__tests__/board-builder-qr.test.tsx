@@ -47,12 +47,7 @@ const qrRequests = () => fetchMock.mock.calls.map(([url]) => String(url)).filter
 beforeEach(() => {
   jest.clearAllMocks();
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "tok-1");
   serve();
-});
-
-afterEach(() => {
-  localStorage.removeItem("authToken");
 });
 
 it("draws the business's first payment board's QR, never the business-wide one", async () => {

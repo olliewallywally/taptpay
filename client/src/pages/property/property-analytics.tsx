@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { usePropertyInvoices } from "@/lib/property-data";
 import { periodWindow, collectedCents, type Timeframe } from "@/lib/property-dashboard-data";
 import { PropertyReportsButton } from "@/components/reports/PropertyReportsButton";
@@ -12,7 +12,7 @@ const C = {
   sheet:    '#F4F4F4',
   handle:   'rgba(0,0,0,0.08)',
   textDark: '#1a1a1a',
-  textMuted:'rgba(0,0,0,0.35)',
+  textMuted:'#586079',
   green:    '#22C55E',
   red:      '#EF4444',
 };
@@ -210,6 +210,7 @@ export default function PropertyAnalytics() {
      only a spring back inside the bounds if the drag overshot them. */
   const topRef   = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const periodRef = useRef<HTMLDivElement>(null);
   const dragStartY   = useRef(0);
   const dragStartOff = useRef(0);
   const [measuredTop, setMeasuredTop] = useState<number | null>(null);
@@ -224,11 +225,29 @@ export default function PropertyAnalytics() {
     measure();
     const ro = new ResizeObserver(measure);
     if (topRef.current) ro.observe(topRef.current);
-    return () => ro.disconnect();
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
   }, []);
 
   const defaultOffset = measuredTop ?? 320;
   const currentOffset = sheetOffset ?? defaultOffset;
+
+  useLayoutEffect(() => {
+    const period = periodRef.current;
+    if (!period) return;
+    const sync = () => {
+      // Narrow reflow uses ordinary document scrolling; the sheet no longer
+      // overlays the graph. In the swipe layout, covered controls cannot focus.
+      const covered = document.documentElement.clientWidth > 260 && currentOffset < period.offsetTop + period.offsetHeight;
+      if (covered && period.contains(document.activeElement)) {
+        sheetRef.current?.querySelector<HTMLButtonElement>('[data-tutorial-id="pa-reports"] button')?.focus();
+      }
+      period.inert = covered;
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, [currentOffset]);
 
   const onDragStart = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -252,7 +271,7 @@ export default function PropertyAnalytics() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+    <div className="property-analytics-view" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
       <div ref={topRef} style={{ padding: '52px 24px 0' }}>
@@ -262,9 +281,9 @@ export default function PropertyAnalytics() {
         </div>
 
         {/* Period pills */}
-        <div data-tutorial-id="pa-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
+        <div ref={periodRef} data-tutorial-id="pa-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
-            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button key={p} aria-pressed={tf === p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.7)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
             </button>
           ))}
@@ -272,7 +291,7 @@ export default function PropertyAnalytics() {
 
         {/* Total */}
         <div data-tutorial-id="pa-total" style={{ textAlign: 'center', marginBottom: 4 }}>
-          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.7)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
           <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' }}>
             {totalStr}
           </p>
@@ -288,6 +307,7 @@ export default function PropertyAnalytics() {
       {/* ── Swipeable white sheet ── */}
       <div
         ref={sheetRef}
+        className="pa-history-sheet"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           height: '100svh',

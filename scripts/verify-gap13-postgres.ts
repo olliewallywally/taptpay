@@ -212,20 +212,35 @@ try {
   const storage = new DatabaseStorage(db as any);
   const otherInstance = new DatabaseStorage(db as any);
 
+  // Since R1-T7 S6a a document is read only with a clean scan on record (0032). These documents
+  // predate scanning, so each check first shows that nobody reads one unscanned, then records the
+  // verdict a scan pass would and shows that ownership alone still decides who reads it.
+  const ownerOf = async (path: string): Promise<number | null | undefined> =>
+    (await pool.query("SELECT merchant_id FROM uploaded_files WHERE path=$1", [path])).rows[0]?.merchant_id;
+  const bytesOf = async (path: string): Promise<Buffer | undefined> =>
+    (await pool.query("SELECT data FROM uploaded_files WHERE path=$1", [path])).rows[0]?.data;
+  const scannedClean = (path: string) => pool.query(
+    "INSERT INTO uploaded_file_scans(file_id,verdict,scanner) SELECT id,'clean','verifier' FROM uploaded_files WHERE path=$1 ON CONFLICT (file_id) DO NOTHING", [path]);
   await check("untrusted legacy references confer no tenant authority; bytes retained", async () => {
-    assert.equal(await storage.getUploadedFileForMerchant(doc, b), undefined);
-    assert.equal(await storage.uploadedFileOwnedByMerchant(doc, b), false);
-    assert.deepEqual((await storage.getUploadedFile(doc))?.data, bytes);
+    await scannedClean(doc);
+    assert.equal(await storage.getCleanUploadedFileForMerchant(doc, b), undefined);
+    assert.equal(await storage.cleanUploadedFileOwnedByMerchant(doc, b), false);
+    assert.deepEqual(await bytesOf(doc), bytes);
   });
   await check("the evidenced owner of a legacy document keeps access to it", async () => {
-    assert.deepEqual((await storage.getUploadedFileForMerchant(doc, a))?.data, bytes);
-    assert.equal(await storage.uploadedFileOwnedByMerchant(doc, a), true);
+    assert.equal(await ownerOf(doc), a);
+    assert.deepEqual((await storage.getCleanUploadedFileForMerchant(doc, a))?.data, bytes);
+    assert.equal(await storage.cleanUploadedFileOwnedByMerchant(doc, a), true);
   });
   await check("a locked document reaches no merchant, and stays readable by the admin", async () => {
-    for (const merchant of [a, b]) assert.equal(await storage.getUploadedFileForMerchant(s2, merchant), undefined);
-    assert.equal(await storage.uploadedFileOwnedByMerchant(s3, a), false);
-    assert.deepEqual((await storage.getUploadedFile(s2))?.data, Buffer.from(`%PDF-1.4 ${s2}`)); // the admin route's read
-    assert.deepEqual((await storage.getUploadedFileForMerchant(s1, a))?.data, Buffer.from(`%PDF-1.4 ${s1}`));
+    // Unscanned: not the admin's read either.
+    assert.equal(await storage.getCleanUploadedFile(s2), undefined);
+    assert.equal(await storage.getCleanUploadedFileForMerchant(s1, a), undefined);
+    for (const path of [s1, s2, s3]) await scannedClean(path);
+    for (const merchant of [a, b]) assert.equal(await storage.getCleanUploadedFileForMerchant(s2, merchant), undefined);
+    assert.equal(await storage.cleanUploadedFileOwnedByMerchant(s3, a), false);
+    assert.deepEqual((await storage.getCleanUploadedFile(s2))?.data, Buffer.from(`%PDF-1.4 ${s2}`)); // the admin route's read
+    assert.deepEqual((await storage.getCleanUploadedFileForMerchant(s1, a))?.data, Buffer.from(`%PDF-1.4 ${s1}`));
   });
   await check("logo remains public and can be overwritten by its owner", async () => {
     await storage.saveUploadedFile(`logos/merchant-${a}.png`, "image/png", bytes, a);
@@ -236,14 +251,14 @@ try {
     const raced = await Promise.allSettled([storage.saveUploadedFile(path,"application/pdf",bytes,a),
       otherInstance.saveUploadedFile(path,"application/pdf",bytes,b)]);
     assert.equal(raced.filter(r => r.status === "fulfilled").length,1);
-    const owner = await storage.uploadedFileOwnedByMerchant(path,a) ? a : b;
+    const owner = (await ownerOf(path)) === a ? a : b;
     const foreign = owner === a ? b : a;
     await assert.rejects(storage.saveUploadedFile(path,"application/pdf",bytes,foreign), UploadPathOwnershipError);
     await storage.deleteUploadedFile(path,foreign);
-    assert.ok(await storage.getUploadedFileForMerchant(path,owner));
-    assert.equal(await storage.getUploadedFileForMerchant(path,foreign),undefined);
+    assert.equal(await ownerOf(path), owner);
     await storage.saveUploadedFile(path,"application/pdf",Buffer.from("new"),owner);
-    assert.equal((await storage.getUploadedFileForMerchant(path,owner))?.data.toString(),"new");
+    assert.equal((await bytesOf(path))?.toString(),"new");
+    assert.equal(await ownerOf(path), owner);
     await assert.rejects(storage.saveUploadedFile(doc,"application/pdf",bytes,b), UploadPathOwnershipError);
     await storage.deleteUploadedFile(path,owner);
     assert.equal(await storage.getUploadedFile(path),undefined);

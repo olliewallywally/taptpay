@@ -1,7 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
+import { signedIn, createOwnerPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
 
 /**
  * R1-T6 batch 1 (/api/merchants family, 39 sites) — proves the family
@@ -21,7 +21,7 @@ describe("R1-T6 batch 1 — /api/merchants strict numeric parsing", () => {
 
       const response = await request(app)
         .get(`/api/merchants/${encodeURIComponent(garbage)}/profile`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
 
       expect(response.status).toBe(400);
     },
@@ -31,7 +31,7 @@ describe("R1-T6 batch 1 — /api/merchants strict numeric parsing", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const response = await request(app).get(`/api/merchants/${owner.merchantId}/profile`).set(bearer(owner));
+    const response = await request(app).get(`/api/merchants/${owner.merchantId}/profile`).set(signedIn(owner));
 
     expect(response.status).toBe(200);
   });
@@ -44,7 +44,7 @@ describe("R1-T6 batch 1 — /api/merchants strict numeric parsing", () => {
     // unsafe/rounded number and fell through to a 403/404 further down.
     const response = await request(app)
       .get("/api/merchants/999999999999999999999/profile")
-      .set(bearer(owner));
+      .set(signedIn(owner));
 
     expect(response.status).toBe(400);
   });

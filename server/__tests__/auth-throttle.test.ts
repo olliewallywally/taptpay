@@ -5,9 +5,10 @@ import crypto from "crypto";
 import request from "supertest";
 import { config } from "../config";
 import {
-  VALID_PASSWORD, bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
+  VALID_PASSWORD, signedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
   type Principal,
 } from "./support/http-harness";
+import { businessSessionBegunBy } from "./support/session-browser";
 
 /**
  * R1-T4 phase C (owner decision 2026-09-21, Q5: slow repeated attempts down instead of
@@ -289,7 +290,7 @@ describe("changing the password while signed in", () => {
   // The current-password check is a password check too: someone holding a stolen
   // session could otherwise guess the password without limit, then change it.
   const changePassword = (app: App, who: Principal, currentPassword: string, newPassword = "Changed-password-3") =>
-    request(app).put(`/api/merchants/${who.merchantId}/change-password`).set(bearer(who))
+    request(app).put(`/api/merchants/${who.merchantId}/change-password`).set(signedIn(who))
       .send({ currentPassword, newPassword, confirmPassword: newPassword });
 
   it("allows five wrong current passwords, then makes each attempt wait", async () => {
@@ -321,7 +322,7 @@ describe("changing the password while signed in", () => {
     expect(await statuses(4, () => changePassword(app, owner, WRONG))).toEqual([400, 400, 400, 400]);
     const changed = await changePassword(app, owner, VALID_PASSWORD, "Changed-password-3");
     expect(changed.status).toBe(200);
-    const fresh = { ...owner, token: changed.body.token as string };
+    const fresh = { ...owner, ...businessSessionBegunBy(changed) };
     expect(await statuses(5, () => changePassword(app, fresh, WRONG))).toEqual([400, 400, 400, 400, 400]);
     expectSlowed(await changePassword(app, fresh, WRONG), 30);
   });

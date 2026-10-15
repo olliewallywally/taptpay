@@ -78,6 +78,54 @@ describe("no-network guard", () => {
     ]);
   });
 
+  // External review 2026-09-29 (R1-T1): where a request is going is read before any agent or proxy
+  // setting can route it through this machine, where the socket guard would take it for local.
+  it("refuses http.get to an outside host even when its agent would send it through a proxy on this machine", async () => {
+    const proxied: string[] = [];
+    const proxy = http.createServer((req, res) => {
+      proxied.push(req.headers.host ?? "");
+      res.end("proxied");
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+    const { port } = proxy.address() as net.AddressInfo;
+    const viaProxy = new http.Agent();
+    (viaProxy as unknown as { createConnection: () => net.Socket }).createConnection = () => net.connect(port, "127.0.0.1");
+    try {
+      const error = await new Promise<Error>((resolve) => {
+        http.get({ host: "192.0.2.1", port: 80, path: "/", agent: viaProxy }, () => resolve(new Error("answered by the proxy")))
+          .on("error", resolve);
+      });
+      expect(error.message).toMatch(/no-network/);
+      expect(proxied).toEqual([]);
+      expect(takeNetworkViolations()).toEqual([
+        expect.objectContaining({ kind: "connect", target: "192.0.2.1:80" }),
+      ]);
+    } finally {
+      viaProxy.destroy();
+      await new Promise((resolve) => proxy.close(resolve));
+    }
+  });
+
+  it("refuses fetch to an outside host before the request is handed on at all", async () => {
+    // Refused at the socket only, fetch fails later, as a plain "fetch failed" whose cause is the
+    // refusal; through a proxy on this machine it would not fail at all.
+    await expect(fetch("http://192.0.2.1/")).rejects.toMatchObject({ code: "ENOTALLOWED" });
+    expect(takeNetworkViolations()).toEqual([
+      expect.objectContaining({ kind: "connect", target: "192.0.2.1:80" }),
+    ]);
+  });
+
+  it("refuses every question a resolver would send, this machine's own name included, and answers a plain lookup of it here", async () => {
+    // resolve* and reverse go to the configured name server, wherever it is, even for "localhost".
+    await expect(dns.promises.resolve4("localhost")).rejects.toThrow(/no-network/);
+    await expect(dns.promises.reverse("127.0.0.1")).rejects.toThrow(/no-network/);
+    expect(takeNetworkViolations().map((violation) => violation.kind)).toEqual(["dns", "dns"]);
+
+    expect(await dns.promises.lookup("localhost", { all: true })).toEqual([{ address: "127.0.0.1", family: 4 }]);
+    expect(await dns.promises.lookup("localhost", 6)).toEqual({ address: "::1", family: 6 });
+    expect(takeNetworkViolations()).toEqual([]);
+  });
+
   it("allows this machine, by address and by name, and records nothing", async () => {
     const server = net.createServer((socket) => socket.end("pong"));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

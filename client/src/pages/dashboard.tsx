@@ -4,6 +4,8 @@ import { useLocation } from "wouter";
 import { RetailReportsButton } from "@/components/reports/RetailReportsButton";
 import { RetailDashboardView } from "@/features/dashboard/RetailDashboardView";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -14,12 +16,9 @@ export default function Dashboard() {
   }, [merchantId, setLocation]);
 
   const { data: merchant } = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -32,13 +31,9 @@ export default function Dashboard() {
     isError: transactionError,
     refetch: refetchTransactions,
   } = useQuery<any[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(
-        `/api/merchants/${merchantId}/transactions`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },

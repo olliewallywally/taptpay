@@ -2,7 +2,7 @@ import "./support/test-env";
 
 import request from "supertest";
 import {
-  bearer,
+  signedIn,
   createAdminPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -47,28 +47,28 @@ describe("R1-T6 — /api/admin identifier batch", () => {
   describe("POST /api/admin/merchants/:id/verify", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400 for an authenticated admin", async (garbage) => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .post(`/api/admin/merchants/${encodeURIComponent(garbage)}/verify`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
     });
 
     it("a well-formed but unknown id 404s rather than 400", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .post("/api/admin/merchants/999999/verify")
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(404);
     });
 
     it("verifies a real, not-yet-verified merchant with a password already set", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
       // A waiting application that chose its password at sign-up. (This used
       // createOwnerPrincipal's active business until 2026-09-26, when verify
       // stopped setting an active business back to verified: owner decision,
@@ -86,7 +86,7 @@ describe("R1-T6 — /api/admin identifier batch", () => {
 
       const response = await request(app)
         .post(`/api/admin/merchants/${waiting.id}/verify`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(200);
       expect(response.body.merchant.status).toBe("verified");
     });
@@ -95,28 +95,28 @@ describe("R1-T6 — /api/admin identifier batch", () => {
   describe("POST /api/admin/merchants/:id/set-active", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .post(`/api/admin/merchants/${encodeURIComponent(garbage)}/set-active`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
     });
 
     it("a well-formed but unknown id 404s rather than 400", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .post("/api/admin/merchants/999999/set-active")
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(404);
     });
 
     it("activates a real, verified merchant", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
       // A verified business. (This used a freshly created pending one until
       // 2026-09-26, when set-active stopped activating an application whose
       // email was never confirmed: owner decision, C10 batch 4.)
@@ -129,7 +129,7 @@ describe("R1-T6 — /api/admin identifier batch", () => {
 
       const response = await request(app)
         .post(`/api/admin/merchants/${created.id}/set-active`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(200);
       expect(response.body.merchant.status).toBe("active");
     });
@@ -138,35 +138,35 @@ describe("R1-T6 — /api/admin identifier batch", () => {
   describe("GET /api/admin/merchants/:id/transactions", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .get(`/api/admin/merchants/${encodeURIComponent(garbage)}/transactions`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
     });
 
     it("a well-formed but unknown id returns 200 with an empty list (this route never checks merchant existence)", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .get("/api/admin/merchants/999999/transactions")
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);
     });
 
     it("a real merchant's transactions are returned", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
       const owner = await createOwnerPrincipal();
       const txn = await fixtureTransaction(owner.merchantId);
 
       const response = await request(app)
         .get(`/api/admin/merchants/${owner.merchantId}/transactions`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(1);
       expect(response.body[0].id).toBe(txn.id);
@@ -176,11 +176,11 @@ describe("R1-T6 — /api/admin identifier batch", () => {
   describe("PATCH /api/admin/merchants/:id/windcave-merchant-id", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400 without even needing a body", async (garbage) => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .patch(`/api/admin/merchants/${encodeURIComponent(garbage)}/windcave-merchant-id`)
-        .set(bearer(admin))
+        .set(signedIn(admin))
         .send({});
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
@@ -188,23 +188,23 @@ describe("R1-T6 — /api/admin identifier batch", () => {
 
     it("a well-formed but unknown id 404s rather than 400", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .patch("/api/admin/merchants/999999/windcave-merchant-id")
-        .set(bearer(admin))
+        .set(signedIn(admin))
         .send({ windcaveMerchantId: "wc-123" });
       expect(response.status).toBe(404);
     });
 
     it("updates a real merchant's Windcave merchant id", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
       const owner = await createOwnerPrincipal();
 
       const response = await request(app)
         .patch(`/api/admin/merchants/${owner.merchantId}/windcave-merchant-id`)
-        .set(bearer(admin))
+        .set(signedIn(admin))
         .send({ windcaveMerchantId: "wc-123" });
       expect(response.status).toBe(200);
 
@@ -216,11 +216,11 @@ describe("R1-T6 — /api/admin identifier batch", () => {
   describe("POST /api/admin/merchants/:id/activate", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400 even with no password in the body", async (garbage) => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .post(`/api/admin/merchants/${encodeURIComponent(garbage)}/activate`)
-        .set(bearer(admin))
+        .set(signedIn(admin))
         .send({});
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
@@ -231,12 +231,12 @@ describe("R1-T6 — /api/admin identifier batch", () => {
         "— proving the id guard already passed",
       async () => {
         const { app } = await createTestApp();
-        const admin = createAdminPrincipal();
+        const admin = await createAdminPrincipal();
         const owner = await createOwnerPrincipal();
 
         const response = await request(app)
           .post(`/api/admin/merchants/${owner.merchantId}/activate`)
-          .set(bearer(admin))
+          .set(signedIn(admin))
           .send({});
         expect(response.status).toBe(400);
         expect(response.body.message).toBe("Password is required for activation");
@@ -245,11 +245,11 @@ describe("R1-T6 — /api/admin identifier batch", () => {
 
     it("a well-formed but unknown id 404s once a password is supplied", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .post("/api/admin/merchants/999999/activate")
-        .set(bearer(admin))
+        .set(signedIn(admin))
         .send({ password: "Whatever123" });
       expect(response.status).toBe(404);
     });
@@ -261,31 +261,31 @@ describe("R1-T6 — /api/admin identifier batch", () => {
   describe("GET /api/admin/merchants/:id", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
       const response = await request(app)
         .get(`/api/admin/merchants/${encodeURIComponent(garbage)}`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
     });
 
     it("a well-formed but unknown id 404s rather than 400", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
 
-      const response = await request(app).get("/api/admin/merchants/999999").set(bearer(admin));
+      const response = await request(app).get("/api/admin/merchants/999999").set(signedIn(admin));
       expect(response.status).toBe(404);
     });
 
     it("a real merchant returns 200", async () => {
       const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
+      const admin = await createAdminPrincipal();
       const owner = await createOwnerPrincipal();
 
       const response = await request(app)
         .get(`/api/admin/merchants/${owner.merchantId}`)
-        .set(bearer(admin));
+        .set(signedIn(admin));
       expect(response.status).toBe(200);
       expect(response.body.id).toBe(owner.merchantId);
     });

@@ -466,27 +466,7 @@
     border: 1px solid rgba(255, 255, 255, 0.20) !important;
   }
   
-  /* Ensure form labels are visible */
-  label {
-    color: rgba(255, 255, 255, 0.95) !important;
-    font-weight: 500;
-  }
-  
-  /* Glass input styling */
-  input {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.20) !important;
-    color: black !important;
-  }
-  
-  input::placeholder {
-    color: rgba(0, 0, 0, 0.6) !important;
-  }
-  
-  input:focus {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border: 1px solid rgba(255, 255, 255, 0.30) !important;
-  }
+
 
   /* COMPLETE TABLE TRANSPARENCY OVERRIDE - MOBILE ONLY */
   table,
@@ -1151,6 +1131,14 @@
 
 /* ── Respect prefers-reduced-motion ─────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
   ::view-transition-old(property-hero),
   ::view-transition-new(property-hero),
   ::view-transition-old(root),
@@ -1223,4 +1211,13 @@
     var(--list-fade-color, transparent),
     transparent
   );
+}
+
+/* Keyboard focus stays visible on both light and dark application surfaces.
+   Resting geometry is unchanged; tutorials retain their separately measured ring. */
+:focus-visible:not(.tutorial-next):not(.tutorial-close),
+input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]):focus-within {
+  outline: 2px solid #040d6d !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px #ffffff !important;
 }

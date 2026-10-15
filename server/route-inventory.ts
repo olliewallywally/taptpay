@@ -18,8 +18,9 @@
 import * as ts from "typescript";
 import fs from "fs";
 import path from "path";
+import { METHODS } from "node:http";
 
-export type HttpRegistrationMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
+export type HttpRegistrationMethod = Uppercase<string>;
 
 export interface RouteRegistration {
   method: HttpRegistrationMethod;
@@ -48,14 +49,9 @@ export interface SourceInventory {
   uses: MiddlewareUse[];
 }
 
-const ROUTE_METHODS: Record<string, HttpRegistrationMethod> = {
-  get: "GET",
-  post: "POST",
-  put: "PUT",
-  patch: "PATCH",
-  delete: "DELETE",
-  all: "ALL",
-};
+const ROUTE_METHODS = Object.fromEntries(
+  [...METHODS, "ALL"].map(method => [method.toLowerCase(), method as HttpRegistrationMethod]).concat([["del", "DELETE"]]),
+) as Record<string, HttpRegistrationMethod>;
 
 /**
  * Type names that make a parameter an Express app or router
@@ -150,17 +146,21 @@ export function extractSourceInventory(
   function visit(node: ts.Node) {
     if (
       ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
+      (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression)) &&
       ts.isIdentifier(node.expression.expression) &&
       bindings.has(node.expression.expression.text)
     ) {
-      const prop = node.expression.name.text;
+      const prop = ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text
+        : ts.isStringLiteralLike(node.expression.argumentExpression) ? node.expression.argumentExpression.text : null;
+      if (prop === null || prop === "route") throw new Error(`Unsupported dynamic/chained Express registration at ${fileName}:${lineOf(node)}`);
       const firstArg = node.arguments[0];
 
       if (prop in ROUTE_METHODS) {
         // `app.get("env")` (one argument) reads a setting; a route has a handler.
         if (firstArg && ts.isStringLiteralLike(firstArg) && node.arguments.length >= 2) {
           registrations.push({ method: ROUTE_METHODS[prop], path: firstArg.text, line: lineOf(node) });
+        } else if (node.arguments.length >= 2) {
+          throw new Error(`Non-literal Express route path at ${fileName}:${lineOf(node)}`);
         }
       } else if (prop === "use") {
         const pathArg = firstArg && ts.isStringLiteralLike(firstArg) ? firstArg : null;
@@ -440,6 +440,21 @@ export function isNotificationWebhookRegistration(method: string, routePath: str
  * analysis passes independently recommended for this class of route.
  */
 export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
+  // R3 retained factories: exact same public routes, with actual handler facts
+  // followed across modules by route-facts.ts and reviewed in route-review.ts.
+  "POST /api/pay/t/:token/session":"bearer token and durable retail attempt in server/payment-checkout-handlers.ts",
+  "POST /api/pay/t/:token/hosted-fields-complete":"exact token/UUID/share/session binding and shared verifier/finalizer",
+  "POST /api/pay/t/:token/googlepay-complete":"same exact durable binding; once-only wallet command",
+  "GET /api/pay/return/:state":"hashed return state and narrow local outcome; shared reconciliation",
+  "POST /api/transactions/:id/pay":"retained numeric board sale; token-addressed sales excluded; durable retail attempt",
+  "POST /api/transactions/:id/hosted-fields-complete":"exact numeric-sale UUID/share/session binding",
+  "POST /api/transactions/:id/googlepay-complete":"exact numeric-sale binding and once-only wallet command",
+  "GET /api/windcave/callback":"hashed state must match the numeric sale; legacy incomplete identities stay held",
+  "POST /api/checkout/:token/split":"invoice bearer token with guarded split CAS",
+  "POST /api/checkout/:token/session":"invoice bearer token and concrete durable invoice/share attempt",
+  "POST /api/checkout/:token/hosted-fields-complete":"exact invoice-token UUID/share/session binding; shared worker",
+  "POST /api/checkout/:token/googlepay-complete":"same exact invoice binding; once-only wallet command",
+  "GET /api/checkout/callback":"invoice token and hashed state must identify the same persisted attempt",
   "GET /robots.txt": "static well-known text file, no middleware",
   "GET /.well-known/apple-developer-merchantid-domain-association":
     "Apple Pay domain-verification file Apple's own servers must fetch unauthenticated",
@@ -460,8 +475,19 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
     "OAuth callback that issues the one-time sign-in handoff code (R1-T4 phase A); necessarily pre-session",
   "POST /api/auth/google/session":
     "redeems the one-time handoff code its HttpOnly cookie carries, once, for the account token (R1-T4 phase A); the code is the credential, so necessarily pre-session",
-  "POST /api/auth/login": "credential-checked login endpoint that issues the JWT; necessarily pre-session",
-  "POST /api/admin/auth/login": "credential-checked admin login endpoint that issues the admin JWT; necessarily pre-session",
+  "GET /api/auth/apple": "Sign in with Apple redirect initiation (R1-T5b); necessarily pre-session",
+  "GET /api/auth/apple/available":
+    "whether Sign in with Apple is offered on this server (R1-T5d): one boolean from configuration and the origin's scheme, no secret; the login page asks before it shows the button",
+  "POST /api/auth/apple/callback":
+    "Apple's form-post callback that issues the one-time sign-in handoff code (R1-T5b); necessarily pre-session, and admitted cross-site only from Apple's exact origin",
+  "POST /api/auth/apple/session":
+    "redeems the one-time handoff code its HttpOnly cookie carries, once, for the session (R1-T5b); the code is the credential, so necessarily pre-session",
+  "POST /api/auth/login":
+    "credential-checked login endpoint that starts a session (R1-T4 phase E; the JWT too until E3); necessarily pre-session",
+  "POST /api/admin/auth/login":
+    "credential-checked admin login endpoint that starts an admin session (R1-T4 phase E; the admin JWT too until E3); necessarily pre-session",
+  "GET /api/auth/session":
+    "the app's start-up check (R1-T4 phase E): reads only the caller's own session cookie, answers { signedIn: false } to anyone without a valid one, and the signed-in login with its page's CSRF token otherwise; necessarily open to the signed-out",
   "POST /api/auth/resend-confirmation":
     "leading '// Resend confirmation email (public — for check-email screen)' comment is misattributed by sliceHandlerBodies to the preceding registration; rate-limited, resends only to the account's own on-file email",
   "POST /api/merchants/signup": "account-creation endpoint; necessarily pre-session, rate-limited",

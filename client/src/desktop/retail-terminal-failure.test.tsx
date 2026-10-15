@@ -55,7 +55,6 @@ const settle = () => act(async () => {
 
 beforeEach(() => {
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
 });
 
 describe("retail terminal when sales fail to load (R1-T9)", () => {

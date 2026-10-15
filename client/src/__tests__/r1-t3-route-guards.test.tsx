@@ -155,32 +155,36 @@ const jsonResponse = (status: number, body: unknown) =>
     text: async () => JSON.stringify(body),
   }) as unknown as Response;
 
+// R1-T4 phase E: a sign-in is an HttpOnly session cookie the page cannot see. Who the browser is signed in
+// as is the server's answer to the start-up check (/api/auth/session), and the admin area's (/api/admin/
+// auth/me). What the page kept in storage before the switch is removed on the first load.
 const session = (overrides: Record<string, unknown> = {}) => ({
+  signedIn: true,
   user: { id: 7, email: "owner@example.test", merchantId: "22", role: "owner", onboardingCompleted: true, ...overrides },
+  csrfToken: "c".repeat(43),
 });
+const ADMIN_ME = { user: { id: 1, email: "admin@example.test", merchantId: 0, role: "admin" }, csrfToken: "a".repeat(43) };
 
 interface Caller {
-  /** What the browser holds. */
-  stored: Record<string, string>;
-  /** The server's answer to the merchant session check (/api/auth/me). */
-  me?: number | ReturnType<typeof session>;
-  /** The server's answer to the admin session check (/api/admin/auth/me). */
+  /** What the browser still holds in storage from before the switch (removed on the first load). */
+  stored?: Record<string, string>;
+  /** The server's answer to the start-up check, from the browser's session cookie. */
+  session?: ReturnType<typeof session> | { signedIn: false };
+  /** The server's answer to the admin area's check, from the browser's admin session cookie. */
   adminMe?: number;
 }
 
 const CALLERS: Record<string, Caller & { merchantPages: "page" | "sign-in" | "onboarding" }> = {
-  "signed out": { stored: {}, merchantPages: "sign-in" },
+  "signed out": { merchantPages: "sign-in" },
   "a session the server refuses (expired; a disabled login; a suspended business)": {
-    stored: { authToken: "refused" }, me: 401, merchantPages: "sign-in",
+    stored: { authToken: "an-old-stored-token" }, session: { signedIn: false }, merchantPages: "sign-in",
   },
-  "the owner": { stored: { authToken: "owner" }, me: session(), merchantPages: "page" },
-  "a teammate": { stored: { authToken: "teammate" }, me: session({ id: 8, role: "member" }), merchantPages: "page" },
-  "another business's owner": { stored: { authToken: "other" }, me: session({ id: 9, merchantId: "99" }), merchantPages: "page" },
-  "the platform admin (the admin area's own session)": {
-    stored: { adminAuthToken: "admin" }, adminMe: 200, merchantPages: "sign-in",
-  },
+  "the owner": { session: session(), merchantPages: "page" },
+  "a teammate": { session: session({ id: 8, role: "member" }), merchantPages: "page" },
+  "another business's owner": { session: session({ id: 9, merchantId: "99" }), merchantPages: "page" },
+  "the platform admin (the admin area's own session)": { adminMe: 200, merchantPages: "sign-in" },
   "an owner who has not finished onboarding": {
-    stored: { authToken: "new" }, me: session({ onboardingCompleted: false }), merchantPages: "onboarding",
+    session: session({ onboardingCompleted: false }), merchantPages: "onboarding",
   },
 };
 
@@ -193,8 +197,13 @@ function serve(caller: Caller) {
   global.fetch = jest.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     requests.push(url);
-    if (url === "/api/auth/me") return typeof caller.me === "object" ? jsonResponse(200, caller.me) : jsonResponse(caller.me ?? 401, {});
-    if (url === "/api/admin/auth/me") return jsonResponse(caller.adminMe ?? 401, { message: "Invalid admin session" });
+    if (url === "/api/auth/session") return jsonResponse(200, caller.session ?? { signedIn: false });
+    if (url === "/api/auth/me") {
+      return caller.session?.signedIn ? jsonResponse(200, { user: caller.session.user }) : jsonResponse(401, {});
+    }
+    if (url === "/api/admin/auth/me") {
+      return caller.adminMe === 200 ? jsonResponse(200, ADMIN_ME) : jsonResponse(caller.adminMe ?? 401, { message: "Invalid admin session" });
+    }
     if (url === "/api/tutorial/state") return jsonResponse(200, { autoEnabled: false, generation: 1, progress: {}, pageCount: 0 });
     if (url.startsWith(`/api/property/tenants/${RECORD_ID}`)) return jsonResponse(404, { message: "Tenant not found" });
     if (url.startsWith(`/api/trades/clients/${RECORD_ID}`)) return jsonResponse(404, { message: "Client not found" });
@@ -205,7 +214,7 @@ function serve(caller: Caller) {
 
 async function open(shell: Shell, path: string, caller: Caller) {
   mockShell = shell;
-  store = { ...caller.stored };
+  store = { ...(caller.stored ?? {}) };
   serve(caller);
   window.history.pushState({}, "", path);
   render(<App />);
@@ -356,16 +365,17 @@ describe.each(SHELLS)("R1-T3 — the admin area, on the %s shell", (shell) => {
     ["the owner", CALLERS["the owner"]],
     ["a teammate", CALLERS["a teammate"]],
     ["another business's owner", CALLERS["another business's owner"]],
-  ])("/admin: not shown to %s, who is sent to sign in; no admin check is made", async (_label, caller) => {
+  ])("/admin: not shown to %s, whom the admin check refuses and sends to sign in", async (_label, caller) => {
     await open(shell, "/admin", caller);
     await waitFor(() => expect(triedToLeave()).toBe(true));
     await settle();
 
     expect(mockShown).toEqual([]);
-    expect(requests).not.toContain("/api/admin/auth/me");
+    // The admin's sign-in is a cookie the page cannot see, so the area always asks (R1-T4 phase E).
+    expect(requests).toContain("/api/admin/auth/me");
   });
 
-  it("/admin: not shown when the server refuses the admin session, which is forgotten", async () => {
+  it("/admin: not shown when the server refuses the admin session; what was stored before the switch is removed", async () => {
     await open(shell, "/admin", { stored: { adminAuthToken: "refused", adminUser: "{}" }, adminMe: 401 });
     await waitFor(() => expect(triedToLeave()).toBe(true));
     await settle();

@@ -315,7 +315,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
       <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
       <div className="stagger tp-home-stack" style={{ background: OFFW, paddingInline: 22 }}>
         <StackHeader onExpand={onExpand} />
-        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <div className="tp-stack-scroll" tabIndex={0} role="region" aria-label="Active payment stack" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onRowClick={onRowClick} />
         </div>
       </div>
@@ -351,7 +351,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
       <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
       <div className="stagger tp-home-stack" style={{ background: OFFW, paddingInline: 22 }}>
         <StackHeader onExpand={onExpand} />
-        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <div className="tp-stack-scroll" tabIndex={0} role="region" aria-label="Active payment stack" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onRowClick={onRowClick} />
         </div>
       </div>
@@ -1289,7 +1289,7 @@ export default function RetailTerminalViewCore({
   useFitTerminalAmounts(viewportRef);
 
   return (
-    <div className="retail-terminal-view tp-viewport" data-retail-terminal-view ref={viewportRef}>
+    <div className="retail-terminal-view tp-viewport" data-retail-terminal-view ref={viewportRef} tabIndex={0} role="region" aria-label="Retail terminal">
       {conveyor && (
         <div key={'leave-' + conveyor.prevId} className={`tp-layer leaving ${conveyorDir}`}>
           {renderScreen(conveyor.prevId)}
@@ -1338,7 +1338,7 @@ export default function RetailTerminalViewCore({
       <div className={`tp-toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
 
       {/* ── Active Stack Full-Page Overlay ── */}
-      <div style={{
+      <div aria-hidden={!stackExpanded} {...inertWhen(!stackExpanded)} style={{
         position: 'absolute', inset: 0, zIndex: 55,
         background: OFFW,
         transform: stackExpanded ? 'translateY(0)' : 'translateY(100%)',
@@ -1350,6 +1350,7 @@ export default function RetailTerminalViewCore({
         <div style={{ background: NAVY, padding: '52px 24px 20px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <button
+              aria-label="Close active stack"
               onClick={() => setStackExpanded(false)}
               style={{ width: 36, height: 36, borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', color: BLUE, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             ><Ic.Back sz={20} /></button>

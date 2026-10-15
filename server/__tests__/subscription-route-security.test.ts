@@ -68,50 +68,33 @@ describe("subscription and team route authorization", () => {
 });
 
 describe("subscription card and paid-plan route integration", () => {
-  test("a hosted-card session is bound before its identifier is returned", () => {
-    const session = handler("post", "/api/billing/card/session");
-    const created = session.indexOf("createCardStorageSession(");
-    const bound = session.indexOf("storage.bindSubscriptionCardSession(");
-    const returned = session.indexOf("res.json({ sessionId:");
-
-    expect(created).toBeGreaterThan(0);
-    expect(bound).toBeGreaterThan(created);
-    expect(returned).toBeGreaterThan(bound);
+  test("card setup requires a UUID and delegates to the durable scoped engine",()=>{
+    const session=handler("post","/api/billing/card/session");
+    expect(session.indexOf("isAccountOwner(req.user)")).toBeLessThan(session.indexOf("subscriptionPayments.card.start("));
+    expect(session.indexOf("isUuid(idempotencyKey)")).toBeLessThan(session.indexOf("subscriptionPayments.card.start("));
+    expect(session).toContain("actor:commandActor(req,res)");
+    expect(session).not.toContain("createCardStorageSession(");
+  });
+  test("confirmation uses the same durable inbox and projects only masked card fields",()=>{
+    const confirm=handler("post","/api/billing/card/confirm");
+    expect(confirm).toContain("subscriptionPayments.card.confirm(merchantId,parsed.data.sessionId)");
+    expect(confirm).not.toContain("storage.completeSubscriptionCardSetup(");expect(confirm).not.toContain("storage.saveSubscriptionCard(");
+    expect(confirm).toContain("res.status(202)");expect(confirm).toContain("res.status(422)");
+    expect(confirm).toContain("ready:renewalPaymentMethodIsReady(subscription)");
+    expect(source).toContain('app.all("/api/billing/card/notification",...durableNotificationHandlers)');
+  });
+  test("paid plan changes carry the authenticated actor and map failure families",()=>{
+    const plan=handler("put","/api/subscription/plan");
+    expect(plan).toContain("request=>executeStoredCardCharge(request,commandActor(req,res))");
+    for(const reason of ["payment-method-required","declined","billing-busy","invalid-state","charge-failed"])expect(plan).toContain(`result.reason === "${reason}"`);
+  });
+  test("card returns validate hashed state and never trust the browser outcome",()=>{
+    const start=source.indexOf("const billingCardCallback"),end=source.indexOf("// Remove the stored card",start),callback=source.slice(start,end);
+    expect(callback).toContain("resolveReturnState(state)");expect(callback).toContain("card.confirm(attempt.merchant_id,attempt.session_id)");
+    expect(callback).toContain("card=pending");expect(callback).not.toContain("req.query.result");
+    expect(callback).toContain('app.get("/api/billing/card/callback"');expect(callback).toContain('app.post("/api/billing/card/callback"');
   });
 
-  test("card confirmation completes the bound setup and never directly saves a token", () => {
-    const confirm = handler("post", "/api/billing/card/confirm");
-    expect(confirm).toContain("storage.completeSubscriptionCardSetup(");
-    expect(confirm).toContain("executeStoredCardCharge");
-    expect(confirm).not.toContain("storage.saveSubscriptionCard(");
-    expect(confirm).toContain('completion.reason === "session-mismatch"');
-    expect(confirm).toContain('completion.reason === "billing-busy"');
-    expect(confirm).toContain('completion.reason === "invalid-state"');
-    expect(confirm).toContain('completion.reason === "declined"');
-    expect(confirm).toContain('completion.reason === "charge-failed"');
-    expect(confirm).toContain("ready: renewalPaymentMethodIsReady(completion.subscription)");
-    expect(source).toContain('app.all("/api/billing/card/notification"');
-  });
-
-  test("paid plan changes provide a charge executor and map every failure family", () => {
-    const plan = handler("put", "/api/subscription/plan");
-    expect(plan).toContain("changeSubscriptionPlan(merchantId, parsed.data, executeStoredCardCharge)");
-    expect(plan).toContain('result.reason === "payment-method-required"');
-    expect(plan).toContain('result.reason === "declined"');
-    expect(plan).toContain('result.reason === "billing-busy"');
-    expect(plan).toContain('result.reason === "invalid-state"');
-    expect(plan).toContain('result.reason === "charge-failed"');
-  });
-
-  test("Windcave callback supports GET and POST without reflecting a session", () => {
-    const start = source.indexOf("const billingCardCallback");
-    const end = source.indexOf("// Remove the stored card", start);
-    const callback = source.slice(start, end);
-    expect(callback).toContain('app.get("/api/billing/card/callback", billingCardCallback)');
-    expect(callback).toContain('app.post("/api/billing/card/callback", billingCardCallback)');
-    expect(callback).not.toContain("sessionId");
-    expect(callback).not.toContain("&session=");
-  });
 });
 
 describe("internal cron isolation and observability", () => {

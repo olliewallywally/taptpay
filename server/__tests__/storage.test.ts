@@ -190,10 +190,15 @@ describe("push notification preference storage", () => {
       await storage.updateTransactionStatus(failed.id, "failed");
       await storage.updateTransactionStatus(cash.id, "completed");
       const splitRows = await storage.getSplitPaymentsByTransaction(split.id);
-      await storage.updateSplitPaymentStatus(splitRows[0].id, "completed", "split-one");
+      // A paid share as the finalizer records it (the legacy split writer was removed: R3 integration R-1).
+      const completeShare = (id: number, providerTransactionId: string) => {
+        const shares = (storage as any).splitPayments as Map<number, any>;
+        shares.set(id, { ...shares.get(id), status: "completed", windcaveTransactionId: providerTransactionId, paidAt: new Date() });
+      };
+      completeShare(splitRows[0].id, "split-one");
 
       jest.setSystemTime(new Date("2026-08-06T11:05:00.000Z"));
-      await storage.updateSplitPaymentStatus(splitRows[1].id, "completed", "split-two");
+      completeShare(splitRows[1].id, "split-two");
 
       await expect(storage.getDailyPushPaymentSummaries(
         new Date("2026-08-06T10:00:00.000Z"),
@@ -325,7 +330,7 @@ describe("MemStorage board allocation", () => {
       stoneNumber: 1,
     });
     await storage.createTaptStone({ merchantId: 1, name: "Three", stoneNumber: 3 });
-    await storage.deleteTaptStone(first.id);
+    await storage.deleteTaptStoneForMerchant(first.id, 1);
 
     await expect(storage.createNextTaptStone(1)).resolves.toMatchObject({
       merchantId: 1,

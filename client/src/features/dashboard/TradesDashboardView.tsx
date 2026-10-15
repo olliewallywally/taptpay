@@ -139,8 +139,9 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
         {TIMEFRAMES.map((t, i) => (
           <button key={t} type="button" ref={el => (btnRefs.current[i] = el)}
             className="td-tap" onPointerDown={pulse}
+            aria-pressed={tf === t}
             onClick={() => onPick(t)}
-            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? INK : 'rgba(88,171,255,0.55)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
+            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? INK : '#93BAFF', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
             {t}
           </button>
         ))}
@@ -208,7 +209,7 @@ function JobsBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
       {/* Value pill above the selected bar */}
       {sel && (
         <div key={`${animKey}-${selectedIdx}`} className="td-bar-pill"
-          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: INK, padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(0,127,255,0.35)', pointerEvents: 'none' }}>
+          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: "#000F3F", padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(0,127,255,0.35)', pointerEvents: 'none' }}>
           {fmtCompact(sel.valueCents)}
         </div>
       )}
@@ -311,7 +312,7 @@ export function TradesDashboardView({
         </div>
 
         {/* ── Stat cards ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
+        <div data-tutorial-id="trades-home-health" style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
           <button type="button" className="td-card td-tap" data-demo-id="trades-dashboard-clients" onPointerDown={pulse} onClick={() => onNavigate('/trades/clients')}
             style={{ background: '#FFFFFF', borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -331,7 +332,7 @@ export function TradesDashboardView({
         </div>
 
         {/* ── Action shortcuts ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '18px 22px 0' }}>
+        <div data-tutorial-id="trades-home-actions" style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '18px 22px 0' }}>
           {[
             { label: <>new<br />quote</>, Ico: IcoPlus, to: '/trades/quote', aria: 'new quote' },
             { label: <>quick<br />invoice</>, Ico: IcoBill, to: '/trades/terminal?quick=1', aria: 'quick invoice' },

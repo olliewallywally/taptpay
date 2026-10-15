@@ -10,6 +10,8 @@ import {
 } from 'recharts';
 // @ts-ignore - react-simple-maps ships no type declarations and has no @types package
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
+import { adminCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -151,26 +153,26 @@ function WorldMap({ countries }: { countries: { code: string; users: number }[] 
         </div>
       )}
       <div className="flex items-center gap-2 mt-3">
-        <span className="text-[#dbdfea]/40 text-xs">0</span>
+        <span className="text-[#dbdfea]/70 text-xs">0</span>
         <div className="flex-1 h-2 rounded-full" style={{ background: 'linear-gradient(to right, #1d1e2c, #0055FF, #00E5CC)' }} />
-        <span className="text-[#dbdfea]/40 text-xs">{fmt(maxUsers)}</span>
+        <span className="text-[#dbdfea]/70 text-xs">{fmt(maxUsers)}</span>
       </div>
     </div>
   );
 }
 
 export function Analytics() {
-  const adminToken = localStorage.getItem('adminAuthToken');
   const [range, setRange] = useState('7d');
   const [trafficView, setTrafficView] = useState<'chart' | 'map'>('chart');
   const [chartMetric, setChartMetric] = useState<'users' | 'sessions' | 'pageViews'>('users');
 
-  const headers = { Authorization: `Bearer ${adminToken}` };
+  // R1-T4 phase E: the sign-in is the admin's session cookie; this is the page's CSRF token.
+  const headers = adminCsrfHeader();
 
   const { data: summary, isLoading: summaryLoading } = useQuery<GA4Summary>({
-    queryKey: ['/api/admin/ga4-metrics'],
+    queryKey: [apiPath("GET /api/admin/ga4-metrics")],
     queryFn: async () => {
-      const res = await fetch('/api/admin/ga4-metrics', { headers });
+      const res = await fetch(apiPath("GET /api/admin/ga4-metrics"), { headers });
       return res.json();
     },
     staleTime: 60000,
@@ -178,24 +180,24 @@ export function Analytics() {
   });
 
   const { data: detailed, isLoading: detailedLoading } = useQuery<GA4Detailed>({
-    queryKey: ['/api/admin/ga4-detailed', range],
+    queryKey: [apiPath("GET /api/admin/ga4-detailed"), range],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/ga4-detailed?range=${range}`, { headers });
+      const res = await fetch(`${apiPath("GET /api/admin/ga4-detailed")}?range=${range}`, { headers });
       return res.json();
     },
     staleTime: 120000,
   });
 
   const { data: revenueData } = useQuery<RevenuePoint[]>({
-    queryKey: ['/api/admin/revenue-over-time'],
+    queryKey: [apiPath("GET /api/admin/revenue-over-time")],
   });
 
   const { data: paymentMethods } = useQuery<PaymentMethod[]>({
-    queryKey: ['/api/admin/payment-method-breakdown'],
+    queryKey: [apiPath("GET /api/admin/payment-method-breakdown")],
   });
 
   const { data: platformStats } = useQuery<AnalyticsData>({
-    queryKey: ['/api/admin/analytics'],
+    queryKey: [apiPath("GET /api/admin/analytics")],
   });
 
   const ga4Ok = summary?.configured && !summary?.error;
@@ -247,7 +249,7 @@ export function Analytics() {
               <div className="size-3 rounded-full bg-[#00E5CC] animate-pulse flex-shrink-0" />
               <p className="text-[#dbdfea] text-sm">
                 <span className="font-semibold text-[#00E5CC]">{summary?.activeUsers ?? 0} active users</span>
-                {' '}right now on TaptPay · Measurement ID: <span className="text-[#dbdfea]/50 font-mono text-xs">G-0MBNS0C2L5</span>
+                {' '}right now on TaptPay · Measurement ID: <span className="text-[#dbdfea]/70 font-mono text-xs">G-0MBNS0C2L5</span>
               </p>
             </div>
           )}
@@ -267,7 +269,7 @@ export function Analytics() {
           {!summary?.configured && !summaryLoading && (
             <div className="bg-[#24263a] border border-[#0055FF]/30 rounded-xl p-6 mb-6">
               <div className="flex items-start gap-4">
-                <AlertCircle className="size-5 text-[#0055FF] flex-shrink-0 mt-0.5" />
+                <AlertCircle className="size-5 text-[#93BAFF] flex-shrink-0 mt-0.5" />
                 <p className="text-[#dbdfea]/60 text-sm">Google Analytics service account not configured. Add <code className="text-[#00E5CC] text-xs">GOOGLE_ANALYTICS_PROPERTY_ID</code> and <code className="text-[#00E5CC] text-xs">GOOGLE_ANALYTICS_SERVICE_ACCOUNT</code> to secrets.</p>
               </div>
             </div>
@@ -278,9 +280,9 @@ export function Analytics() {
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               {[
                 { icon: <Users className="size-5 text-white" />, label: `Users (${RANGE_OPTIONS.find(r=>r.value===range)?.label})`, value: summaryLoading ? '—' : fmt(summary?.metrics?.totalUsers || 0), sub: 'Unique visitors', grad: true },
-                { icon: <Eye className="size-5 text-[#0055FF]" />, label: 'Page Views', value: summaryLoading ? '—' : fmt(summary?.metrics?.pageViews || 0), sub: 'Total screen views', grad: false },
+                { icon: <Eye className="size-5 text-[#93BAFF]" />, label: 'Page Views', value: summaryLoading ? '—' : fmt(summary?.metrics?.pageViews || 0), sub: 'Total screen views', grad: false },
                 { icon: <Activity className="size-5 text-[#00E5CC]" />, label: 'Sessions', value: summaryLoading ? '—' : fmt(summary?.metrics?.sessions || 0), sub: 'Browsing sessions', grad: false },
-                { icon: <Clock className="size-5 text-[#0055FF]" />, label: 'Avg Session', value: summaryLoading ? '—' : fmtDur(summary?.metrics?.avgSessionDuration || 0), sub: `${((summary?.metrics?.bounceRate || 0) * 100).toFixed(1)}% bounce rate`, grad: false },
+                { icon: <Clock className="size-5 text-[#93BAFF]" />, label: 'Avg Session', value: summaryLoading ? '—' : fmtDur(summary?.metrics?.avgSessionDuration || 0), sub: `${((summary?.metrics?.bounceRate || 0) * 100).toFixed(1)}% bounce rate`, grad: false },
                 { icon: <TrendingUp className="size-5 text-[#00E5CC]" />, label: 'New Users', value: detailedLoading ? '—' : fmt(detailed?.newUsers || 0), sub: `${fmt(detailed?.returningUsers || 0)} returning`, grad: false },
               ].map((m, i) => (
                 <div key={i} className="bg-[#24263a] rounded-xl p-4">
@@ -289,11 +291,11 @@ export function Analytics() {
                       {m.icon}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[#dbdfea]/50 text-xs truncate">{m.label}</p>
+                      <p className="text-[#dbdfea]/70 text-xs truncate">{m.label}</p>
                       <p className="text-[#dbdfea] text-lg font-semibold leading-tight">{m.value}</p>
                     </div>
                   </div>
-                  <p className="text-[#dbdfea]/40 text-xs">{m.sub}</p>
+                  <p className="text-[#dbdfea]/70 text-xs">{m.sub}</p>
                 </div>
               ))}
             </div>
@@ -311,7 +313,7 @@ export function Analytics() {
                         <button
                           key={m}
                           onClick={() => setChartMetric(m)}
-                          className={`px-2.5 py-1 rounded-md text-xs transition-colors ${chartMetric === m ? 'bg-[#0055FF] text-white' : 'text-[#dbdfea]/50 hover:text-[#dbdfea]'}`}
+                          className={`px-2.5 py-1 rounded-md text-xs transition-colors ${chartMetric === m ? 'bg-[#0055FF] text-white' : 'text-[#dbdfea]/70 hover:text-[#dbdfea]'}`}
                         >
                           {m === 'users' ? 'Users' : m === 'sessions' ? 'Sessions' : 'Views'}
                         </button>
@@ -322,13 +324,13 @@ export function Analytics() {
                 <div className="flex items-center gap-1 bg-[#1d1e2c] rounded-lg p-0.5">
                   <button
                     onClick={() => setTrafficView('chart')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors ${trafficView === 'chart' ? 'bg-[#0055FF] text-white' : 'text-[#dbdfea]/50 hover:text-[#dbdfea]'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors ${trafficView === 'chart' ? 'bg-[#0055FF] text-white' : 'text-[#dbdfea]/70 hover:text-[#dbdfea]'}`}
                   >
                     <BarChart2 className="size-3.5" /> Chart
                   </button>
                   <button
                     onClick={() => setTrafficView('map')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors ${trafficView === 'map' ? 'bg-[#0055FF] text-white' : 'text-[#dbdfea]/50 hover:text-[#dbdfea]'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors ${trafficView === 'map' ? 'bg-[#0055FF] text-white' : 'text-[#dbdfea]/70 hover:text-[#dbdfea]'}`}
                   >
                     <Map className="size-3.5" /> World Map
                   </button>
@@ -342,7 +344,7 @@ export function Analytics() {
                   </div>
                 ) : chartData.length === 0 ? (
                   <div className="h-56 flex items-center justify-center">
-                    <p className="text-[#dbdfea]/40 text-sm">No data yet — check back in 24–48 hours as GA4 processes new traffic</p>
+                    <p className="text-[#dbdfea]/70 text-sm">No data yet — check back in 24–48 hours as GA4 processes new traffic</p>
                   </div>
                 ) : (
                   <div className="h-56">
@@ -380,7 +382,7 @@ export function Analytics() {
                           {(detailed?.countries || []).slice(0, 6).map((c, i) => (
                             <div key={i} className="flex items-center justify-between bg-[#1d1e2c] rounded-lg px-3 py-2">
                               <div className="flex items-center gap-2">
-                                <Globe className="size-3.5 text-[#0055FF]" />
+                                <Globe className="size-3.5 text-[#93BAFF]" />
                                 <span className="text-[#dbdfea]/70 text-xs">{c.code}</span>
                               </div>
                               <span className="text-[#dbdfea] text-xs font-medium">{fmt(c.users)}</span>
@@ -401,11 +403,11 @@ export function Analytics() {
               {/* Top Pages */}
               <div className="bg-[#24263a] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="size-4 text-[#0055FF]" />
+                  <TrendingUp className="size-4 text-[#93BAFF]" />
                   <h3 className="text-[#dbdfea] font-semibold text-sm">Top Pages</h3>
                 </div>
                 {(summary?.topPages || []).length === 0 ? (
-                  <p className="text-[#dbdfea]/40 text-sm">No page data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No page data yet</p>
                 ) : (
                   <div className="space-y-3">
                     {(summary?.topPages || []).map((page, i) => {
@@ -434,7 +436,7 @@ export function Analytics() {
                   <h3 className="text-[#dbdfea] font-semibold text-sm">Devices</h3>
                 </div>
                 {(summary?.devices || []).length === 0 ? (
-                  <p className="text-[#dbdfea]/40 text-sm">No device data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No device data yet</p>
                 ) : (
                   <>
                     <div className="h-36 mb-3">
@@ -467,11 +469,11 @@ export function Analytics() {
               {/* New vs Returning */}
               <div className="bg-[#24263a] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <Users className="size-4 text-[#0055FF]" />
+                  <Users className="size-4 text-[#93BAFF]" />
                   <h3 className="text-[#dbdfea] font-semibold text-sm">New vs Returning</h3>
                 </div>
                 {newVsReturn.length === 0 || (newVsReturn[0].value === 0 && newVsReturn[1].value === 0) ? (
-                  <p className="text-[#dbdfea]/40 text-sm">No data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No data yet</p>
                 ) : (
                   <>
                     <div className="h-36 mb-3">
@@ -513,9 +515,9 @@ export function Analytics() {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             {[
               { icon: <DollarSign className="size-5 text-white" />, label: 'Total Revenue', value: fmtNZD(platformStats?.totalRevenue || 0), sub: 'All completed transactions', grad: true },
-              { icon: <Activity className="size-5 text-[#0055FF]" />, label: 'Transactions', value: fmt(platformStats?.totalTransactions || 0), sub: `${fmt(platformStats?.completedTransactions || 0)} completed`, grad: false },
+              { icon: <Activity className="size-5 text-[#93BAFF]" />, label: 'Transactions', value: fmt(platformStats?.totalTransactions || 0), sub: `${fmt(platformStats?.completedTransactions || 0)} completed`, grad: false },
               { icon: <Users className="size-5 text-[#00E5CC]" />, label: 'Active Merchants', value: fmt(platformStats?.activeMerchants || 0), sub: `of ${fmt(platformStats?.totalMerchants || 0)} total`, grad: false },
-              { icon: <TrendingUp className="size-5 text-[#0055FF]" />, label: 'Avg Transaction', value: fmtNZD(avgTransaction), sub: 'Platform average', grad: false },
+              { icon: <TrendingUp className="size-5 text-[#93BAFF]" />, label: 'Avg Transaction', value: fmtNZD(avgTransaction), sub: 'Platform average', grad: false },
               { icon: <DollarSign className="size-5 text-[#00E5CC]" />, label: 'Recurring Revenue', value: fmtNZD(platformStats?.monthlyRecurringRevenue || 0), sub: `${fmt(platformStats?.payingSubscriptions || 0)} subscriptions / month`, grad: false },
             ].map((m, i) => (
               <div key={i} className="bg-[#24263a] rounded-xl p-4">
@@ -524,11 +526,11 @@ export function Analytics() {
                     {m.icon}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[#dbdfea]/50 text-xs truncate">{m.label}</p>
+                    <p className="text-[#dbdfea]/70 text-xs whitespace-normal break-words">{m.label}</p>
                     <p className="text-[#dbdfea] text-lg font-semibold leading-tight">{m.value}</p>
                   </div>
                 </div>
-                <p className="text-[#dbdfea]/40 text-xs">{m.sub}</p>
+                <p className="text-[#dbdfea]/70 text-xs">{m.sub}</p>
               </div>
             ))}
           </div>
@@ -538,12 +540,12 @@ export function Analytics() {
             {/* Revenue over time */}
             <div className="bg-[#24263a] rounded-xl p-6">
               <div className="flex items-center gap-2 mb-5">
-                <TrendingUp className="size-4 text-[#0055FF]" />
+                <TrendingUp className="size-4 text-[#93BAFF]" />
                 <h3 className="text-[#dbdfea] font-semibold">Revenue — Last 7 Days</h3>
               </div>
               {!revenueData || revenueData.length === 0 ? (
                 <div className="h-48 flex items-center justify-center">
-                  <p className="text-[#dbdfea]/40 text-sm">No revenue data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No revenue data yet</p>
                 </div>
               ) : (
                 <div className="h-48">
@@ -577,7 +579,7 @@ export function Analytics() {
               </div>
               {!paymentMethods || paymentMethods.length === 0 ? (
                 <div className="h-48 flex items-center justify-center">
-                  <p className="text-[#dbdfea]/40 text-sm">No transaction data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No transaction data yet</p>
                 </div>
               ) : (
                 <>

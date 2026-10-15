@@ -1,3 +1,4 @@
+import {cashCommandConflict,cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import {
   notifyIfBillingCardRequired,
 } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
+import { cancelRefusalMessage } from "@/lib/cancel-refusal";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
@@ -25,6 +27,8 @@ import RetailTerminalView, {
   type RetailShareSale,
   type RetailTerminalState,
 } from "@/features/terminal/retail/RetailTerminalView";
+import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo, wholeNumber } from "@shared/api-path";
 
 const BRAND = "#00DFC8";
 
@@ -173,11 +177,9 @@ export default function MerchantTerminalMobile() {
   }, [merchantId, saleLinks]);
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      });
+      const r = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!r.ok) throw new Error("Failed to fetch merchant");
       return r.json();
     },
@@ -185,14 +187,11 @@ export default function MerchantTerminalMobile() {
   });
 
   const { data: activeTransaction } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "active-transaction"],
+    queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"],
     queryFn: async () => {
       // Signed in: this business's newest open sale, a board-less sale with its own link
       // included. The anonymous read of this address was retired on 2026-09-25.
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/active-transaction`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
+      const r = await sessionFetch(apiPath("GET /api/merchants/:id/active-transaction", { id: merchantId }));
       if (!r.ok) throw new Error("Failed to fetch active transaction");
       return r.json();
     },
@@ -203,12 +202,9 @@ export default function MerchantTerminalMobile() {
   });
 
   const { data: taptStones = [] } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
     queryFn: async () => {
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
+      const r = await sessionFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId }));
       if (!r.ok) throw new Error("Failed to fetch tapt stones");
       return r.json();
     },
@@ -216,12 +212,9 @@ export default function MerchantTerminalMobile() {
   });
 
   const { data: allTransactions = [], isSuccess: transactionsLoaded } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
+      const r = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
@@ -253,17 +246,15 @@ export default function MerchantTerminalMobile() {
 
   useEffect(() => {
     if (!merchantId) return;
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-    sseClient.connectMerchant(merchantId, token);
+    sseClient.connectMerchant(merchantId);
     sseClient.subscribe("transaction_updated", (message) => {
       const tx = message.transaction ?? null;
-      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], tx);
+      queryClient.setQueryData([MERCHANTS_KEY, merchantId, "active-transaction"], tx);
       // Keep allTransactions cache in sync for all updates so split progress,
       // status changes, and completedSplits increments appear immediately.
       if (tx) {
         queryClient.setQueryData<any[]>(
-          ["/api/merchants", merchantId, "transactions"],
+          [MERCHANTS_KEY, merchantId, "transactions"],
           (prev: any[] = []) => {
             const exists = prev.some((t: any) => t.id === tx.id);
             return exists
@@ -288,14 +279,14 @@ export default function MerchantTerminalMobile() {
         ? parseFloat(activeTransaction.price).toFixed(2)
         : undefined;
       setSuccessNotif({ id: `success-${Date.now()}`, message: "Payment Received", amount });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
     }
     prevTransactionStatusRef.current = status;
   }, [activeTransaction?.status]);
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: { itemName: string; price: string; selectedStoneId?: number; splitEnabled?: boolean }) => {
-      const r = await apiRequest("POST", "/api/transactions", {
+      const r = await apiRequest(...apiTo("POST /api/transactions"), {
         merchantId,
         itemName: data.itemName,
         price: data.price,
@@ -311,8 +302,8 @@ export default function MerchantTerminalMobile() {
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
     },
     onError: (error) => {
       /* A billing 402 is stated once, by the billing banner apiRequest raises; the
@@ -325,49 +316,54 @@ export default function MerchantTerminalMobile() {
   const createStoneMutation = useMutation({
     mutationFn: async () => {
       const stoneNumber = ((taptStones as any[])?.length || 0) + 1;
-      const r = await apiRequest("POST", `/api/merchants/${merchantId}/tapt-stones`, {
+      const r = await apiRequest(...apiTo("POST /api/merchants/:id/tapt-stones", { id: merchantId }), {
         name: `Stone ${stoneNumber}`,
         stoneNumber,
       });
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"] });
     },
   });
 
   const renameStoneMutation = useMutation({
     mutationFn: async ({ stoneId, name }: { stoneId: number; name: string }) => {
-      const r = await apiRequest("PUT", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`, { name });
+      const r = await apiRequest(...apiTo("PUT /api/merchants/:merchantId/tapt-stones/:stoneId", { merchantId, stoneId }), { name });
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"] });
     },
   });
 
   const deleteStoneMutation = useMutation({
     mutationFn: async (stoneId: number) => {
-      const r = await apiRequest("DELETE", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`);
+      const r = await apiRequest(...apiTo("DELETE /api/merchants/:merchantId/tapt-stones/:stoneId", { merchantId, stoneId }));
       return r.ok ? {} : r.json();
     },
     onSuccess: (_data, stoneId) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"] });
       if (selectedStoneId === stoneId) setSelectedStoneId(null);
     },
   });
 
   const cancelTransactionMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      const r = await apiRequest("POST", `/api/transactions/${transactionId}/cancel`, {});
+      const r = await apiRequest(...apiTo("POST /api/transactions/:id/cancel", { id: transactionId }), {});
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to cancel transaction", variant: "destructive" });
+    onError: (error: Error) => {
+      const refusal = cancelRefusalMessage(error);
+      if (refusal) {
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      }
+      toast({ title: "Error", description: refusal ?? "Failed to cancel transaction", variant: "destructive" });
     },
   });
 
@@ -404,10 +400,9 @@ export default function MerchantTerminalMobile() {
         return;
       }
       setTapToPayStatus("processing");
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch("/api/transactions/tap-to-pay", {
+      const r = await sessionFetch(apiPath("POST /api/transactions/tap-to-pay"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
           transactionId: tx.id,
@@ -423,7 +418,7 @@ export default function MerchantTerminalMobile() {
       const data = await r.json();
       setTapToPayApproved(data.approved);
       setTapToPayStatus(data.approved ? "completed" : "failed");
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
       setTimeout(() => { setShowTapToPayOverlay(false); setTapToPayStatus("idle"); setTapToPayApproved(null); }, 3500);
     } catch (err: any) {
       /* A billing 402: the server refused before charging, so no card was
@@ -505,14 +500,28 @@ export default function MerchantTerminalMobile() {
   const handleCashSale = async (draft: RetailSaleDraft) => {
     setLiveReceipt(null);
     try {
-      const r = await apiRequest("POST", "/api/transactions/cash-sale", {
-        merchantId,
-        itemName: draft.name,
-        price: (draft.amount / 100).toFixed(2),
-      });
-      const { transaction } = await r.json();
+      const body={merchantId,itemName:draft.name,price:(draft.amount/100).toFixed(2)};
+      const key=cashCommandKey(body);
+      let r: Response;
+      try {
+        r = await apiRequest(...apiTo("POST /api/transactions/cash-sale"),body,{idempotencyKey:key});
+      } catch (error) {
+        // The saved command already recorded a different sale (its answer was lost). Say which, and
+        // release the command so this sale can be recorded: it never sticks in the tab.
+        const recorded=cashCommandConflict(error);
+        if(recorded) {
+          completeCashCommand(merchantId,key);
+          toast({ title: "Error", variant: "destructive",
+            description: `An earlier cash sale (${recorded.itemName}${recorded.price ? `, $${recorded.price}` : ""}) was already recorded. Record this sale again to save it.` });
+          throw Object.assign(new Error("Cash sale conflicts with one already recorded"), { handled: true });
+        }
+        throw error;
+      }
+      const { transaction, replayed } = await r.json();
+      if(!Number.isSafeInteger(transaction?.id) || transaction.id<1 || transaction.merchantId!==merchantId || transaction.paymentMethod!=='cash')
+        throw new Error('Cash sale confirmation is incomplete. Retry the same sale.');
       queryClient.setQueryData<any[]>(
-        ["/api/merchants", merchantId, "transactions"],
+        [MERCHANTS_KEY, merchantId, "transactions"],
         (prev: any[] = []) => (prev.some((t: any) => t.id === transaction.id) ? prev : [transaction, ...prev]),
       );
       setLiveReceipt({
@@ -520,7 +529,11 @@ export default function MerchantTerminalMobile() {
         amount: Math.round(parseFloat(transaction?.price) * 100),
         url: `${window.location.origin}/receipt/${transaction.id}`,
       });
+      completeCashCommand(merchantId,key);
+      // A replay is the earlier sale, not a new one: say so, so an identical second sale is never swallowed.
+      if (replayed === true) toast({ title: "Already recorded", description: "This cash sale was recorded earlier. Record it again for a new sale." });
     } catch (error) {
+      if ((error as any)?.handled) throw error;
       if (!isBillingCardRequired(error)) {
         toast({ title: "Error", description: apiErrorMessage(error, "Failed to record cash sale"), variant: "destructive" });
       }
@@ -551,7 +564,7 @@ export default function MerchantTerminalMobile() {
     // Push the new transaction into the list cache immediately so it appears in the
     // active stack before the next background poll fires.
     queryClient.setQueryData<any[]>(
-      ["/api/merchants", merchantId, "transactions"],
+      [MERCHANTS_KEY, merchantId, "transactions"],
       (prev: any[] = []) => {
         const exists = prev.some((t: any) => t.id === newTx.id);
         return exists ? prev : [newTx, ...prev];
@@ -592,12 +605,10 @@ export default function MerchantTerminalMobile() {
     refundReason,
     refundMethod,
   }: RetailRefundIntent) => {
-    const token = localStorage.getItem("authToken");
-    const response = await fetch(`/api/transactions/${transactionId}/refunds`, {
+    const response = await sessionFetch(apiPath("POST /api/transactions/:transactionId/refunds", { transactionId: wholeNumber(transactionId) }), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ refundAmount, refundReason, refundMethod }),
     });

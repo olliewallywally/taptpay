@@ -146,10 +146,14 @@ export async function newMobilePage(browser, vertical, { width, height, safeArea
        chain this run measures nothing extra; it is wired now so clause 8 does
        not have to be retrofitted later. */
     await page.addInitScript((sa) => {
+      const apply = () => {
       document.documentElement.style.setProperty("--sa-test-top", `${sa.top}px`);
       document.documentElement.style.setProperty("--sa-test-bottom", `${sa.bottom}px`);
       document.documentElement.style.setProperty("--sa-test-left", `${sa.left}px`);
       document.documentElement.style.setProperty("--sa-test-right", `${sa.right}px`);
+      };
+      if (document.documentElement) apply();
+      else document.addEventListener('DOMContentLoaded', apply, { once: true });
     }, safeArea);
   }
 

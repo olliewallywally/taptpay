@@ -27,7 +27,7 @@ export default function DesktopLegacyPage({
       <div className="tapt-desktop-legacy-wrap">
         {/* One entry bounce for the whole 430px column — the mobile page inside
             owns its own markup and is deliberately left un-cascaded. */}
-        <div className="tapt-desktop-legacy-column dt-rise">{children}</div>
+        <div className="tapt-desktop-legacy-column dt-rise" tabIndex={0} role="region" aria-label="Page content">{children}</div>
       </div>
     </DesktopPageScaffold>
   );

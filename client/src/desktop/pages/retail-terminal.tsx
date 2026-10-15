@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest, isBillingCardRequired } from "@/lib/queryClient";
+import { cancelRefusalMessage } from "@/lib/cancel-refusal";
 import { useToast } from "@/hooks/use-toast";
 import {
   DesktopPageScaffold,
@@ -16,6 +17,9 @@ import {
   type DesktopKeypadKey,
 } from "../desktop-keypad";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
+import { sessionFetch } from "@/lib/session";
+import { retailResponse } from "@/lib/response-data";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -190,34 +194,33 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const [draftName, setDraftName] = useState("");
 
   const authFetch = async (path: string) => {
-    const token = localStorage.getItem("authToken");
-    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return retailResponse(path, await res.json());
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId })),
     enabled: !!merchantId,
   });
 
   const txQuery = useQuery<Tx[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/transactions`),
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId })),
     refetchInterval: 5000,
     enabled: !!merchantId,
   });
 
   const stockQuery = useQuery<StockItem[]>({
-    queryKey: ["/api/merchants", merchantId, "stock-items"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/stock-items`),
+    queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:merchantId/stock-items", { merchantId })),
     enabled: !!merchantId,
   });
 
   const stonesQuery = useQuery<Stone[]>({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/tapt-stones`),
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId })),
     enabled: !!merchantId,
   });
 
@@ -238,7 +241,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
   const createMutation = useMutation<CreatedSaleResponse, Error, CreateSaleInput>({
     mutationFn: async (sale) => {
-      const res = await apiRequest("POST", "/api/transactions", {
+      const res = await apiRequest(...apiTo("POST /api/transactions"), {
         merchantId,
         itemName: sale.item,
         price: sale.price,
@@ -258,8 +261,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setCopiedKey(null);
     },
     onSuccess: (created, sale) => {
-      void queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      void queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      void queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      void queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
 
       const paymentUrl = typeof created?.paymentUrl === "string" ? created.paymentUrl.trim() : "";
       const qrCodeUrl = typeof created?.qrCodeUrl === "string" ? created.qrCodeUrl.trim() : "";
@@ -297,8 +300,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     mutationFn: async (name) => {
       const trimmed = name?.trim();
       const res = await apiRequest(
-        "POST",
-        `/api/merchants/${merchantId}/tapt-stones`,
+        ...apiTo("POST /api/merchants/:id/tapt-stones", { id: merchantId }),
         trimmed ? { name: trimmed } : {},
       );
       return res.json();
@@ -316,7 +318,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setBoardsOn(true);
       setPickerOpen(false);
       queryClient.setQueryData<Stone[]>(
-        ["/api/merchants", merchantId, "tapt-stones"],
+        [MERCHANTS_KEY, merchantId, "tapt-stones"],
         (current = []) =>
           [...current.filter((stone) => stone.id !== created.id), created].sort(
             (a, b) => a.stoneNumber - b.stoneNumber,
@@ -325,7 +327,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setDestination({ kind: "board", boardId: created.id });
       setBoardError(null);
       void queryClient.invalidateQueries({
-        queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+        queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
       });
       toast({ title: "New board created", description: `${created.name} selected` });
     },
@@ -345,8 +347,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const renameBoardMutation = useMutation<Stone, Error, { id: number; name: string }>({
     mutationFn: async ({ id, name }) => {
       const res = await apiRequest(
-        "PUT",
-        `/api/merchants/${merchantId}/tapt-stones/${id}`,
+        ...apiTo("PUT /api/merchants/:merchantId/tapt-stones/:stoneId", { merchantId, stoneId: id }),
         { name: name.trim() },
       );
       return res.json();
@@ -356,7 +357,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       /* The server echoes the row back, but fall back to the local name so the
          list still updates if the response shape ever changes. */
       queryClient.setQueryData<Stone[]>(
-        ["/api/merchants", merchantId, "tapt-stones"],
+        [MERCHANTS_KEY, merchantId, "tapt-stones"],
         (current = []) =>
           current.map((stone) =>
             stone.id === id ? { ...stone, ...updated, name: updated?.name ?? name.trim() } : stone,
@@ -365,7 +366,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setEditingId(null);
       setDraftName("");
       void queryClient.invalidateQueries({
-        queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+        queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
       });
     },
     onError: (error) => {
@@ -377,16 +378,23 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
   const cancelMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      const res = await apiRequest("POST", `/api/transactions/${transactionId}/cancel`, {});
+      const res = await apiRequest(...apiTo("POST /api/transactions/:id/cancel", { id: transactionId }), {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
       toast({ title: "Transaction cancelled" });
       setExpandedId(null);
     },
-    onError: () => toast({ title: "Failed to cancel", variant: "destructive" }),
+    onError: (error: Error) => {
+      const refusal = cancelRefusalMessage(error);
+      if (refusal) {
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+      }
+      toast({ title: "Failed to cancel", description: refusal ?? undefined, variant: "destructive" });
+    },
   });
 
   /* ── derived ── */
@@ -747,6 +755,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
             <div
               className="rt-rows"
+              tabIndex={0} role="region" aria-label="Sales"
               ref={rowsRef}
               onScroll={(e) => {
                 filterScroll.current[filter] = e.currentTarget.scrollTop;
@@ -1326,10 +1335,10 @@ const RT_CSS = `
 .rt-stack-head { flex:0 0 44px; height:44px; display:flex; align-items:center; justify-content:space-between; }
 .rt-stack-title { display:inline-flex; align-items:center; gap:6px; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; }
 .rt-stack-search { flex:0 0 32px; display:flex; align-items:center; gap:8px; width:180px; height:32px; padding:0 14px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
-.rt-stack-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:11px; }
+.rt-stack-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:11px; min-height:36px; }
 /* 44 + 32 + 2 = 78px below the shell top → canvas y566 collapsed, y171 expanded. */
 .rt-chips { flex:0 0 auto; margin-top:2px; display:flex; gap:8px; }
-.rt-chip { padding:6px 13px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
+.rt-chip { padding:6px 13px; min-height:36px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
 /* The only part of the shell that resizes. */
 .rt-rows { flex:1; min-height:0; margin-top:8px; display:flex; flex-direction:column; overflow-y:auto; scrollbar-width:none; }
 .rt-rows::-webkit-scrollbar { display:none; }
@@ -1375,7 +1384,7 @@ const RT_CSS = `
 .rt-amt-row { display:flex; align-items:baseline; gap:12px; }
 .rt-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:66px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .rt-edit { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; cursor:pointer; background:transparent; }
-.rt-destination-label { margin-top:18px; font-weight:700; font-size:9px; letter-spacing:0.16em; color:rgba(244,246,255,0.45); }
+.rt-destination-label { margin-top:18px; font-weight:700; font-size:9px; letter-spacing:0.16em; color:rgba(244,246,255,0.65); }
 /* ── payment board picker ──────────────────────────────────────────────────
    Progressive disclosure, all in the wireframe idiom: an outlined pill that
    goes solid when engaged, a second pill that pops in beside it, and an
@@ -1462,11 +1471,11 @@ const RT_CSS = `
 .rt-item-name { margin-top:16px; font-weight:300; font-size:16px; color:${TEXT_SOFT}; text-transform:lowercase; }
 .rt-item-hint { margin-top:4px; font-weight:500; font-size:13px; color:rgba(244,246,255,0.5); }
 .rt-field { display:flex; flex-direction:column; gap:8px; }
-.rt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.rt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 .rt-name-input { height:50px; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; box-sizing:border-box; color:${INK}; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; }
 .rt-split-toggle { display:flex; align-items:center; justify-content:space-between; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .rt-split-text { display:flex; flex-direction:column; gap:1px; }
-.rt-split-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); }
+.rt-split-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.65); }
 .rt-split-desc { font-weight:600; font-size:13px; color:${TEXT_SOFT}; }
 .rt-switch { position:relative; width:48px; height:29px; border-radius:9999px; cursor:pointer; transition:background .18s ease; flex:0 0 auto; }
 .rt-knob { position:absolute; top:4px; left:4px; width:21px; height:21px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(10,17,40,0.25); transition:transform .18s ease; }
@@ -1516,7 +1525,7 @@ const RT_CSS = `
 /* share */
 
 .rt-share-head { font-weight:300; font-size:15px; color:${KP_INK}; }
-.rt-share-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }
+.rt-share-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.65); }
 .rt-share-body { margin-top:28px; display:flex; flex-direction:column; gap:14px; }
 .rt-share-link { display:flex; align-items:center; gap:12px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .rt-share-url { flex:1; min-width:0; font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

@@ -1,40 +1,15 @@
-import "./support/test-env";
-
-// The provider is never reached (R1-T1): its sessions, their outcomes and Google Pay's submission are stubbed.
-jest.mock("../windcave", () => {
-  const actual = jest.requireActual("../windcave");
-  let sessions = 0;
-  return {
-    ...actual,
-    isWindcaveConfigured: () => true,
-    createWindcaveSession: jest.fn(async () => {
-      sessions += 1;
-      return {
-        success: true,
-        sessionId: `matrix-session-${sessions}`,
-        hppUrl: `https://uat.windcave.com/hpp/matrix-${sessions}`,
-        ajaxSubmitCardUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${sessions}/card`,
-        ajaxSubmitApplePayUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${sessions}/applepay`,
-        ajaxSubmitGooglePayUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${sessions}/googlepay`,
-      };
-    }),
-    queryWindcaveSession: jest.fn(async (sessionId: string) => ({
-      success: true, approved: true, windcaveTransactionId: `provider-${sessionId}`,
-    })),
-    submitGooglePayToken: jest.fn(async () => ({ success: true, approved: true, windcaveTransactionId: "provider-google-pay" })),
-  };
-});
+import "./support/durable-payments-env";
 
 import crypto from "crypto";
 import QRCode from "qrcode";
 import request from "supertest";
 import * as windcave from "../windcave";
-import { mintPaymentCredential, resetTestStorage, storage } from "./support/http-harness";
+import { mintPaymentCredential, resetTestStorage, storage, createTestApp } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   type OwnServedCaller,
   type OwnServedRecipe,
   type ServedCtx,
@@ -62,8 +37,11 @@ const LINK_SALE_FIELDS = [
   "status", "totalSplits",
 ];
 
-const createSession = windcave.createWindcaveSession as jest.Mock;
-const submitGooglePay = windcave.submitGooglePayToken as jest.Mock;
+import {PaymentAttemptService} from '../payment-attempt-service';
+import {syntheticRetailRuntime} from './support/retail-runtime';
+let port:ReturnType<typeof syntheticRetailRuntime>;
+async function runtime(ctx:ServedCtx){port=syntheticRetailRuntime(storage,new PaymentAttemptService(storage));ctx.app=(await createTestApp({paymentRuntime:port.runtime})).app;}
+let submitGooglePay:jest.SpyInstance;
 const get = (path: string): ServedRequest => ({ method: "get", path });
 const post = (path: string, body: Record<string, unknown> = {}): ServedRequest => ({ method: "post", path, body });
 const download = (path: string, method: "get" | "post" = "get"): ServedRequest => ({ method, path, binary: true, ...(method === "post" ? { body: {} } : {}) });
@@ -73,6 +51,7 @@ const keysOf = (value: Record<string, unknown>) => Object.keys(value).filter((ke
 
 /** A sale with its own payment link: only the link's hash is kept. */
 async function linkSale(ctx: ServedCtx, fields: Record<string, unknown> = {}) {
+  await runtime(ctx);
   const link = mintPaymentCredential();
   const made = await storage.createTransaction({
     merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50", status: "pending", paymentMethod: "qr_code",
@@ -83,6 +62,7 @@ async function linkSale(ctx: ServedCtx, fields: Record<string, unknown> = {}) {
 
 /** A board sale, as the terminal leaves one for the board's customer. */
 async function boardSale(ctx: ServedCtx, fields: Record<string, unknown> = {}) {
+  await runtime(ctx);
   const board = await storage.createNextTaptStone(ctx.merchantId, "Front till");
   const made = await storage.createTransaction({
     merchantId: ctx.merchantId, taptStoneId: board.id, itemName: "Toastie", price: "12.00", status: "pending",
@@ -94,18 +74,19 @@ async function boardSale(ctx: ServedCtx, fields: Record<string, unknown> = {}) {
 /** A board sale whose customer has opened a provider session (the /pay step). */
 async function boardSaleInPayment(ctx: ServedCtx) {
   const made = await boardSale(ctx);
-  const opened = await request(ctx.app).post(`/api/transactions/${made.id}/pay`).send({});
+  const intent={idempotencyKey:crypto.randomUUID(),shareIndex:0};
+  const opened = await request(ctx.app).post(`/api/transactions/${made.id}/pay`).send(intent);
   if (opened.status !== 200) throw new Error(`fixture: pay failed ${opened.status}`);
-  return { ...made, sessionId: opened.body.sessionId as string };
+  port.setObservation('approved');return { ...made,...intent, sessionId: opened.body.sessionId as string,returnState:opened.body.returnState as string };
 }
 
 /** A link sale whose customer has opened a provider session, with its payment attempt. */
 async function linkSaleInPayment(ctx: ServedCtx) {
   const made = await linkSale(ctx, { splitEnabled: false });
   const idempotencyKey = crypto.randomUUID();
-  const opened = await request(ctx.app).post(`/api/pay/t/${made.token}/session`).send({ idempotencyKey });
+  const opened = await request(ctx.app).post(`/api/pay/t/${made.token}/session`).send({ idempotencyKey,shareIndex:0 });
   if (opened.status !== 200) throw new Error(`fixture: session failed ${opened.status}`);
-  return { ...made, idempotencyKey, sessionId: opened.body.sessionId as string, returnState: opened.body.returnState as string };
+  port.setObservation('approved');return { ...made, idempotencyKey, sessionId: opened.body.sessionId as string, returnState: opened.body.returnState as string };
 }
 
 /** The text each QR image encodes (the real image is still made). */
@@ -195,17 +176,13 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     const made = await linkSale(ctx, { splitEnabled: false });
     const idempotencyKey = crypto.randomUUID();
     return {
-      req: post(`/api/pay/t/${made.token}/session`, { idempotencyKey }), status: 200,
+      req: post(`/api/pay/t/${made.token}/session`, { idempotencyKey,shareIndex:0 }), status: 200,
       check: async (res) => {
-        expect(res.body).toMatchObject({ sessionId: expect.stringMatching(/^matrix-session-/), attemptState: "ready", shareIndex: 0 });
+        expect(res.body).toMatchObject({ sessionId: expect.stringMatching(/^synthetic-session-/), attemptState: "ready", shareIndex: 0 });
         // The provider is asked for the price, and told where to send the browser and its notification.
-        const [, amount, , , , , , urls] = createSession.mock.calls[0];
-        expect(amount).toBe("5.50");
-        expect(urls).toEqual({
-          callbackBase: `${ORIGIN}/api/pay/return/${res.body.returnState}?source=hpp`,
-          notificationUrl: `${ORIGIN}/api/pay/notification/${res.body.returnState}`,
-        });
-        expect((await sale(made.id)).status).toBe("processing");
+        expect(port.client.createSession.mock.calls[0][0]).toMatchObject({amount:'5.50',
+          callbackBase:`${ORIGIN}/api/pay/return/${res.body.returnState}?source=hpp`,notificationUrl:`${ORIGIN}/api/windcave/notification`});
+        expect((await sale(made.id)).status).toBe("pending");
       },
     };
   },
@@ -226,6 +203,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
   "POST /api/pay/t/:token/googlepay-complete": async (ctx) => {
     const paying = await linkSaleInPayment(ctx);
+    const query=port.client.querySession.getMockImplementation()!;port.setObservation('pending');const pending=await query(paying.sessionId);port.setObservation('approved');port.client.querySession.mockResolvedValueOnce(pending);
     return {
       req: post(`/api/pay/t/${paying.token}/googlepay-complete`, {
         idempotencyKey: paying.idempotencyKey, sessionId: paying.sessionId, shareIndex: 0, googlePayToken: { signature: "synthetic" },
@@ -234,8 +212,9 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       check: async (res) => {
         expect(res.body).toEqual({ approved: true, outcome: "approved", receiptShare: null });
         // The wallet's token goes to the provider's own submit address for this attempt, and nowhere else.
-        expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*\/googlepay$/), { signature: "synthetic" }]]);
-        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "google_pay", windcaveTransactionId: "provider-google-pay" });
+        expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*googlepay$/), { signature: "synthetic" }]]);
+        // R2-T5: the verified session query settles it, never the submit's own reply.
+        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "card", windcaveTransactionId: expect.stringMatching(/^provider-synthetic-session-/) });
       },
     };
   },
@@ -249,7 +228,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
         expect((await sale(paying.id)).status).toBe("completed");
         // The page then reads the outcome, and no more.
         const read = await request(ctx.app).get(`/api/pay/return/${paying.returnState}`);
-        expect(read.body).toEqual({ outcome: "approved", receiptShare: null });
+        expect(read.body).toEqual({ approved:true,outcome: "approved", receiptShare: null });
       },
     };
   },
@@ -295,42 +274,35 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   "POST /api/transactions/:id/pay": async (ctx) => {
     const made = await boardSale(ctx);
     return {
-      req: post(`/api/transactions/${made.id}/pay`), status: 200,
-      check: async (res) => {
-        // The provider's session: its hosted page and the addresses the browser submits the card to.
-        const n = res.body.sessionId.replace("matrix-session-", "");
-        expect(res.body).toEqual({
-          sessionId: `matrix-session-${n}`,
-          hppUrl: `https://uat.windcave.com/hpp/matrix-${n}`,
-          ajaxSubmitCardUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${n}/card`,
-          ajaxSubmitApplePayUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${n}/applepay`,
-          ajaxSubmitGooglePayUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${n}/googlepay`,
-        });
-        // Exactly the price, and the session is bound to the sale.
-        expect(createSession.mock.calls.map((call) => call[1])).toEqual(["12.00"]);
-        expect((await sale(made.id)).windcaveSessionId).toBe(res.body.sessionId);
+      req: post(`/api/transactions/${made.id}/pay`,{idempotencyKey:crypto.randomUUID(),shareIndex:0}), status:200,
+      check:async res=>{
+        expect(res.body).toMatchObject({sessionId:expect.stringMatching(/^synthetic-session-/),shareIndex:0,attemptState:'ready',returnState:expect.any(String)});
+        expect(port.client.createSession.mock.calls[0][0]).toMatchObject({amount:'12.00'});
+        expect(port.bindings.has(res.body.sessionId)).toBe(true);expect(port.bindings.get(res.body.sessionId).paymentAttemptId).toEqual(expect.any(String));
       },
     };
   },
   "POST /api/transactions/:id/hosted-fields-complete": async (ctx) => {
     const paying = await boardSaleInPayment(ctx);
     return {
-      req: post(`/api/transactions/${paying.id}/hosted-fields-complete`, { sessionId: paying.sessionId }), status: 200,
+      req: post(`/api/transactions/${paying.id}/hosted-fields-complete`, { idempotencyKey:paying.idempotencyKey,shareIndex:0,sessionId: paying.sessionId }), status: 200,
       check: async (res) => {
-        expect(res.body).toEqual({ approved: true, redirectPath: `/receipt/${paying.id}` });
+        expect(res.body).toEqual({ approved:true,outcome:"approved",receiptShare:null });
         expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "card", windcaveTransactionId: `provider-${paying.sessionId}` });
       },
     };
   },
   "POST /api/transactions/:id/googlepay-complete": async (ctx) => {
     const paying = await boardSaleInPayment(ctx);
+    const query=port.client.querySession.getMockImplementation()!;port.setObservation('pending');const pending=await query(paying.sessionId);port.setObservation('approved');port.client.querySession.mockResolvedValueOnce(pending);
     return {
-      req: post(`/api/transactions/${paying.id}/googlepay-complete`, { sessionId: paying.sessionId, googlePayToken: { signature: "synthetic" } }),
+      req: post(`/api/transactions/${paying.id}/googlepay-complete`, { idempotencyKey:paying.idempotencyKey,shareIndex:0,sessionId: paying.sessionId, googlePayToken: { signature: "synthetic" } }),
       status: 200,
       check: async (res) => {
-        expect(res.body).toEqual({ approved: true, redirectPath: `/receipt/${paying.id}` });
-        expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*\/googlepay$/), { signature: "synthetic" }]]);
-        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "google_pay", windcaveTransactionId: "provider-google-pay" });
+        expect(res.body).toEqual({ approved:true,outcome:"approved",receiptShare:null });
+        expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*googlepay$/), { signature: "synthetic" }]]);
+        // R2-T5: the verified session query settles it, never the submit's own reply.
+        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "card", windcaveTransactionId: expect.stringMatching(/^provider-synthetic-session-/) });
       },
     };
   },
@@ -338,7 +310,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     const paying = await boardSaleInPayment(ctx);
     return {
       // The provider sends the browser back: the outcome is read from the provider, and the receipt shown.
-      req: get(`/api/windcave/callback?transactionId=${paying.id}&result=approved`), status: 302,
+      req: get(`/api/windcave/callback?transactionId=${paying.id}&state=${paying.returnState}&result=approved`), status: 303,
       check: async (res) => {
         expect(res.headers.location).toBe(`/receipt/${paying.id}`);
         expect(await sale(paying.id)).toMatchObject({ status: "completed", windcaveTransactionId: `provider-${paying.sessionId}` });
@@ -370,8 +342,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(pay\/(t\/|return\/)|transactions\/:id|split-payments\/:id|windcave\/callback)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("retail-pay");
 const SERVED = ownServedPairs(ROWS);
 
 /**
@@ -397,15 +368,14 @@ const SERVED_BY: Record<string, OwnServedCaller[]> = {
   "POST /api/transactions/:id/pay": BY_NUMBER,
   "POST /api/transactions/:id/hosted-fields-complete": BY_NUMBER,
   "POST /api/transactions/:id/googlepay-complete": BY_NUMBER,
-  "GET /api/windcave/callback": BY_NUMBER,
+  "GET /api/windcave/callback": LINK,
   "POST /api/transactions/:id/receipt-pdf": BY_NUMBER,
   "GET /api/transactions/:id/receipt-qr": BY_NUMBER,
 };
 
 beforeEach(() => {
   resetTestStorage();
-  createSession.mockClear();
-  submitGooglePay.mockClear();
+  submitGooglePay=jest.spyOn(windcave,'submitGooglePayToken').mockResolvedValue({approved:true} as any);
 });
 afterEach(() => jest.restoreAllMocks());
 

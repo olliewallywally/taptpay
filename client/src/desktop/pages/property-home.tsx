@@ -17,6 +17,7 @@ import {
 } from "../DesktopPageScaffold";
 import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -374,7 +375,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
                     data-seg-id={r}
                     aria-pressed={on}
                     style={{
-                      color: on ? NAVY : "#6B7BB8",
+                      color: on ? NAVY : "#93BAFF",
                       fontWeight: on ? 700 : 600,
                     }}
                     onClick={() => {
@@ -483,6 +484,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
           <button
             type="button"
             className="ph-notif-prev"
+            aria-hidden={notifOpen} tabIndex={notifOpen ? -1 : 0} aria-expanded={notifOpen}
             style={{ opacity: notifOpen ? 0 : 1, pointerEvents: notifOpen ? "none" : "auto" }}
             onClick={() => setNotifOpen(true)}
           >
@@ -505,6 +507,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
           </button>
           <div
             className="ph-notif-list"
+            aria-hidden={!notifOpen} {...inertWhen(!notifOpen)}
             style={{ opacity: notifOpen ? 1 : 0, pointerEvents: notifOpen ? "auto" : "none" }}
           >
             <button type="button" className="ph-notif-listhead" onClick={() => setNotifOpen(false)}>
@@ -514,7 +517,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
               </span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(191,209,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
             </button>
-            <div className="ph-notif-rows">
+            <div className="ph-notif-rows" tabIndex={0} role="region" aria-label="Notifications">
               {notifications.length === 0 ? (
                 <div className="ph-empty">you're all caught up</div>
               ) : (
@@ -637,13 +640,13 @@ const PH_CSS = `
 .ph-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; }
 .ph-bd-head { display:flex; align-items:center; justify-content:space-between; }
 .ph-bd-title { font-weight:300; font-size:11px; letter-spacing:0.22em; color:${ACCENT_SOFT}; }
-.ph-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.4); }
+.ph-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.65); }
 .ph-bd-body { display:flex; align-items:flex-end; gap:26px; }
 .ph-bd-col { display:flex; flex-direction:column; gap:3px; }
 .ph-bd-amt { font-family:'Outfit',sans-serif; font-weight:800; font-size:30px; line-height:1; color:${TEXT_SOFT}; }
 .ph-bd-label { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; text-transform:capitalize; }
 .ph-bd-avg { font-family:'Outfit',sans-serif; font-weight:800; font-size:20px; line-height:1; color:rgba(244,246,255,0.75); }
-.ph-bd-muted { font-weight:300; font-size:11px; color:rgba(244,246,255,0.45); }
+.ph-bd-muted { font-weight:300; font-size:11px; color:rgba(244,246,255,0.65); }
 .ph-bd-share { flex:1; display:flex; flex-direction:column; gap:7px; }
 .ph-bd-share-top { display:flex; align-items:baseline; justify-content:space-between; }
 .ph-bd-pct { font-weight:800; font-size:13px; color:${ACCENT}; }

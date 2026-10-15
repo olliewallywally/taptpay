@@ -10,6 +10,17 @@ import {
 
 configure({ testIdAttribute: "data-demo-id" });
 
+test('timeframe buttons expose the selected filter to assistive technology', () => {
+  render(<RetailDashboardView {...makeProps()} />);
+  const week = screen.getByTestId('retail-dashboard-timeframe-week');
+  const month = screen.getByTestId('retail-dashboard-timeframe-month');
+  expect(week).toHaveAttribute('aria-pressed', 'true');
+  expect(month).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(month);
+  expect(month).toHaveAttribute('aria-pressed', 'true');
+  expect(week).toHaveAttribute('aria-pressed', 'false');
+});
+
 const viewSourcePath = path.resolve(
   process.cwd(),
   "client/src/features/dashboard/RetailDashboardView.tsx",
@@ -24,6 +35,7 @@ const forbiddenViewPatterns = [
   /@tanstack\/react-query/,
   /@\/components\/reports/,
   /@\/lib\/auth/,
+  /@\/lib\/session/,
   /wouter/,
   /useLocation/,
   /\bfetch\s*\(/,
@@ -88,7 +100,9 @@ describe("RetailDashboardView boundary", () => {
     expect(adapterSource).toContain("<RetailDashboardView");
     expect(adapterSource).toContain("getCurrentMerchantId");
     expect(adapterSource).toContain("useQuery");
-    expect(adapterSource).toContain('localStorage.getItem("authToken")');
+    // R1-T4 phase E: the adapter's reads go with the session cookie; nothing is read from storage.
+    expect(adapterSource).toContain("sessionFetch");
+    expect(adapterSource).not.toMatch(/localStorage|Authorization/);
     expect(adapterSource).toContain("RetailReportsButton");
     expect(adapterSource).toContain("/api/merchants/");
     expect(adapterSource).toContain("/profile");

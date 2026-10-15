@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Building2, User, FileText, Globe } from "lucide-react";
+import { apiPath, apiTo } from "@shared/api-path";
 
 /* `text-base md:text-sm` rather than `text-sm`, matching components/ui/input.tsx
    these were copied from: a field under 16px makes iOS zoom the page on focus,
@@ -29,7 +30,7 @@ export default function MerchantOnboarding() {
   const { data: authData } = useQuery<{
     user: { id: number; email: string; merchantId: number; role: string };
   }>({
-    queryKey: ["/api/auth/me"],
+    queryKey: [apiPath("GET /api/auth/me")],
   });
 
   const merchantId = authData?.user?.merchantId;
@@ -46,7 +47,7 @@ export default function MerchantOnboarding() {
     nzbn: string;
     gstNumber: string;
   }>({
-    queryKey: [`/api/merchants/${merchantId}/profile`],
+    queryKey: [apiPath("GET /api/merchants/:id/profile", { id: merchantId })],
     enabled: !!merchantId,
   });
 
@@ -64,12 +65,12 @@ export default function MerchantOnboarding() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/merchants/${merchantId}/onboarding`, form);
+      const res = await apiRequest(...apiTo("POST /api/merchants/:id/onboarding", { id: merchantId }), form);
       return res.json();
     },
     onSuccess: () => {
       trackEvent("onboarding_submitted", { outcome: "success" });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/auth/me")] });
       setShowSuccessDialog(true);
     },
     onError: (err: any) => {
@@ -111,7 +112,7 @@ export default function MerchantOnboarding() {
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Complete Your Business Profile</h1>
-          <p className="text-gray-500 mt-2 text-sm max-w-md mx-auto">
+          <p className="text-gray-600 mt-2 text-sm max-w-md mx-auto">
             To activate your account and start accepting payments, we need a few more details for identity verification.
           </p>
         </div>
@@ -136,7 +137,7 @@ export default function MerchantOnboarding() {
             <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
               <span className="text-xs font-bold text-white">3</span>
             </div>
-            <span className="text-sm font-semibold text-blue-700">Business Details</span>
+            <span className="text-sm font-semibold text-blue-900">Business Details</span>
           </div>
         </div>
 
@@ -235,8 +236,9 @@ export default function MerchantOnboarding() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Estimated Annual Card Turnover</label>
+                  <label htmlFor="onboarding-annual-turnover" className="text-sm font-medium text-gray-700">Estimated Annual Card Turnover</label>
                   <select
+                    id="onboarding-annual-turnover"
                     value={form.estimatedAnnualTurnover}
                     onChange={(e) => set("estimatedAnnualTurnover", e.target.value)}
                     className={INPUT_CLASS}

@@ -5,6 +5,7 @@
    wrapper binds that — so one component serves retail, property and trades. */
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 
 import { timeframeWindow, type Timeframe } from "@/lib/report-utils";
 import type { ReportOption, ReportFormat, DateRange } from "@/lib/report-pdf/reports/types";
@@ -16,7 +17,7 @@ const M = {
   gray: "#E9ECF4",
   white: "#FFFFFF",
   ink: "#1a1a1a",
-  mute: "rgba(0,0,0,0.45)",
+  mute: "#586079",
   danger: "#C71A2A",
 };
 
@@ -58,6 +59,7 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
     setClosing(true);
     setTimeout(onClose, 300);
   };
+  const modalRef = useAccessibleModal(true, close);
 
   const resolveRange = (): DateRange => {
     if (preset === "custom") {
@@ -125,6 +127,7 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
 
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
         <div
+          ref={modalRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
           style={{
             width: "100%",
             maxWidth: 420,
@@ -161,6 +164,7 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
                 <button
                   key={o.id}
                   type="button"
+                  aria-pressed={on}
                   onClick={() => { setSelectedId(o.id); setErr(null); }}
                   style={{
                     textAlign: "left",
@@ -194,19 +198,19 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
             })}
 
             {/* Period */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: M.sky, letterSpacing: "0.1em", textTransform: "uppercase", margin: "18px 0 8px" }}>Period</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: M.navy, letterSpacing: "0.1em", textTransform: "uppercase", margin: "18px 0 8px" }}>Period</div>
             {periodOn ? (
               <>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {PRESETS.map((p) => (
-                    <button key={p.tf} type="button" onClick={() => setPreset(p.tf)} style={pill(preset === p.tf, true)}>{p.label}</button>
+                    <button key={p.tf} type="button" aria-pressed={preset === p.tf} onClick={() => setPreset(p.tf)} style={pill(preset === p.tf, true)}>{p.label}</button>
                   ))}
-                  <button type="button" onClick={() => setPreset("custom")} style={pill(preset === "custom", true)}>Custom</button>
+                  <button type="button" aria-pressed={preset === "custom"} onClick={() => setPreset("custom")} style={pill(preset === "custom", true)}>Custom</button>
                 </div>
                 {preset === "custom" && (
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <input type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: "max(13px, var(--field-floor, 0px))", fontFamily: "inherit" }} />
-                    <input type="date" value={cEnd} onChange={(e) => setCEnd(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: "max(13px, var(--field-floor, 0px))", fontFamily: "inherit" }} />
+                    <input aria-label="Start date" type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: "max(13px, var(--field-floor, 0px))", fontFamily: "inherit" }} />
+                    <input aria-label="End date" type="date" value={cEnd} onChange={(e) => setCEnd(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: "max(13px, var(--field-floor, 0px))", fontFamily: "inherit" }} />
                   </div>
                 )}
               </>
@@ -219,8 +223,9 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
             {/* Client selector (trades Client Statement) */}
             {selected?.needsClient && clients && clients.length > 0 && (
               <>
-                <div style={{ fontSize: 11, fontWeight: 700, color: M.sky, letterSpacing: "0.1em", textTransform: "uppercase", margin: "18px 0 8px" }}>Client</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: M.navy, letterSpacing: "0.1em", textTransform: "uppercase", margin: "18px 0 8px" }}>Client</div>
                 <select
+                  aria-label="Client"
                   value={clientId ?? ""}
                   onChange={(e) => setClientId(e.target.value || null)}
                   style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: 13.5, fontFamily: "inherit" }}
@@ -257,7 +262,7 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
               )}
             </div>
 
-            {err && <div style={{ marginTop: 12, color: M.danger, fontSize: 12.5, fontWeight: 500 }}>{err}</div>}
+            {err && <div role="alert" style={{ marginTop: 12, color: M.danger, fontSize: 12.5, fontWeight: 500 }}>{err}</div>}
           </div>
         </div>
       </div>

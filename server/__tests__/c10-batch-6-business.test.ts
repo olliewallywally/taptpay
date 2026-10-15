@@ -9,7 +9,7 @@ import request from "supertest";
 import * as emailService from "../email-service";
 import { ROUTE_POLICY } from "../route-policy";
 import {
-  VALID_PASSWORD, bearer, createAdminPrincipal, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
+  VALID_PASSWORD, signedIn, createAdminPrincipal, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
   storageSnapshot,
 } from "./support/http-harness";
 
@@ -42,7 +42,7 @@ describe("onboarding keeps what it is sent, held to sign-up's rules", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const res = await request(app).post(`/api/merchants/${owner.merchantId}/onboarding`).set(bearer(owner)).send(DETAILS);
+    const res = await request(app).post(`/api/merchants/${owner.merchantId}/onboarding`).set(signedIn(owner)).send(DETAILS);
 
     expect(res.status).toBe(200);
     expect(await storage.getMerchant(owner.merchantId)).toMatchObject({ ...DETAILS, onboardingCompleted: true });
@@ -52,7 +52,7 @@ describe("onboarding keeps what it is sent, held to sign-up's rules", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const res = await request(app).post(`/api/merchants/${owner.merchantId}/onboarding`).set(bearer(owner))
+    const res = await request(app).post(`/api/merchants/${owner.merchantId}/onboarding`).set(signedIn(owner))
       .send({ director: "Dee Rector", nzbn: "", gstNumber: "", websiteUrl: "", estimatedAnnualTurnover: "", businessDescription: "" });
 
     expect(res.status).toBe(200);
@@ -75,7 +75,7 @@ describe("onboarding keeps what it is sent, held to sign-up's rules", () => {
     const owner = await createOwnerPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).post(`/api/merchants/${owner.merchantId}/onboarding`).set(bearer(owner)).send(body);
+    const res = await request(app).post(`/api/merchants/${owner.merchantId}/onboarding`).set(signedIn(owner)).send(body);
 
     expect(res.status).toBe(400);
     expect(Array.isArray(res.body.errors)).toBe(true);
@@ -89,9 +89,9 @@ describe("renaming a board is held to the name rule creating one uses", () => {
   it("refuses a name over 60 characters, and keeps the old one", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
-    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(bearer(owner)).send({ name: "Front till" });
+    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(signedIn(owner)).send({ name: "Front till" });
 
-    const res = await request(app).put(`/api/merchants/${owner.merchantId}/tapt-stones/${board.body.id}`).set(bearer(owner))
+    const res = await request(app).put(`/api/merchants/${owner.merchantId}/tapt-stones/${board.body.id}`).set(signedIn(owner))
       .send({ name: "x".repeat(61) });
 
     expect(res.status).toBe(400);
@@ -102,9 +102,9 @@ describe("renaming a board is held to the name rule creating one uses", () => {
   it("still takes a 60-character name", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
-    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(bearer(owner)).send({});
+    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(signedIn(owner)).send({});
 
-    const res = await request(app).put(`/api/merchants/${owner.merchantId}/tapt-stones/${board.body.id}`).set(bearer(owner))
+    const res = await request(app).put(`/api/merchants/${owner.merchantId}/tapt-stones/${board.body.id}`).set(signedIn(owner))
       .send({ name: "y".repeat(60) });
 
     expect(res.status).toBe(200);
@@ -136,7 +136,7 @@ describe("the unused settings routes are removed", () => {
     const before = storageSnapshot();
 
     for (const who of [member, owner]) {
-      const res = await request(app).put(address.replace("{business}", String(owner.merchantId))).set(bearer(who)).send(body);
+      const res = await request(app).put(address.replace("{business}", String(owner.merchantId))).set(signedIn(who)).send(body);
       expect(res.status).toBe(404);
       expect(res.headers["content-type"]).not.toMatch(/json/);
     }
@@ -147,7 +147,7 @@ describe("the unused settings routes are removed", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const res = await request(app).put(`/api/merchants/${owner.merchantId}/details`).set(bearer(owner))
+    const res = await request(app).put(`/api/merchants/${owner.merchantId}/details`).set(signedIn(owner))
       .send({ businessName: "Still Here Ltd", contactEmail: "still@harness.test", contactPhone: "021 000", businessAddress: "1 Road" });
 
     expect(res.status).toBe(200);
@@ -164,9 +164,10 @@ describe("change-password is for a TaptPay login", () => {
   it("refuses the platform admin (403), and changes nothing", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
+    const admin = await createAdminPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(bearer(createAdminPrincipal()))
+    const res = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(signedIn(admin))
       .send({ currentPassword: VALID_PASSWORD, newPassword: "NewHarness456!", confirmPassword: "NewHarness456!" });
 
     expect(res.status).toBe(403);
@@ -182,7 +183,7 @@ describe("stock belongs to the business's logins and the platform admin", () => 
     const owner = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
     const other = await createOwnerPrincipal();
-    const item = await request(app).post(`/api/merchants/${owner.merchantId}/stock-items`).set(bearer(owner)).send({ name: "Seed", cost: "1.00" });
+    const item = await request(app).post(`/api/merchants/${owner.merchantId}/stock-items`).set(signedIn(owner)).send({ name: "Seed", cost: "1.00" });
     return { app, owner, member, other, itemId: item.body.id as number };
   };
 
@@ -191,10 +192,10 @@ describe("stock belongs to the business's logins and the platform admin", () => 
     const before = storageSnapshot();
     const base = `/api/merchants/${owner.merchantId}/stock-items`;
 
-    expect((await request(app).get(base).set(bearer(other))).status).toBe(403);
-    expect((await request(app).post(base).set(bearer(other)).send({ name: "Theirs", cost: "2.00" })).status).toBe(403);
-    expect((await request(app).put(`${base}/${itemId}`).set(bearer(other)).send({ name: "Theirs", cost: "2.00" })).status).toBe(403);
-    expect((await request(app).delete(`${base}/${itemId}`).set(bearer(other))).status).toBe(403);
+    expect((await request(app).get(base).set(signedIn(other))).status).toBe(403);
+    expect((await request(app).post(base).set(signedIn(other)).send({ name: "Theirs", cost: "2.00" })).status).toBe(403);
+    expect((await request(app).put(`${base}/${itemId}`).set(signedIn(other)).send({ name: "Theirs", cost: "2.00" })).status).toBe(403);
+    expect((await request(app).delete(`${base}/${itemId}`).set(signedIn(other))).status).toBe(403);
     expect(storageSnapshot()).toBe(before);
   });
 
@@ -202,10 +203,10 @@ describe("stock belongs to the business's logins and the platform admin", () => 
     const { app, owner, member, itemId } = await seed();
     const base = `/api/merchants/${owner.merchantId}/stock-items`;
 
-    expect((await request(app).get(base).set(bearer(member))).status).toBe(200);
-    expect((await request(app).put(`${base}/${itemId}`).set(bearer(member)).send({ name: "Renamed", cost: "3.00" })).status).toBe(200);
-    expect((await request(app).get(base).set(bearer(createAdminPrincipal()))).status).toBe(200);
-    expect((await request(app).delete(`${base}/${itemId}`).set(bearer(createAdminPrincipal()))).status).toBe(200);
+    expect((await request(app).get(base).set(signedIn(member))).status).toBe(200);
+    expect((await request(app).put(`${base}/${itemId}`).set(signedIn(member)).send({ name: "Renamed", cost: "3.00" })).status).toBe(200);
+    expect((await request(app).get(base).set(signedIn(await createAdminPrincipal()))).status).toBe(200);
+    expect((await request(app).delete(`${base}/${itemId}`).set(signedIn(await createAdminPrincipal()))).status).toBe(200);
   });
 });
 
@@ -244,7 +245,7 @@ describe("the sales, report and payment routes no screen calls are removed", () 
     const before = storageSnapshot();
 
     let pending = request(app)[method](address.replace("{business}", String(owner.merchantId)).replace("{sale}", String(sale.id)))
-      .set(bearer(owner));
+      .set(signedIn(owner));
     if (body) pending = pending.send(body);
     const res = await pending;
 
@@ -258,11 +259,11 @@ describe("the sales, report and payment routes no screen calls are removed", () 
     const owner = await createOwnerPrincipal();
     const sale = await pendingSale(owner.merchantId);
 
-    expect((await request(app).get(`/api/merchants/${owner.merchantId}/transactions`).set(bearer(owner))).status).toBe(200);
-    expect((await request(app).get(`/api/transactions/${sale.id}/refunds`).set(bearer(owner))).status).toBe(200);
-    const pdf = await request(app).get(`/api/merchants/${owner.merchantId}/export/pdf`).set(bearer(owner));
+    expect((await request(app).get(`/api/merchants/${owner.merchantId}/transactions`).set(signedIn(owner))).status).toBe(200);
+    expect((await request(app).get(`/api/transactions/${sale.id}/refunds`).set(signedIn(owner))).status).toBe(200);
+    const pdf = await request(app).get(`/api/merchants/${owner.merchantId}/export/pdf`).set(signedIn(owner));
     expect(pdf.status).toBe(200);
     expect(pdf.headers["content-type"]).toMatch(/pdf/);
-    expect((await request(app).post(`/api/transactions/${sale.id}/cancel`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).post(`/api/transactions/${sale.id}/cancel`).set(signedIn(owner))).status).toBe(200);
   });
 });

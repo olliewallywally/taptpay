@@ -194,7 +194,7 @@ export const TUTORIAL_REGISTRY: Record<TutorialPageKey, TutorialPageDefinition> 
       { target: 'input[aria-label^="Item"]', fallbackTarget: '[data-tutorial-id="tq-totals"]', desktopTarget: '[data-tutorial-id="trades-quote-lines"]', tag: "Line items", title: "Build the quote", body: "Add descriptions, quantities and prices. Add a line for each part of the job.", desktopBody: "Add descriptions, quantities and prices in the desktop composer, with one line for each part of the job." },
       { target: '[data-tutorial-id="tq-deposit"]', fallbackTarget: '[data-tutorial-id="tq-totals"]', desktopTarget: '[data-tutorial-id="trades-quote-deposit"]', tag: "Deposit", title: "Ask for a deposit", body: "Optionally require a percentage or fixed deposit before the work begins." },
       { target: '[data-tutorial-id="tq-totals"]', fallbackTarget: "main", desktopTarget: '[data-tutorial-id="trades-quote-totals"]', tag: "Totals", title: "Check GST and totals", body: "Review the subtotal, GST and final total before you send the quote." },
-      { target: '[data-tutorial-id="tq-create"]', fallbackTarget: "main", desktopTarget: '[data-tutorial-id="trades-quote-create"]', tag: "Create quote", title: "Send it to the client", body: "When every detail is right, create the quote to send it for acceptance." },
+      { target: '[data-tutorial-id="tq-create"]', fallbackTarget: '[data-demo-id="trades-quote"]', desktopTarget: '[data-tutorial-id="trades-quote-create"]', tag: "Create quote", title: "Send it to the client", body: "When every detail is right, create the quote to send it for acceptance." },
     ],
   },
   "trades-recurring": {

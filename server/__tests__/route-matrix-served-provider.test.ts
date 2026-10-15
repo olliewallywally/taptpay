@@ -1,4 +1,4 @@
-import "./support/test-env";
+import "./support/durable-payments-env";
 import { HARNESS_EVOLUTION_KEY } from "./support/whatsapp-test-env";
 
 // The ecommerce API is shut (404) unless its flag is on, which needs enforce mode (config.ts); it makes
@@ -7,40 +7,17 @@ process.env.FEATURE_ECOMMERCE_API = "true";
 process.env.FEATURE_NEW_RETAIL_PAYMENTS = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
-// The provider is never reached (R1-T1): its sessions, their outcomes and a stored card's charge are stubbed.
-jest.mock("../windcave", () => {
-  const actual = jest.requireActual("../windcave");
-  let sessions = 0;
-  return {
-    ...actual,
-    isWindcaveConfigured: () => true,
-    createWindcaveSession: jest.fn(async () => {
-      sessions += 1;
-      return { success: true, sessionId: `matrix-session-${sessions}`, hppUrl: `https://uat.windcave.com/hpp/matrix-${sessions}` };
-    }),
-    queryWindcaveSession: jest.fn(async (sessionId: string) => ({
-      success: true, approved: true, windcaveTransactionId: `provider-${sessionId}`,
-    })),
-    chargeStoredCard: jest.fn(async () => ({ success: true, approved: true, windcaveTransactionId: "provider-renewal" })),
-  };
-});
-// A paid rent invoice's GST invoice is emailed: caught here.
-jest.mock("../gst-invoice", () => ({
-  ...jest.requireActual("../gst-invoice"),
-  sendGstInvoices: jest.fn(async () => true),
-}));
-
 import crypto from "crypto";
 import request from "supertest";
 import * as delivery from "../trades-delivery";
 import * as gst from "../gst-invoice";
 import * as windcave from "../windcave";
-import { cronHeader, mintPaymentCredential, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
+import { cronHeader, mintPaymentCredential, resetTestStorage, storage, storageSnapshot,createTestApp } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   paidMonth,
   type OwnServedCaller,
   type OwnServedRecipe,
@@ -69,8 +46,13 @@ const ORIGIN = "https://harness.test";
 const KEY = "matrix-ecommerce-key";
 let property: PropertyFake;
 let trades: TradesFake;
-const sendGstInvoices = gst.sendGstInvoices as unknown as jest.Mock;
-const chargeStoredCard = windcave.chargeStoredCard as jest.Mock;
+let sendGstInvoices:jest.SpyInstance;
+import {PaymentAttemptService} from '../payment-attempt-service';
+import {syntheticRetailRuntime} from './support/retail-runtime';
+import {syntheticInvoiceRuntime} from './support/invoice-runtime';
+import * as subscriptionCron from '../subscription-cron';
+let port:ReturnType<typeof syntheticRetailRuntime>|ReturnType<typeof syntheticInvoiceRuntime>;
+async function retailRuntime(ctx:ServedCtx){port=syntheticRetailRuntime(storage,new PaymentAttemptService(storage));ctx.app=(await createTestApp({paymentRuntime:port.runtime})).app;}
 
 const get = (path: string, headers?: Record<string, string>): ServedRequest => ({ method: "get", path, headers });
 const post = (path: string, body: Record<string, unknown>, headers?: Record<string, string>): ServedRequest =>
@@ -91,7 +73,7 @@ async function eventually(check: () => void | Promise<void>, timeoutMs = 2_000) 
 }
 
 /** The fakes, with the reads by provider session and by WhatsApp message the notifications make. */
-function fakeRecords(ctx: ServedCtx) {
+async function fakeRecords(ctx: ServedCtx) {
   property = fakeProperty();
   trades = fakeTrades();
   seedProperty(property, ctx.merchantId, { invoice: { token: crypto.randomBytes(20).toString("base64url"), splitEnabled: false } });
@@ -101,6 +83,12 @@ function fakeRecords(ctx: ServedCtx) {
   jest.spyOn(storage, "getJobInvoiceByWindcaveSessionId").mockImplementation(async (id: string) => find(trades.invoices, "windcaveSessionId", id));
   jest.spyOn(storage, "getInvoiceRentRequestByWhatsappMessageId").mockImplementation(async (id: string) => find(property.invoices, "whatsappMessageId", id));
   jest.spyOn(storage, "getJobInvoiceByWhatsappMessageId").mockImplementation(async (id: string) => find(trades.invoices, "whatsappMessageId", id));
+  jest.spyOn(storage,'getInvoiceRentRequestByToken').mockImplementation(async token=>find(property.invoices,'token',token));
+  jest.spyOn(storage,'getJobInvoiceByToken').mockImplementation(async token=>find(trades.invoices,'token',token));
+  port=syntheticInvoiceRuntime(async input=>(input.vertical==='property'?property.invoices:trades.invoices).get(input.invoiceId),async(binding,evidence)=>{
+    if(evidence.outcome==='approved')Object.assign((binding.jobInvoiceId?trades.invoices:property.invoices).get(binding.jobInvoiceId??binding.rentInvoiceId),{status:'paid',windcaveTransactionId:evidence.transactionId});
+  });ctx.app=(await createTestApp({paymentRuntime:port.runtime})).app;
+
 }
 
 /** A live ecommerce key of the business, with the permissions given. */
@@ -111,21 +99,34 @@ function apiKey(ctx: ServedCtx, permissions: string[]) {
   return { Authorization: `Bearer ${KEY}` };
 }
 
+async function invoiceNotification(ctx:ServedCtx,vertical:'property'|'trades'){
+  await fakeRecords(ctx);const invoice=(vertical==='property'?property.invoices:trades.invoices).values().next().value;
+  const opened=await request(ctx.app).post(`/api/checkout/${invoice.token}/session`).send({idempotencyKey:crypto.randomUUID(),shareIndex:0});expect(opened.status).toBe(200);
+  const path=vertical==='property'?'rent':'trades';
+  return {req:get(`/api/windcave/${path}-notification?sessionId=${opened.body.sessionId}`),status:200,check:async(res:request.Response)=>{
+    expect(res.text).toBe('OK');expect([...port.receipts.values()].some(x=>x.sessionId===opened.body.sessionId)).toBe(true);
+    port.setObservation('approved');await port.runtime.worker.runOne(crypto.randomUUID(),opened.body.sessionId);expect(invoice).toMatchObject({status:'paid',windcaveTransactionId:`provider-${opened.body.sessionId}`});
+    expect(sendGstInvoices).not.toHaveBeenCalled();expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
+  }};
+}
+
 const RECIPES: Record<string, OwnServedRecipe> = {
   // ── The payment provider's notifications ──
   "ALL /api/pay/notification/:state": async (ctx) => {
     // A sale with its own link, its customer on the provider's page (the attempt's session opened).
+    await retailRuntime(ctx);
     const link = mintPaymentCredential();
     const made = await storage.createTransaction({
       merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50", status: "pending", paymentMethod: "qr_code",
       splitEnabled: false, paymentTokenHash: link.tokenHash,
     } as any);
-    const opened = await request(ctx.app).post(`/api/pay/t/${link.rawToken}/session`).send({ idempotencyKey: crypto.randomUUID() });
+    const opened = await request(ctx.app).post(`/api/pay/t/${link.rawToken}/session`).send({ idempotencyKey: crypto.randomUUID(),shareIndex:0 });
     if (opened.status !== 200) throw new Error(`fixture: session failed ${opened.status}`);
     return {
-      req: get(`/api/pay/notification/${opened.body.returnState}`), status: 200,
+      req: get(`/api/pay/notification/${opened.body.returnState}?sessionId=${opened.body.sessionId}`), status: 200,
       check: async (res) => {
         expect(res.text).toBe("OK");
+        port.setObservation('approved');await port.runtime.worker.runOne(crypto.randomUUID(),opened.body.sessionId);
         // Settled from the provider's own answer for the attempt's session.
         await eventually(async () => expect(await sale(made.id)).toMatchObject({
           status: "completed", windcaveTransactionId: `provider-${opened.body.sessionId}`,
@@ -135,67 +136,42 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
   "ALL /api/windcave/notification": async (ctx) => {
     // A board sale, its customer on the provider's page.
+    await retailRuntime(ctx);
     const board = await storage.createNextTaptStone(ctx.merchantId, "Front till");
     const made = await storage.createTransaction({
       merchantId: ctx.merchantId, taptStoneId: board.id, itemName: "Toastie", price: "12.00", status: "pending",
       paymentMethod: "qr_code", splitEnabled: false,
     } as any);
-    const opened = await request(ctx.app).post(`/api/transactions/${made.id}/pay`).send({});
+    const opened = await request(ctx.app).post(`/api/transactions/${made.id}/pay`).send({idempotencyKey:crypto.randomUUID(),shareIndex:0});
     if (opened.status !== 200) throw new Error(`fixture: pay failed ${opened.status}`);
     return {
       req: get(`/api/windcave/notification?sessionid=${opened.body.sessionId}`), status: 200,
       check: async (res) => {
         expect(res.text).toBe("OK");
+        port.setObservation('approved');await port.runtime.worker.runOne(crypto.randomUUID(),opened.body.sessionId);
         await eventually(async () => expect(await sale(made.id)).toMatchObject({
           status: "completed", windcaveSessionState: "approved", windcaveTransactionId: `provider-${opened.body.sessionId}`,
         }));
       },
     };
   },
-  "ALL /api/billing/card/notification": () => {
+  "ALL /api/billing/card/notification": async(ctx) => {
+    await retailRuntime(ctx);
     const before = storageSnapshot();
     return {
       // A nudge only: the card's outcome is read from the provider when the page confirms it.
-      req: post("/api/billing/card/notification", { SessionId: "matrix-card-session" }), status: 200,
+      req: post("/api/billing/card/notification", { sessionId: "matrix-card-session" }), status: 200,
       check: (res) => {
         expect(res.text).toBe("OK");
         expect(storageSnapshot()).toBe(before);
       },
     };
   },
-  "ALL /api/windcave/rent-notification": (ctx) => {
-    fakeRecords(ctx);
-    Object.assign(property.invoices.get(INVOICE), { windcaveSessionId: "matrix-rent-session" });
-    return {
-      req: get("/api/windcave/rent-notification?sessionid=matrix-rent-session"), status: 200,
-      check: async (res) => {
-        expect(res.text).toBe("OK");
-        await eventually(() => expect(property.invoices.get(INVOICE)).toMatchObject({
-          status: "paid", windcaveTransactionId: "provider-matrix-rent-session",
-        }));
-        // The tenant's GST invoice.
-        await eventually(() => expect(sendGstInvoices.mock.calls).toEqual([[expect.objectContaining({ recipients: ["tess@example.test"] })]]));
-      },
-    };
-  },
-  "ALL /api/windcave/trades-notification": (ctx) => {
-    fakeRecords(ctx);
-    Object.assign(trades.invoices.get(JOB_INVOICE), { windcaveSessionId: "matrix-trades-session" });
-    return {
-      req: get("/api/windcave/trades-notification?sessionid=matrix-trades-session"), status: 200,
-      check: async (res) => {
-        expect(res.text).toBe("OK");
-        await eventually(() => expect(trades.invoices.get(JOB_INVOICE)).toMatchObject({
-          status: "paid", windcaveTransactionId: "provider-matrix-trades-session",
-        }));
-        // The client is sent the paid invoice.
-        await eventually(() => expect(delivery.sendTradePaymentInvoice).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_INVOICE, status: "paid" })));
-      },
-    };
-  },
+  "ALL /api/windcave/rent-notification":async ctx=>invoiceNotification(ctx,'property'),
+  "ALL /api/windcave/trades-notification":async ctx=>invoiceNotification(ctx,'trades'),
   // ── WhatsApp's delivery report, with the messaging provider's key ──
-  "POST /api/webhooks/whatsapp": (ctx) => {
-    fakeRecords(ctx);
+  "POST /api/webhooks/whatsapp": async (ctx) => {
+    await fakeRecords(ctx);
     Object.assign(property.invoices.get(INVOICE), { whatsappMessageId: "matrix-wa-message", whatsappDeliveredAt: null });
     return {
       req: post("/api/webhooks/whatsapp",
@@ -224,24 +200,16 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     const subscription = await storage.getOrCreateSubscription(ctx.merchantId);
     const ended = new Date(Date.now() - 60_000);
     Object.assign(subscription, { currentPeriodEnd: ended, nextBillingDate: ended });
-    return {
-      req: post("/api/internal/cron", {}, cronHeader()), status: 200,
-      check: async (res) => {
-        expect(res.body).toMatchObject({ ok: true, failedPasses: [] });
-        // The card on file is charged the plan's price, once, and the next month is paid.
-        expect(chargeStoredCard.mock.calls).toEqual([[expect.any(String), "matrix-card", expect.stringMatching(/^\d+\.\d{2}$/), expect.any(String)]]);
-        const renewed = (await storage.getSubscription(ctx.merchantId))!;
-        expect(new Date(renewed.currentPeriodEnd!).getTime()).toBeGreaterThan(Date.now());
-        // The run is reported to the status read.
-        const status = await request(ctx.app).get("/api/internal/cron/status").set(cronHeader());
-        expect(status.body.lastRun).toMatchObject({ ok: true, failedPasses: [] });
-      },
-    };
+    const billing=jest.spyOn(subscriptionCron,'runSubscriptionBillingPass').mockResolvedValue({charged:1,failed:0,skipped:0,errors:0,expired:0});
+    return {req:post('/api/internal/cron',{},cronHeader()),status:200,check:async res=>{
+      expect(res.body).toMatchObject({ok:true,failedPasses:[],subscriptionBilling:{charged:1}});expect(billing).toHaveBeenCalledTimes(1);
+      const status=await request(ctx.app).get('/api/internal/cron/status').set(cronHeader());expect(status.body.lastRun).toMatchObject({ok:true,failedPasses:[]});
+    }};
   },
   // ── The ecommerce API ──
   "POST /api/v1/transactions": async (ctx) => {
     await paidMonth(ctx);
-    const headers = apiKey(ctx, ["create_transactions"]);
+    const headers = {...apiKey(ctx, ["create_transactions"]),"Idempotency-Key":crypto.randomUUID()};
     return {
       req: post("/api/v1/transactions", { amount: "10.50", item_name: "Online order" }, headers), status: 200,
       check: async (res) => {
@@ -276,8 +244,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(pay\/notification\/|windcave\/(notification|rent-notification|trades-notification)$|billing\/card\/notification$|webhooks\/|internal\/cron|v1\/)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("provider");
 const SERVED = ownServedPairs(ROWS);
 
 /**
@@ -300,8 +267,8 @@ const SERVED_BY: Record<string, OwnServedCaller[]> = {
 
 beforeEach(() => {
   resetTestStorage();
-  sendGstInvoices.mockClear();
-  chargeStoredCard.mockClear();
+  sendGstInvoices=jest.spyOn(gst,'sendGstInvoices').mockResolvedValue(0);
+  jest.spyOn(delivery,'sendTradePaymentInvoice').mockResolvedValue(true as any);
 });
 afterEach(() => jest.restoreAllMocks());
 

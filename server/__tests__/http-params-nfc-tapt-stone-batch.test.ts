@@ -1,7 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
+import { signedIn, type SignedIn, createOwnerPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
 
 /**
  * R1-T6 — NFC + tapt-stone identifier batch (2026-09-06). Proves, through the
@@ -25,11 +25,11 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
     resetTestStorage();
   });
 
-  async function createStoneFor(merchantId: number, token: string): Promise<number> {
+  async function createStoneFor(merchantId: number, who: SignedIn): Promise<number> {
     const { app } = await createTestApp();
     const response = await request(app)
       .post(`/api/merchants/${merchantId}/tapt-stones`)
-      .set({ Authorization: `Bearer ${token}` })
+      .set(signedIn(who))
       .send({});
     expect(response.status).toBe(200);
     return response.body.id;
@@ -57,7 +57,7 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
     it("real merchantId/stoneId still redirects (200, no-store, html)", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
-      const stoneId = await createStoneFor(owner.merchantId, owner.token);
+      const stoneId = await createStoneFor(owner.merchantId, owner);
 
       const response = await request(app).get(`/nfc/${owner.merchantId}/stone/${stoneId}`);
       expect(response.status).toBe(200);
@@ -94,7 +94,7 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
 
       const response = await request(app)
         .get(`/api/merchants/${owner.merchantId}/active-transaction`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(200);
       expect(response.body).toBeNull();
     });
@@ -109,14 +109,15 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
       expect(response.status).toBe(400);
     });
 
-    it("a well-formed but unrelated stoneId is a 403 (cross-tenant/nonexistent-stone check), not a 400 — parsing and ownership are distinct stages", async () => {
+    it("a well-formed but unrelated stoneId is a 404 (cross-tenant/nonexistent-stone check), not a 400 — parsing and ownership are distinct stages", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
 
       const response = await request(app).get(
         `/api/merchants/${owner.merchantId}/active-transaction?stoneId=999999`,
       );
-      expect(response.status).toBe(403);
+      // 404 since 2026-09-29 (R1-T3, P2.2's tenant-safe answer, as the board's stream and brand answer): it was 403.
+      expect(response.status).toBe(404);
     });
 
     it("a garbage merchantId path param still 400s before the query param is even looked at", async () => {
@@ -141,7 +142,7 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
     it("a negative size is refused rather than relying on the qrcode library to ignore it", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
-      const stoneId = await createStoneFor(owner.merchantId, owner.token);
+      const stoneId = await createStoneFor(owner.merchantId, owner);
 
       const response = await request(app).get(`/api/merchants/${owner.merchantId}/stone/${stoneId}/qr?size=-100`);
       expect(response.status).toBe(400);

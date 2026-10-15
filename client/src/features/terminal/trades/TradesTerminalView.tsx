@@ -154,7 +154,7 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div className="tp-stack-title">jobs</div>
         </div>
-        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <div className="tp-stack-scroll" tabIndex={0} role="region" aria-label="Active invoice stack" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <div className="tp-stack-card">
             {recent.length === 0 ? (
               <div className="tp-stack-empty">tap + to send an invoice</div>
@@ -167,7 +167,9 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
                     {(inv.clientName || '??').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tp-stack-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.clientName || '—'}</div>
+                    <button type="button" className="tp-stack-name"
+                      onClick={(event) => { event.stopPropagation(); onRowTap?.(inv); }}
+                      style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', fontFamily: 'inherit', lineHeight: 'inherit', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.clientName || 'View invoice'}</button>
                     <div className="tp-stack-meta">
                       <span className={`tp-dot ${dotCls}`} />
                       <span className="tp-stack-status">{st}</span>
@@ -209,7 +211,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose client</div>
+          <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose client</div>
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -248,7 +250,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
             return (
               <button key={t.id} onClick={() => onSelect(t)} data-demo-id={`trades-client-${t.id}`}
                 style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(88,171,255,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: OFFW }}>
+                <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
                   {clientInitials(t)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -257,7 +259,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: OFFW, fontVariantNumeric: 'tabular-nums' }}>{amount ? fmt(amount) : '—'}</div>
-                  {st && <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 3 }}><span className={`tp-dot ${dotCls}`} /><span style={{ fontSize: 10, color: 'rgba(244,244,244,0.5)' }}>{st}</span></div>}
+                  {st && <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 3 }}><span className={`tp-dot ${dotCls}`} /><span style={{ fontSize: 10, color: 'rgba(244,244,244,0.7)' }}>{st}</span></div>}
                 </div>
               </button>
             );
@@ -283,9 +285,9 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="trades-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" data-demo-id="trades-amount" style={amountStyle(amountText, 82, { color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 })}>{amountText}</div>
+          <div className="tp-amount" data-demo-id="trades-amount" style={amountStyle(amountText, 82, { color: cents === 0 ? '#586079' : NAVY, marginTop: 18 })}>{amountText}</div>
           {selectedClient && (
-            <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
+            <div style={{ fontWeight: 500, fontSize: 15, color: '#586079', paddingBottom: 8 }}>
               {clientName(selectedClient)} · {selectedClient.siteAddress}
             </div>
           )}
@@ -301,7 +303,7 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
           {/* Amounts entered in cents — no decimal key; this cell is an inert spacer. */}
           <div className="tp-kp" style={{ visibility: 'hidden' }} aria-hidden />
           <button className="tp-kp" data-demo-id="trades-key-0" onClick={() => press('0')}>0</button>
-          <button className="tp-kp outline" data-demo-id="trades-key-back" onClick={back}><Ic.Back /></button>
+          <button type="button" aria-label="Delete last digit" className="tp-kp outline" data-demo-id="trades-key-back" onClick={back}><Ic.Back /></button>
         </div>
         </div>
       </div>
@@ -319,7 +321,7 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
         <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('clients')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
+            <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose a client</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -346,13 +348,13 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <button onClick={onEditAmount} data-demo-id="trades-invoice-amount" style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tp-amount" style={amountStyle(amountText, 82, { color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{amountText}</span>
-            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
+            <span className="tp-amount" style={amountStyle(amountText, 82, { color: amount === 0 ? '#586079' : NAVY })}>{amountText}</span>
+            <span style={{ fontWeight: 600, fontSize: 12, color: '#586079', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
             {isQuick ? (recipient.name.trim() || 'new customer') : clientName(selectedClient)}
-            {!isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>}
-            {isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>quick invoice</div>}
+            {!isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: '#586079', marginTop: 4 }}>{selectedClient.siteAddress}</div>}
+            {isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: '#586079', marginTop: 4 }}>quick invoice</div>}
           </div>
         </div>
         <div style={{ height: 52 }} />
@@ -444,7 +446,7 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
         <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('clients')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
+            <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose a client</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -481,13 +483,13 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ color: OFFW, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>mark as received externally</div>
         {!picked && (
-          <div style={{ marginTop: 16, textAlign: 'center', color: 'rgba(244,244,244,0.5)', fontSize: 13 }}>no outstanding invoice found for this client</div>
+          <div style={{ marginTop: 16, textAlign: 'center', color: 'rgba(244,244,244,0.7)', fontSize: 13 }}>no outstanding invoice found for this client</div>
         )}
         {picked && (
           <>
             {outstanding.length > 1 && (
               <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(244,244,244,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>which invoice?</div>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(244,244,244,0.7)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>which invoice?</div>
                 {outstanding.map((inv: any) => {
                   const on = inv.id === picked.id;
                   return (
@@ -498,7 +500,7 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13.5, color: OFFW, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kindLabel(inv)}</div>
-                        <div style={{ fontSize: 10.5, color: 'rgba(244,244,244,0.5)', marginTop: 1 }}>{invoiceStatusFor(inv)}</div>
+                        <div style={{ fontSize: 10.5, color: 'rgba(244,244,244,0.7)', marginTop: 1 }}>{invoiceStatusFor(inv)}</div>
                       </div>
                       <div style={{ fontWeight: 700, fontSize: 13.5, color: OFFW, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmt(inv.amountCents)}</div>
                     </button>
@@ -595,7 +597,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 17, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{invoice.clientName || 'client'}</div>
-            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(4,13,109,0.5)', marginTop: 2 }}>
+            <div style={{ fontWeight: 500, fontSize: 12.5, color: '#586079', marginTop: 2 }}>
               {kindLabel(invoice)} · {fmt(invoice.amountCents)}
             </div>
           </div>
@@ -604,7 +606,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
 
         {settled ? (
           invoice.completedAt
-            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(4,13,109,0.5)', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
+            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: '#586079', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
             : <Action label="mark job complete" onClick={onComplete} primary />
         ) : (
           <>
@@ -634,7 +636,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
    White top box (20%): action bar + live total + client.
    Solid navy box (80%, scrollable): client, line items, deposit, notes, total, CTA. */
 export type QuoteDraftLine = { id: number; description: string; qty: string; unitPrice: string };
-const Q_LABEL = { fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 10 };
+const Q_LABEL = { fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 10 };
 /* fontSize floors at 1rem under a finger: iOS zooms a focused field below that,
    and index.css no longer forces 16px on every field (A1 §4.4). */
 const Q_FIELD = { width: '100%', boxSizing: 'border-box' as const, padding: '13px 15px', borderRadius: 14, background: OFFW, border: 'none', color: NAVY, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 'max(15px, var(--field-floor, 0px))', outline: 'none' };
@@ -717,8 +719,8 @@ export function QuoteView({
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={onCancel} onCommit={() => { if (created) { onExit(); return; } if (ready) onCreate(); }} />
         <div style={{ flex: 1, minHeight: 0, padding: '2px 28px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <span className="tp-amount" style={amountStyle(amountText, 44, { color: totals.total === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{amountText}</span>
-          <div style={{ marginTop: 4, fontWeight: 500, fontSize: 13, color: 'rgba(4,13,109,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="tp-amount" style={amountStyle(amountText, 44, { color: totals.total === 0 ? '#586079' : NAVY })}>{amountText}</span>
+          <div style={{ marginTop: 4, fontWeight: 500, fontSize: 13, color: '#586079', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {created ? 'quote created' : selectedName || 'new quote'}
           </div>
         </div>
@@ -1063,6 +1065,7 @@ export function TradesTerminalView(props: TradesTerminalViewProps) {
   return (
     <div
       className="trades-terminal-view tp-viewport"
+      tabIndex={0} role="region" aria-label="Trades terminal"
       ref={viewportRef}
       data-demo-id="trades-terminal"
       data-terminal-screen={props.screen}

@@ -2,7 +2,8 @@
  * R1-T2 — regenerates server/route-policy.ts and the documentation table from
  * the current server/routes.ts source. Run this whenever routes.ts's
  * registrations change; server/__tests__/route-policy-inventory.test.ts fails
- * loudly if the two drift apart.
+ * loudly if the two drift apart. R1-T10a: it also writes shared/api-routes.ts, the
+ * client's typed list of the routes a browser calls (server/api-route-list.ts).
  *
  *   npx tsx scripts/generate-route-policy.ts
  */
@@ -23,7 +24,9 @@ import {
   type RouteRegistration,
 } from "../server/route-inventory";
 import { compactFacts, currentRouteFacts, type RecordedRouteFacts } from "../server/route-facts";
+import { MATRIX_CALLER_MEANING, describeMatrixRow, matrixRowFor } from "../server/route-matrix";
 import { REVIEW_PENDING, ROUTE_REVIEW, type RouteReview } from "../server/route-review";
+import { API_ROUTES_FILE, browserApiRoutes, renderApiRoutes } from "../server/api-route-list";
 
 const POLICY_FILE = path.join(process.cwd(), "server", "route-policy.ts");
 const TABLE_FILE = path.join(
@@ -329,17 +332,39 @@ ${Object.entries(ROUTE_REVIEW)
   .flatMap(([key, review]) => (review.findings ?? []).map((finding) => `- **${key}:** ${finding}`))
   .join("\n") || "None."}
 
+## The role and tenant matrix (R1-T3)
+
+For each route, who it serves and what every other caller it names is answered, derived from the
+route's review and its gate (server/route-matrix.ts) and shown in the Routes table's last two columns.
+Every row is driven at runtime: the gates' refusals (route-matrix.test.ts, route-matrix-own-gates),
+a teammate's and another business's (route-matrix-roles, route-matrix-records), and every caller a
+route serves (route-matrix-served-*.test.ts, each with the success status and what the success did).
+route-matrix-inventory.test.ts fails when this table and the matrix disagree.
+
+The callers:
+
+${Object.entries(MATRIX_CALLER_MEANING).map(([caller, meaning]) => `- \`${caller}\`: ${meaning}`).join("\n")}
+
+A refusal's status (P2.2): 401 authentication missing, invalid, expired or disabled; 403 signed in
+without the role or the tenant; 404 another business's record, or a link that is no one's, answered as
+a missing one. A few routes answer by design with 200 (a provider's call is acknowledged whatever it
+names; the reset-link check says \`{ valid: false }\`), 302 (a browser's return is sent home) or 400 (the
+pages that send a one-time token in the body: kept by the owner's decision, 2026-09-29). A retired
+address's success is its notice (410), which it gives everyone.
+
 ## Routes
 
-| Method | Path | Line | Principal | Markers |
-|---|---|---:|---|---|
+| Method | Path | Line | Principal | Markers | Served | Refused (P2.2) |
+|---|---|---:|---|---|---|---|
 ${rows
   .map((r) => {
-    const review = ROUTE_REVIEW[`${r.method} ${r.path}`];
+    const key = `${r.method} ${r.path}`;
+    const review = ROUTE_REVIEW[key];
     const principal = review
       ? [...new Set(review.branches.map((branch) => branch.principal))].join(" / ")
       : `${r.principal} (heuristic)`;
-    return `| ${r.method} | \`${r.path}\` | ${r.file === "server/routes.ts" ? r.line : `${r.file}:${r.line}`} | ${principal} | ${r.markers.join(", ") || "—"} |`;
+    const matrix = review ? describeMatrixRow(matrixRowFor(key, r.facts)) : { served: "(review pending)", refused: "(review pending)" };
+    return `| ${r.method} | \`${r.path}\` | ${r.file === "server/routes.ts" ? r.line : `${r.file}:${r.line}`} | ${principal} | ${r.markers.join(", ") || "—"} | ${matrix.served} | ${matrix.refused} |`;
   })
   .join("\n")}
 
@@ -357,7 +382,12 @@ ${rows.map(renderFactsSection).join("\n")}`;
 
   fs.writeFileSync(TABLE_FILE, table);
 
-  console.log(`Wrote ${POLICY_FILE} and ${TABLE_FILE}`);
+  // R1-T10a: the client's typed list of the routes a browser calls (types only), from the
+  // registrations just read. server/__tests__/api-route-contract.test.ts holds it to them.
+  const apiRoutes = browserApiRoutes(rows, ROUTE_REVIEW);
+  fs.writeFileSync(path.join(process.cwd(), API_ROUTES_FILE), renderApiRoutes(apiRoutes));
+
+  console.log(`Wrote ${POLICY_FILE}, ${TABLE_FILE} and ${API_ROUTES_FILE} (${apiRoutes.length} routes a browser calls)`);
   console.log(`${rows.length} registrations, ${unclassified.length} unclassified, ${suspectedGaps.length} suspected gap(s).`);
 }
 

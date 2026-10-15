@@ -43,6 +43,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { chromium } from "playwright";
 import { BASE_URL, CHROMIUM_PATH, VERTICALS, newMobilePage } from "./mobile-fixtures.mjs";
+import { measureGeometry } from './device-geometry.mjs';
+import { assertBusinessSessionFixture } from "./browser-session-fixture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE = join(HERE, "verify-mobile-responsive.baseline.json");
@@ -51,6 +53,7 @@ const argv = new Set(process.argv.slice(2));
 const UPDATE = argv.has("--update");
 const AS_JSON = argv.has("--json");
 const VERBOSE = argv.has("--verbose");
+const STRICT = argv.has("--strict");
 
 /* §4.1's device matrix. 390x844 is the reference the design is calibrated to;
    320x568 is where the vertical budget gets thin (§4.3). */
@@ -263,7 +266,7 @@ async function measure(page, allowlist) {
     const tapCentreMissSamples = [];
     const inflatedSamples = [];
     for (const el of controls) {
-      if (!visible(el)) continue;
+      if (!visiblyMounted(el) || el.closest('[inert],[aria-hidden="true"]')) continue;
       const r = el.getBoundingClientRect();
       if (r.width < 44 || r.height < 44) tapUnder44++;
       /* RC-1's fingerprint: the element renders at exactly the rule's minimum
@@ -445,11 +448,17 @@ async function runCell(browser, vertical, vp, safeArea) {
     await page.goto(`${BASE_URL}${VERTICALS[vertical].route}`, {
       waitUntil: "domcontentloaded", timeout: 30_000,
     });
+    await assertBusinessSessionFixture(page);
     /* The terminal mounts its stylesheet and measures its indicator after
        paint; a networkidle wait is not enough on its own. */
     await page.waitForSelector(".tp-viewport", { timeout: 15_000 });
     await page.waitForTimeout(1400);
     const m = await measure(page, EDGE_ALLOWLIST);
+    // Reuse the matrix's tested paint/clip and rounded-centre evaluation.
+    // Mounted offscreen rows are tested by the separate native-scroll gate.
+    const geometry = await measureGeometry(page);
+    m.tapCentreMiss = geometry.tapCentreMiss;
+    m.tapCentreMissSamples = geometry.tapCentreMissSamples;
     m.drift = await measureDrift(page, vp);
     m.pageErrors = errors.length;
     if (VERBOSE && errors.length) m.pageErrorSamples = errors.slice(0, 4);
@@ -550,6 +559,19 @@ async function main() {
     }
   } finally {
     await browser.close();
+  }
+
+  if (STRICT) {
+    const failures = [];
+    for (const [cell, metrics] of Object.entries(current)) {
+      for (const key of [...COUNTERS, 'pageErrors']) if ((dig(metrics, key) ?? 0) > 0) failures.push(`${cell} ${key}: ${dig(metrics, key)}`);
+    }
+    if (failures.length) {
+      console.error(failures.join('\n'));
+      if (AS_JSON) console.log(JSON.stringify(current, null, 2));
+      return 1;
+    }
+    console.log('Strict mobile counters and page errors: zero in every cell.');
   }
 
   if (AS_JSON) {

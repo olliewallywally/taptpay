@@ -1,3 +1,4 @@
+import { responseRows, requireResponseRecord } from "@/lib/response-data";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ import {
   formatDesktopKeypadMoney,
   type DesktopKeypadKey,
 } from "../desktop-keypad";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -166,19 +168,19 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const quotesQuery = useTradesQuotesQuery();
   /* A failed answer is a failure, not "no schedules" (R1-T9). */
   const schedulesQuery = useQuery<TradesSchedule[]>({
-    queryKey: ["/api/trades/schedules"],
+    queryKey: [apiPath("GET /api/trades/schedules")],
     queryFn: async () => {
-      const response = await tradesFetch("/api/trades/schedules");
+      const response = await tradesFetch(apiPath("GET /api/trades/schedules"));
       if (!response.ok) throw new Error("Could not load recurring invoices");
-      return response.json();
+      return responseRows(await response.json()) as TradesSchedule[];
     },
   });
   const reminderSettingsQuery = useQuery<{ tradeRemindersEnabled: boolean }>({
-    queryKey: ["/api/trades/reminder-settings"],
+    queryKey: [apiPath("GET /api/trades/reminder-settings")],
     queryFn: async () => {
-      const response = await tradesFetch("/api/trades/reminder-settings");
+      const response = await tradesFetch(apiPath("GET /api/trades/reminder-settings"));
       if (!response.ok) throw new Error("Could not load reminder settings");
-      const body = await response.json();
+      const body = requireResponseRecord(await response.json());
       return { tradeRemindersEnabled: body?.tradeRemindersEnabled !== false };
     },
   });
@@ -187,9 +189,9 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
      quotes without GST, and the null was cached under the key every page shares
      for the business details, where exports would read it as loaded (R1-T9). */
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const response = await tradesFetch(`/api/merchants/${merchantId}/profile`);
+      const response = await tradesFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Could not load the business details");
       return response.json();
     },
@@ -417,7 +419,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (invType === "balance") {
         if (!balanceDeposit) throw new Error("No paid deposit to bill the balance for");
         const res = await tradesFetch(
-          `/api/trades/invoices/${balanceDeposit.id}/send-balance`,
+          apiPath("POST /api/trades/invoices/:id/send-balance", { id: balanceDeposit.id }),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -431,7 +433,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (amountCents <= 0) throw new Error("Enter an amount first");
       const due = new Date();
       due.setDate(due.getDate() + 7);
-      const res = await tradesFetch("/api/trades/invoices", {
+      const res = await tradesFetch(apiPath("POST /api/trades/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -478,7 +480,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const promoteClient = useMutation({
     mutationFn: async () => {
       if (!sentInvoice?.clientProfileId) throw new Error("No client to save");
-      const res = await tradesFetch(`/api/trades/clients/${sentInvoice.clientProfileId}/promote`, { method: "POST" });
+      const res = await tradesFetch(apiPath("POST /api/trades/clients/:id/promote", { id: sentInvoice.clientProfileId }), { method: "POST" });
       if (!res.ok) throw await failure(res, "Could not save the client");
       return res.json();
     },
@@ -519,7 +521,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       }
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
-      const res = await tradesFetch("/api/trades/quotes", {
+      const res = await tradesFetch(apiPath("POST /api/trades/quotes"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -554,7 +556,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     mutationFn: async () => {
       const amountCents = Math.round(Number(recurring.amount) * 100);
       if (!recurring.clientProfileId || amountCents <= 0) throw new Error("Choose a client and enter an amount");
-      const response = await tradesFetch("/api/trades/schedules", {
+      const response = await tradesFetch(apiPath("POST /api/trades/schedules"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...recurring, amountCents, startDate: new Date(`${recurring.startDate}T09:00:00Z`).toISOString(), amount: undefined }),
@@ -562,7 +564,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (!response.ok) throw new Error(await response.json().then((d) => d.message).catch(() => "Could not create recurring invoice"));
       return response.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] }); setRecurringError(""); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/schedules")] }); setRecurringError(""); },
     onError: (error) =>
       setRecurringError(
         isBillingCardRequired(error)
@@ -573,7 +575,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
 
   const toggleReminders = useMutation({
     mutationFn: async (tradeRemindersEnabled: boolean) => {
-      const response = await tradesFetch("/api/trades/reminder-settings", {
+      const response = await tradesFetch(apiPath("PUT /api/trades/reminder-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tradeRemindersEnabled }),
@@ -582,7 +584,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       return response.json();
     },
     onSuccess: (body) => {
-      queryClient.setQueryData(["/api/trades/reminder-settings"], {
+      queryClient.setQueryData([apiPath("GET /api/trades/reminder-settings")], {
         tradeRemindersEnabled: body?.tradeRemindersEnabled !== false,
       });
       toast({ title: "Reminder settings saved" });
@@ -600,8 +602,11 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       action: "update" | "cancel";
       status?: "active" | "paused";
     }) => {
-      const response = await tradesFetch(`/api/trades/schedules/${scheduleId}`, {
-        method: action === "cancel" ? "DELETE" : "PUT",
+      const [method, address] = action === "cancel"
+        ? apiTo("DELETE /api/trades/schedules/:id", { id: scheduleId })
+        : apiTo("PUT /api/trades/schedules/:id", { id: scheduleId });
+      const response = await tradesFetch(address, {
+        method,
         headers: action === "cancel" ? undefined : { "Content-Type": "application/json" },
         body: action === "cancel" ? undefined : JSON.stringify({ status }),
       });
@@ -609,7 +614,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/schedules")] });
       toast({ title: "Recurring schedule updated" });
     },
     onError: (error: unknown) => toast({
@@ -620,7 +625,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
 
   const markReceived = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const res = await tradesFetch(`/api/trades/invoices/${invoiceId}/mark-paid-external`, {
+      const res = await tradesFetch(apiPath("POST /api/trades/invoices/:id/mark-paid-external", { id: invoiceId }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ externalPaymentReference: null }),
@@ -858,7 +863,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   })}
                 </div>
 
-                <div className="tt-rows">
+                <div className="tt-rows" tabIndex={0} role="region" aria-label="Jobs">
                   {isLoading ? (
                     <div className="tt-empty">loading jobs…</div>
                   ) : invoicesUnavailable || clientsUnavailable ? (
@@ -989,11 +994,11 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   title={sendUnavailableHint}
                   onClick={() => sendInvoice.mutate()}
                 >
-                  {sendInvoice.isPending ? "sending…" : sentFlash ? "invoice sent ✓" : quickMode ? "send quick invoice" : "send invoice"}
+                  {sendInvoice.isPending ? "sending…" : sentFlash ? (sentInvoice?.delivered===true?"invoice sent ✓":"invoice created · delivery pending") : quickMode ? "send quick invoice" : "send invoice"}
                 </button>
                 {quickMode && sentInvoice?.clientProfileId && (
                   <div className="tt-quick-success" role="status">
-                    <span>invoice sent ✓</span>
+                    <span>{sentInvoice?.delivered===true?'invoice sent ✓':'invoice created · delivery pending'}</span>
                     <button type="button" disabled={promoteClient.isPending || promoteClient.isSuccess} onClick={() => promoteClient.mutate()}>
                       {promoteClient.isPending ? "saving…" : promoteClient.isSuccess ? "client saved ✓" : "add client"}
                     </button>
@@ -1420,18 +1425,19 @@ function JobRow({ row, onPick }: { row: TradesClientRow; onPick: (id: string) =>
       type="button"
       className="tt-row"
       title={label}
-      aria-label={`select ${row.name}`}
+      aria-label={`select ${label}`}
+      aria-describedby={`tt-job-${row.id}-status tt-job-${row.id}-amount`}
       onClick={() => onPick(row.id)}
     >
-      <span className="tt-avatar">{row.initials}</span>
+      <span className="tt-avatar" aria-hidden="true">{row.initials}</span>
       <span className="tt-row-mid">
         <span className="tt-row-name">{label}</span>
-        <span className="tt-row-status">
+        <span className="tt-row-status" id={`tt-job-${row.id}-status`}>
           <span className="tt-dot" style={{ background: STATUS_DOT[row.status] }} />
           <span>{row.status}</span>
         </span>
       </span>
-      <span className="tt-row-amt">
+      <span className="tt-row-amt" id={`tt-job-${row.id}-amount`}>
         {row.amountCents === null ? "—" : formatNzd(row.amountCents)}
       </span>
     </button>
@@ -1493,7 +1499,7 @@ const TT_CSS = `
 .tt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; }
 .tt-mode { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .tt-mode-title { font-weight:300; font-size:15px; color:${PALE}; }
-.tt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.tt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 
 /* invoice compose — the design pins both blocks to fixed y offsets */
 .tt-inv-top { position:absolute; left:668px; top:154px; width:445px; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
@@ -1519,7 +1525,7 @@ const TT_CSS = `
 .tt-note { height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:#12162E; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; }
 .tt-via { display:flex; align-items:center; gap:14px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .tt-via-text { display:flex; flex-direction:column; gap:1px; min-width:0; }
-.tt-via-label { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); text-transform:lowercase; }
+.tt-via-label { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.65); text-transform:lowercase; }
 .tt-via-value { font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tt-type-chips { display:flex; gap:10px; margin-top:6px; }
 .tt-type-chip { flex:1; height:44px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; text-transform:lowercase; }
@@ -1605,7 +1611,7 @@ const TT_CSS = `
 .tt-rec-row-actions button { padding:3px 7px; border:1px solid rgba(94,158,255,.4); border-radius:999px; background:transparent; color:${ACCENT_SOFT}; font:inherit; font-size:10px; cursor:pointer; }
 
 .tt-paid-title { margin-top:100px; }
-.tt-paid-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }
+.tt-paid-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.65); }
 .tt-paid-rows { margin-top:22px; display:flex; flex-direction:column; width:440px; max-height:420px; overflow-y:auto; scrollbar-width:none; }
 .tt-paid-rows::-webkit-scrollbar { display:none; }
 .tt-paid-row { display:flex; align-items:center; gap:14px; padding:11px 0; border-bottom:1px solid rgba(94,158,255,0.14); flex:0 0 auto; }

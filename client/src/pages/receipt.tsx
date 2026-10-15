@@ -13,6 +13,7 @@ import {
   receiptPdfEndpoint,
   type ReceiptSource,
 } from "@/lib/payment-addressing";
+import { SPLIT_PAYMENTS_KEY, TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 
 function formatPaymentMethod(method?: string): string {
   switch (method) {
@@ -48,10 +49,10 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
     : (id ? { kind: "retail-legacy", transactionId: id, splitPaymentId: splitId } : null);
 
   const { data: legacyTransaction, isLoading: transactionLoading } = useQuery({
-    queryKey: ["/api/transactions", id],
+    queryKey: [TRANSACTIONS_KEY, id],
     queryFn: async () => {
       if (!id) return null;
-      const response = await fetch(`/api/transactions/${id}`);
+      const response = await fetch(apiPath("GET /api/transactions/:id", { id }));
       if (!response.ok) throw new Error("Failed to fetch transaction");
       return response.json();
     },
@@ -80,10 +81,10 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
   const legacyMerchant = legacyTransaction?.merchant;
 
   const { data: legacySplitPayment, isLoading: splitLoading } = useQuery({
-    queryKey: ["/api/split-payments", splitId],
+    queryKey: [SPLIT_PAYMENTS_KEY, splitId],
     queryFn: async () => {
       if (!splitId) return null;
-      const response = await fetch(`/api/split-payments/${splitId}`);
+      const response = await fetch(apiPath("GET /api/split-payments/:id", { id: splitId }));
       if (!response.ok) throw new Error("Failed to fetch split payment");
       return response.json();
     },
@@ -264,7 +265,7 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
             <CheckCircle className="w-16 h-16 text-[#00E5CC] mx-auto mb-3" />
             <h1 className="text-2xl font-bold text-white mb-1">Payment Accepted!</h1>
             <p className="text-[#00E5CC] text-5xl font-bold mt-3">${effectiveAmount.toFixed(2)}</p>
-            <p className="text-white/60 text-sm mt-2">{transaction.itemName}</p>
+            <p className="text-white text-sm mt-2">{transaction.itemName}</p>
             {isSplitReceipt && (
               <p className="text-white/40 text-xs mt-1">
                 Split — original total ${parseFloat(transaction.price).toFixed(2)}
@@ -283,16 +284,16 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
                 {merchant.businessName || merchant.name}
               </p>
               {merchant.businessAddress && (
-                <p className="text-xs text-gray-400 whitespace-pre-line mt-1">{merchant.businessAddress}</p>
+                <p className="text-xs text-gray-600 whitespace-pre-line mt-1">{merchant.businessAddress}</p>
               )}
               {merchant.contactPhone && (
-                <p className="text-xs text-gray-400">{merchant.contactPhone}</p>
+                <p className="text-xs text-gray-600">{merchant.contactPhone}</p>
               )}
               {merchant.gstNumber && (
                 <p className="text-xs text-gray-500 mt-1 font-medium">GST No: {merchant.gstNumber}</p>
               )}
               {merchant.nzbn && (
-                <p className="text-xs text-gray-400">NZBN: {merchant.nzbn}</p>
+                <p className="text-xs text-gray-600">NZBN: {merchant.nzbn}</p>
               )}
             </div>
           )}
@@ -300,18 +301,18 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
           {/* Date + Method */}
           <div className="space-y-2 mb-4">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Date</span>
+              <span className="text-gray-600">Date</span>
               <span className="text-gray-700 font-medium text-right text-xs leading-relaxed max-w-[60%]">
                 {formatDate(transaction.createdAt)}
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Payment method</span>
+              <span className="text-gray-600">Payment method</span>
               <span className="text-gray-700 font-medium">{formatPaymentMethod(receiptPaymentMethod)}</span>
             </div>
             {!isTokenSource && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Reference</span>
+                <span className="text-gray-600">Reference</span>
                 <span className="text-gray-500 font-mono text-xs">#{transaction.id}</span>
               </div>
             )}
@@ -321,7 +322,7 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
 
           {/* Items */}
           <div className="mb-3">
-            <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">Items</p>
+            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2">Items</p>
             <div className="flex justify-between text-sm">
               <span className="text-gray-700">{transaction.itemName}</span>
               <span className="font-medium text-gray-900">${effectiveAmount.toFixed(2)}</span>
@@ -332,11 +333,11 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
 
           {/* GST breakdown */}
           <div className="space-y-1.5 mb-1">
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between text-sm text-gray-600">
               <span>Subtotal (excl. GST)</span>
               <span>${netAmount.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between text-sm text-gray-600">
               <span>GST (15%)</span>
               <span>${gstAmount.toFixed(2)}</span>
             </div>
@@ -346,7 +347,7 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
 
           <div className="flex justify-between font-bold text-base">
             <span className="text-gray-900">{isSplitReceipt ? "Your share" : "Total"}</span>
-            <span className="text-[#0055FF]">${effectiveAmount.toFixed(2)}</span>
+            <span className="text-[#040D6D]">${effectiveAmount.toFixed(2)}</span>
           </div>
         </div>
 
@@ -377,13 +378,13 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
             onClick={handleShare}
             disabled={isActioning}
             variant="outline"
-            className="w-full border-[#0055FF] border-2 text-[#0055FF] bg-transparent hover:bg-[#0055FF]/5 rounded-[20px] py-6 text-base font-medium"
+            className="w-full border-[#0055FF] border-2 text-[#040D6D] bg-transparent hover:bg-[#0055FF]/5 rounded-[20px] py-6 text-base font-medium"
           >
             <Share2 className="w-4 h-4 mr-2" />
             Share Receipt
           </Button>
 
-          <p className="text-center text-[#0055FF]/50 text-xs mt-4">Powered by TaptPay</p>
+          <p className="text-center text-[#040D6D] text-xs mt-4">Powered by TaptPay</p>
         </div>
 
       </div>

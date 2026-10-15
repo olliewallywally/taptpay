@@ -2,6 +2,13 @@
 import crypto from "crypto";
 import { redactSensitive } from "./request-log";
 import { config } from "./config";
+import { createWindcaveClient, type RefundOutcome, type RefundRequest, type UnknownReason, type WindcaveClient } from "./windcave-client";
+import { selectSessionLinks, validateCallbackAddress, validateWindcaveLink, windcaveScriptEnv } from "./windcave-links";
+import { normalizeSessionQuery, parseCentsExact } from "./windcave-query";
+import { verifyWindcaveOutcome, type WindcaveExpectedOutcome } from "./windcave-verify";
+import { writeSecurityAuditEvent } from "./security-audit-log";
+
+export type { WindcaveExpectedOutcome } from "./windcave-verify";
 
 const WINDCAVE_ENDPOINT = config.windcave.endpoint || "";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
@@ -10,8 +17,7 @@ const REQUEST_TIMEOUT = 15000;
 const RETRY_LIMIT = 5;
 
 export function getWindcaveEnv(): "uat" | "sec" {
-  const endpoint = config.windcave.endpoint || "";
-  return endpoint.includes("sec.windcave.com") ? "sec" : "uat";
+  return windcaveScriptEnv(config.paymentMode);
 }
 
 const PROCESSOR_AUDIT_VALUE_KEY = /(?:session|x[-_]?id|transactionId|txId|refundTxId|merchantReference|url|href|body)/i;
@@ -30,6 +36,17 @@ function logAudit(action: string, details: Record<string, any>) {
   console.log(`[WINDCAVE] [${new Date().toISOString()}] ${action}:`, JSON.stringify(sanitized));
 }
 
+// R2-T6 (RF-6): what a failure may say outside this module. Provider reply text can echo
+// request details (session IDs, references, tokens), and a transport error can name the
+// request, so callers get a status or a category only; they log, store and show these.
+function providerFailure(status: number, label = "Windcave"): string {
+  return `${label} ${status}`;
+}
+
+function transportFailure(err: unknown): "timeout" | "network" {
+  return (err as Error | undefined)?.name === "AbortError" ? "timeout" : "network";
+}
+
 function buildAuthHeader(): string {
   const username = config.windcave.username || "";
   const apiKey = config.windcave.apiKey || "";
@@ -40,7 +57,8 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    // R2-T6: never follow a redirect with credentials or a wallet token.
+    return await fetch(url, { ...options, redirect: "manual", signal: controller.signal });
   } finally {
     clearTimeout(id);
   }
@@ -73,7 +91,67 @@ export interface QuerySessionResult {
 export interface RefundResult {
   success: boolean;
   refundTransactionId?: string;
+  /** A fixed code, never provider text (R2-T6). */
   error?: string;
+  /** R4-T1: what the provider's reply established; the route acts on this. */
+  outcome: RefundOutcome;
+}
+
+// Session creation and query run through the injectable client (R2-T1,
+// server/windcave-client.ts). These wrappers keep the return shapes the routes use
+// today; the routes move onto typed outcomes and the shared verifier in R2-T5.
+let sessionClient: WindcaveClient | undefined;
+let singleAttemptClient: WindcaveClient | undefined;
+
+/** One exchange, no retries: for a merchant waiting on a decision (OI-1's cancel check).
+ * "Cannot say yet" is a safe answer there, so a slow provider costs one timeout, not minutes. */
+function singleAttemptSessionClient(): WindcaveClient {
+  return singleAttemptClient ??= createWindcaveClient({
+    config: {
+      mode: config.paymentMode,
+      endpoint: config.windcave.endpoint || "",
+      username: config.windcave.username || "",
+      apiKey: config.windcave.apiKey || "",
+      publicOrigin: config.publicOrigin,
+    },
+    transport: (url, init) => fetch(url, init),
+    wait: delay,
+    clock: () => new Date(),
+    audit: logAudit,
+    retryLimit: 0,
+  });
+}
+
+function defaultSessionClient(): WindcaveClient {
+  return sessionClient ??= createWindcaveClient({
+    config: {
+      mode: config.paymentMode,
+      endpoint: config.windcave.endpoint || "",
+      username: config.windcave.username || "",
+      apiKey: config.windcave.apiKey || "",
+      publicOrigin: config.publicOrigin,
+    },
+    // Resolved per call, so the no-network test guard and fetch spies still apply.
+    transport: (url, init) => fetch(url, init),
+    wait: delay,
+    clock: () => new Date(),
+    audit: logAudit,
+  });
+}
+
+function legacyFailure(outcome: { kind: "rejected"; status: number } | { kind: "unknown"; reason: UnknownReason } | { kind: "malformed" } | { kind: "invalid_request" } | { kind: "disabled" }): string {
+  switch (outcome.kind) {
+    // Provider text is not carried: it can echo request details (RF-6).
+    case "rejected": return `Windcave ${outcome.status}`;
+    case "unknown":
+      return outcome.reason === "timeout" ? "Windcave request timed out"
+        : outcome.reason === "network" ? "Windcave network error"
+        : outcome.reason === "server_error" ? "Windcave server error"
+        : "Unexpected Windcave status";
+    case "malformed": return "Unreadable provider response body";
+    case "invalid_request": return "Callback address is not on the public origin";
+    case "disabled": return "Payment provider is not configured";
+  }
 }
 
 // Create a Windcave payment session — returns all available submission URLs
@@ -84,185 +162,88 @@ export async function createWindcaveSession(
   customerEmail: string,
   baseUrl: string,
   transactionId: number,
-  retries = 0,
+  /** Unused: retries now happen inside the client, with the same X-ID. */
+  _retries = 0,
   // Optional override for non-retail flows (e.g. property rent checkout) that need
   // their own callback/notification routes. callbackBase must already contain a `?`
   // query string so `&result=...` can be appended.
   callbacks?: { callbackBase: string; notificationUrl: string }
 ): Promise<CreateSessionResult> {
-  const callbackBase = callbacks?.callbackBase ?? `${baseUrl}/api/windcave/callback?transactionId=${transactionId}`;
-  const notificationUrl = callbacks?.notificationUrl ?? `${baseUrl}/api/windcave/notification`;
-  const body = {
-    type: "purchase",
+  const outcome = await defaultSessionClient().createSession({
+    xId,
     amount,
-    currency: "NZD",
     merchantReference,
-    customer: {
-      email: customerEmail,
-    },
-    callbackUrls: {
-      approved: `${callbackBase}&result=approved`,
-      declined: `${callbackBase}&result=declined`,
-      cancelled: `${callbackBase}&result=cancelled`,
-    },
-    notificationUrl,
-  };
+    customerEmail,
+    callbackBase: callbacks?.callbackBase ?? `${baseUrl}/api/windcave/callback?transactionId=${transactionId}`,
+    notificationUrl: callbacks?.notificationUrl ?? `${baseUrl}/api/windcave/notification`,
+  });
 
-  logAudit("CREATE_SESSION_REQUEST", { xId, merchantReference, amount, retries });
-
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(SESSION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: buildAuthHeader(),
-        "X-ID": xId,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (err: any) {
-    const isTimeout = err.name === "AbortError";
-    logAudit("CREATE_SESSION_NETWORK_ERROR", { xId, error: err.message, isTimeout });
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, transactionId, retries + 1, callbacks);
-    }
-    return { success: false, error: err.message };
-  }
-
-  if (response.status === 200) {
-    // Duplicate X-ID — session already complete
-    const data = await response.json();
-    const tx = data.transactions?.[0];
-    const approved = tx?.authorised === true;
-    logAudit("CREATE_SESSION_DUPLICATE_XID", { xId, approved, txId: tx?.id });
+  if (outcome.kind === "created") {
+    // Validated per relation (R2-T2); no other REDIRECT link stands in for the hosted page.
     return {
       success: true,
-      sessionId: data.id,
-      alreadyComplete: true,
-      approved,
-      windcaveTransactionId: approved ? tx?.id : undefined,
-    };
-  }
-
-  if (response.status === 202) {
-    const data = await response.json();
-    const links: any[] = data.links || [];
-
-    const findHref = (rel: string) =>
-      links.find((l) => l.rel === rel)?.href;
-
-    const hppUrl = findHref("hpp") || links.find((l) => l.method === "REDIRECT")?.href;
-    const ajaxSubmitCardUrl = findHref("ajaxSubmitCard");
-    const ajaxSubmitApplePayUrl = findHref("ajaxSubmitApplePay");
-    const ajaxSubmitGooglePayUrl = findHref("ajaxSubmitGooglePay");
-
-    logAudit("CREATE_SESSION_PENDING", {
-      xId,
-      sessionId: data.id,
-      hppUrl,
-      ajaxSubmitCardUrl: !!ajaxSubmitCardUrl,
-      ajaxSubmitApplePayUrl: !!ajaxSubmitApplePayUrl,
-      ajaxSubmitGooglePayUrl: !!ajaxSubmitGooglePayUrl,
-    });
-
-    return {
-      success: true,
-      sessionId: data.id,
-      hppUrl,
-      ajaxSubmitCardUrl,
-      ajaxSubmitApplePayUrl,
-      ajaxSubmitGooglePayUrl,
+      sessionId: outcome.sessionId,
+      hppUrl: outcome.links.hpp,
+      ajaxSubmitCardUrl: outcome.links.ajaxSubmitCard,
+      ajaxSubmitApplePayUrl: outcome.links.ajaxSubmitApplePay,
+      ajaxSubmitGooglePayUrl: outcome.links.ajaxSubmitGooglePay,
       alreadyComplete: false,
     };
   }
 
-  if (response.status >= 400 && response.status < 500) {
-    const errorBody = await response.text().catch(() => "");
-    logAudit("CREATE_SESSION_4XX", { xId, status: response.status, errorBody });
-    return { success: false, error: `Windcave ${response.status}: ${errorBody}` };
-  }
-
-  if (response.status >= 500) {
-    logAudit("CREATE_SESSION_5XX", { xId, status: response.status, retries });
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, transactionId, retries + 1, callbacks);
+  if (outcome.kind === "duplicate") {
+    // R2-T5 (RF-3): an X-ID already used names a session that exists; whether it paid
+    // is confirmed only by a verified query, never read from this reply.
+    const data = outcome.body as { id?: unknown } | null;
+    if (!data || typeof data !== "object" || typeof data.id !== "string" || data.id.length === 0) {
+      return { success: false, error: legacyFailure({ kind: "malformed" }) };
     }
-    return { success: false, error: `Windcave server error ${response.status}` };
+    return { success: true, sessionId: data.id, alreadyComplete: true };
   }
 
-  return { success: false, error: `Unexpected status ${response.status}` };
+  return { success: false, error: legacyFailure(outcome) };
 }
 
-// Query a session to determine the payment outcome
+/** The environment this server's provider configuration targets. */
+export function currentProviderEnvironment(): "uat" | "production" {
+  return config.paymentMode === "production" ? "production" : "uat";
+}
+
+// Query a session and settle only on an outcome verified against what the payment
+// expected (R2-T5, plan §9.5). success:true means a verified approval or decline; every
+// other answer (pending, unverifiable, mismatch, provider failure) leaves the payment
+// reconcilable. A mismatch is recorded as a sanitized security event (field only).
 export async function queryWindcaveSession(
   sessionId: string,
-  retries = 0
+  expected: WindcaveExpectedOutcome | null,
+  options: { singleAttempt?: boolean } = {},
 ): Promise<QuerySessionResult> {
-  logAudit("QUERY_SESSION", { sessionId, retries });
-
-  let response: Response;
-  try {
-    // One encoded path segment: a split invoice passes on the id its page sent.
-    response = await fetchWithTimeout(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
-      method: "GET",
-      headers: { Authorization: buildAuthHeader() },
-    });
-  } catch (err: any) {
-    logAudit("QUERY_SESSION_NETWORK_ERROR", { sessionId, error: err.message });
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return queryWindcaveSession(sessionId, retries + 1);
-    }
-    return { success: false, error: err.message };
+  if (!expected) return { success: false, error: "unverifiable:no_expected" };
+  if (expected.sessionId !== sessionId) {
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: "session" });
+    return { success: false, error: "integrity_mismatch:session" };
   }
+  const outcome = await (options.singleAttempt ? singleAttemptSessionClient() : defaultSessionClient()).querySession(sessionId);
+  if (outcome.kind === "pending") return { success: false, error: "Session still processing after max retries" };
+  if (outcome.kind !== "reply") return { success: false, error: legacyFailure(outcome) };
 
-  if (response.status === 200) {
-    // A 200 carrying a truncated or non-JSON body must be an unknown outcome,
-    // not a thrown exception: callers treat a throw as a crash and would strand
-    // the session mid-transition rather than leaving it reconcilable.
-    let data: any;
-    try {
-      data = await response.json();
-    } catch (err: any) {
-      logAudit("QUERY_SESSION_BODY_ERROR", { sessionId, error: err.message });
-      return { success: false, error: "Unreadable provider response body" };
-    }
-    const tx = data.transactions?.[0];
-    const approved = tx?.authorised === true;
-    logAudit("QUERY_SESSION_RESULT", { sessionId, approved, txId: tx?.id });
-    return {
-      success: true,
-      approved,
-      windcaveTransactionId: approved ? tx?.id : undefined,
-    };
+  const verified = verifyWindcaveOutcome(expected, normalizeSessionQuery(outcome.body, sessionId), {
+    providerEnvironment: currentProviderEnvironment(),
+    accountUsername: config.windcave.username || "",
+  });
+  switch (verified.kind) {
+    case "approved":
+      return { success: true, approved: true, windcaveTransactionId: verified.providerTransactionId };
+    case "declined":
+      return { success: true, approved: false };
+    case "pending":
+      return { success: false, error: "pending" };
+    case "unverifiable":
+      return { success: false, error: `unverifiable:${verified.reason}` };
+    case "mismatch":
+      writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: verified.field });
+      return { success: false, error: `integrity_mismatch:${verified.field}` };
   }
-
-  if (response.status === 202) {
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return queryWindcaveSession(sessionId, retries + 1);
-    }
-    return { success: false, error: "Session still processing after max retries" };
-  }
-
-  if (response.status >= 400 && response.status < 500) {
-    const errorBody = await response.text().catch(() => "");
-    logAudit("QUERY_SESSION_4XX", { sessionId, status: response.status, errorBody });
-    return { success: false, error: `Windcave ${response.status}: ${errorBody}` };
-  }
-
-  if (response.status >= 500) {
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return queryWindcaveSession(sessionId, retries + 1);
-    }
-    return { success: false, error: `Windcave server error ${response.status}` };
-  }
-
-  return { success: false, error: `Unexpected status ${response.status}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -297,10 +278,13 @@ interface CardOnFileRequestOptions {
   request?: WindcaveRequest;
   wait?: (ms: number) => Promise<void>;
   transactionPollLimit?: number;
+  /** R3: commit the accepted transaction identity before any polling request. */
+  onPendingTransaction?: (transactionId:string)=>Promise<void>;
 }
 
 export interface StoreCardSessionResult {
   success: boolean;
+  complete?:boolean;
   sessionId?: string;
   hppUrl?: string;
   error?: string;
@@ -321,6 +305,7 @@ export interface StoredCardSessionResult {
   approved?: boolean;
   card?: StoredCard;
   error?: string;
+  providerTransactionId?:string;
 }
 
 export interface ChargeStoredCardResult {
@@ -395,6 +380,13 @@ export async function createCardStorageSession(
     notificationUrl,
   };
 
+  // R2-T6: the addresses the provider calls back are on exactly PUBLIC_ORIGIN (R2-T2).
+  if (!validateCallbackAddress(callbackBase, config.publicOrigin, { needsQuery: true }) ||
+      !validateCallbackAddress(notificationUrl, config.publicOrigin, { needsQuery: false })) {
+    logAudit("STORE_CARD_SESSION_INVALID_REQUEST", { reason: "callback_origin" });
+    return { success: false, error: "invalid_request" };
+  }
+
   logAudit("STORE_CARD_SESSION_REQUEST", { xId, merchantReference });
 
   let response: Response;
@@ -402,6 +394,7 @@ export async function createCardStorageSession(
     const request = options.request ?? fetchWithTimeout;
     response = await request(SESSION_URL, {
       method: "POST",
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         Authorization: buildAuthHeader(),
@@ -410,30 +403,38 @@ export async function createCardStorageSession(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("STORE_CARD_SESSION_NETWORK_ERROR", { xId, error: err.message });
-    return { success: false, error: err.message };
+    logAudit("STORE_CARD_SESSION_NETWORK_ERROR", { xId, error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
   if (response.status === 202 || response.status === 200) {
-    let data: any = {};
-    try { data = JSON.parse(text); } catch {}
-    const links: any[] = data.links || [];
-    const hppUrl =
-      links.find((l) => l.rel === "hpp")?.href ||
-      links.find((l) => l.method === "REDIRECT")?.href;
-    logAudit("STORE_CARD_SESSION_CREATED", { xId, sessionId: data.id, hppUrl });
-    return { success: true, sessionId: data.id, hppUrl };
+    const data = parseWindcaveJson(text);
+    if(data?.state==='complete'&&typeof data.id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(data.id)){
+      return {success:true,sessionId:data.id,complete:true};
+    }
+    // R2-T6: only the `hpp` relation, valid for this mode (R2-T2), goes to the browser;
+    // no other REDIRECT link stands in for it.
+    const links = Array.isArray(data?.links)
+      ? data.links.filter((link: any) => typeof link?.rel === "string" && typeof link?.href === "string")
+      : [];
+    const selected = selectSessionLinks(links, config.paymentMode);
+    if (typeof data?.id !== "string" || data.id.length === 0 || !selected.links.hpp) {
+      logAudit("STORE_CARD_SESSION_LINK_REJECTED", { xId, rejectedLinks: selected.rejected });
+      return { success: false, error: "Windcave card setup reply had no valid hosted page" };
+    }
+    logAudit("STORE_CARD_SESSION_CREATED", { xId, sessionId: data.id, rejectedLinks: selected.rejected });
+    return { success: true, sessionId: data.id, hppUrl: selected.links.hpp };
   }
 
-  logAudit("STORE_CARD_SESSION_ERROR", { xId, status: response.status, body: text.slice(0, 300) });
-  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  logAudit("STORE_CARD_SESSION_ERROR", { xId, status: response.status, bytes: text.length });
+  return { success: false, error: providerFailure(response.status) };
 }
 
 /** Reads back the card token once the shopper has finished the hosted form. */
 export async function queryStoredCardSession(
   sessionId: string,
-  options: Pick<CardOnFileRequestOptions, "request"> = {},
+  options: Pick<CardOnFileRequestOptions, "request"> & {expected?:{reference:string;providerAccount:string}} = {},
 ): Promise<StoredCardSessionResult> {
   logAudit("STORE_CARD_QUERY", { sessionId });
   // Provider ids are opaque path segments, never paths. Reject traversal-like
@@ -447,11 +448,12 @@ export async function queryStoredCardSession(
     const request = options.request ?? fetchWithTimeout;
     response = await request(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
       method: "GET",
+      redirect: "manual",
       headers: { Authorization: buildAuthHeader() },
     });
   } catch (err: any) {
-    logAudit("STORE_CARD_QUERY_NETWORK_ERROR", { sessionId, error: err.message });
-    return { success: false, error: err.message };
+    logAudit("STORE_CARD_QUERY_NETWORK_ERROR", { sessionId, error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
@@ -461,25 +463,61 @@ export async function queryStoredCardSession(
   }
   if (response.status !== 200) {
     logAudit("STORE_CARD_QUERY_ERROR", { sessionId, status: response.status });
-    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+    return { success: false, error: providerFailure(response.status) };
   }
 
   const data = parseWindcaveJson(text);
-  const tx = Array.isArray(data?.transactions) ? data.transactions[0] : undefined;
-  if (!tx || typeof tx.authorised !== "boolean") {
+  // R2-T6: a reply that names another session is never this card's (checked when the
+  // reply names one; whether to require it waits on UAT, owner direction 2026-10-12).
+  if (data && typeof data === "object" && data.id !== undefined && data.id !== sessionId) {
+    logAudit("STORE_CARD_QUERY_MISMATCH", { field: "session" });
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: "session" });
+    return { success: false, error: "integrity_mismatch:session" };
+  }
+  if (typeof data?.state === "string" && data.state !== "complete") {
+    return { success: true, complete: false };
+  }
+  const transactions: any[] | undefined = Array.isArray(data?.transactions) ? data.transactions : undefined;
+  if (!transactions || transactions.length === 0 || transactions.some((entry) => typeof entry?.authorised !== "boolean")) {
     logAudit("STORE_CARD_QUERY_INVALID_RESULT", { sessionId });
     return {
       success: false,
       error: "Windcave stored-card session response did not include a final transaction result",
     };
   }
+  // One authorised result, or only declines; two authorised results are ambiguous.
+  const authorisedEntries = transactions.filter((entry) => entry.authorised === true);
+  if (authorisedEntries.length > 1) {
+    logAudit("STORE_CARD_QUERY_AMBIGUOUS", { sessionId, authorised: authorisedEntries.length });
+    return { success: false, error: "Windcave stored-card session response was ambiguous" };
+  }
+  const tx = authorisedEntries[0] ?? transactions[0];
 
-  const approved = tx.authorised;
+  if(options.expected){
+    // R3 binds this zero-value verification to a pre-send subscription attempt.
+    // Preserve R2's owner-approved conditional-field contract; supplied echoes
+    // must match, and a durable terminal transaction identity is mandatory.
+    for(const entry of transactions){
+      const amount=entry.amount===undefined?undefined:parseCentsExact(entry.amount);
+      if((entry.id!==undefined && entry.transactionId!==undefined && storedCardTransactionId(entry.id)!==storedCardTransactionId(entry.transactionId)) ||
+        (amount!==undefined && (!amount.ok || amount.cents!==0)) ||
+        (entry.currency!==undefined && entry.currency!=='NZD') ||
+        (entry.merchantReference!==undefined && entry.merchantReference!==options.expected.reference) ||
+        (entry.username!==undefined && entry.username!==options.expected.providerAccount) ||
+        (entry.type!==undefined && entry.type!==CARD_ON_FILE_FIELDS.storeSessionType)){
+        writeSecurityAuditEvent('PROVIDER_OUTCOME_MISMATCH',{field:'card_expectation'});
+        return {success:false,error:'integrity_mismatch:card_expectation'};
+      }
+    }
+    if(!storedCardTransactionId(tx.id??tx.transactionId))return {success:false,error:'Stored-card verification has no durable transaction identity'};
+  }
+
+  const approved = authorisedEntries.length === 1;
   const card = approved ? extractStoredCard(tx) : undefined;
   logAudit("STORE_CARD_QUERY_RESULT", { sessionId, approved, hasCard: !!card });
 
   if (!approved) {
-    return { success: true, complete: true, approved: false };
+    return { success: true, complete: true, approved: false,...(options.expected?{providerTransactionId:storedCardTransactionId(tx.id??tx.transactionId)}:{}) };
   }
   if (!card) {
     return {
@@ -487,7 +525,7 @@ export async function queryStoredCardSession(
       error: "Windcave stored-card session response did not include a stored card",
     };
   }
-  return { success: true, complete: true, approved: true, card };
+  return { success: true, complete: true, approved: true, card,...(options.expected?{providerTransactionId:storedCardTransactionId(tx.id??tx.transactionId)}:{}) };
 }
 
 /**
@@ -527,6 +565,7 @@ export async function chargeStoredCard(
     const request = options.request ?? fetchWithTimeout;
     response = await request(TRANSACTION_URL, {
       method: "POST",
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         Authorization: buildAuthHeader(),
@@ -535,8 +574,8 @@ export async function chargeStoredCard(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("CHARGE_STORED_CARD_NETWORK_ERROR", { xId, error: err.message });
-    return { success: false, error: err.message };
+    logAudit("CHARGE_STORED_CARD_NETWORK_ERROR", { xId, error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
@@ -544,18 +583,24 @@ export async function chargeStoredCard(
     const pending = parseWindcaveJson(text);
     const pollUrl = transactionPollUrl(pending);
     if (!pollUrl) {
-      logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, body: text.slice(0, 300) });
+      logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, bytes: text.length });
       return { success: false, error: "Windcave returned a pending transaction without an id" };
     }
-    return pollStoredCardCharge(xId, pollUrl, pending?.id ?? pending?.transactionId, options);
+    const transactionId=storedCardTransactionId(pending?.id??pending?.transactionId)!;
+    try {await options.onPendingTransaction?.(transactionId);}
+    catch {
+      logAudit('CHARGE_STORED_CARD_IDENTITY_COMMIT_FAILED',{});
+      return {success:false,windcaveTransactionId:transactionId,error:'Stored-card transaction identity could not be persisted'};
+    }
+    return pollStoredCardCharge(xId, pollUrl, transactionId, { amount, merchantReference }, options);
   }
 
   if (response.status !== 200 && response.status !== 201) {
-    logAudit("CHARGE_STORED_CARD_ERROR", { xId, status: response.status, body: text.slice(0, 300) });
-    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+    logAudit("CHARGE_STORED_CARD_ERROR", { xId, status: response.status, bytes: text.length });
+    return { success: false, error: providerFailure(response.status) };
   }
 
-  return finalStoredCardChargeResult(xId, parseWindcaveJson(text));
+  return finalStoredCardChargeResult(xId, parseWindcaveJson(text), { amount, merchantReference });
 }
 
 function parseWindcaveJson(text: string): any | undefined {
@@ -566,13 +611,41 @@ function parseWindcaveJson(text: string): any | undefined {
   }
 }
 
+/** What a stored-card charge asked for: its reply must not say otherwise. */
+interface StoredCardCharge {
+  amount: string;
+  merchantReference: string;
+}
+
+/**
+ * R2-T6 (plan §9.5 for the card-on-file charge): the reply's type, exact amount, currency
+ * and reference must be what was charged. Each is checked when the reply carries it;
+ * requiring them waits on an official UAT reply (owner direction 2026-10-12).
+ */
+function storedCardChargeMismatch(data: any, charged: StoredCardCharge): "type" | "amount" | "currency" | "reference" | null {
+  if (data.type !== undefined && data.type !== "purchase") return "type";
+  if (data.amount !== undefined) {
+    const replied = parseCentsExact(data.amount);
+    const asked = parseCentsExact(charged.amount);
+    if (!replied.ok || !asked.ok || replied.cents !== asked.cents) return "amount";
+  }
+  if (data.currency !== undefined && data.currency !== "NZD") return "currency";
+  if (data.merchantReference !== undefined && data.merchantReference !== charged.merchantReference) return "reference";
+  return null;
+}
+
 function finalStoredCardChargeResult(
   xId: string,
   data: any,
+  charged: StoredCardCharge,
   fallbackTransactionId?: string,
 ): ChargeStoredCardResult {
-  const rawTransactionId = data?.id ?? data?.transactionId ?? fallbackTransactionId;
-  const windcaveTransactionId = rawTransactionId ? String(rawTransactionId) : undefined;
+  const windcaveTransactionId = storedCardTransactionId(data?.id ?? data?.transactionId ?? fallbackTransactionId);
+  if(!windcaveTransactionId || (fallbackTransactionId!==undefined && windcaveTransactionId!==fallbackTransactionId) ||
+    (data?.id!==undefined && data?.transactionId!==undefined && storedCardTransactionId(data.id)!==storedCardTransactionId(data.transactionId))){
+    logAudit('CHARGE_STORED_CARD_INVALID_IDENTITY',{});
+    return {success:false,windcaveTransactionId:fallbackTransactionId,error:'Stored-card transaction identity could not be verified'};
+  }
 
   // `authorised` is Windcave's documented final outcome. A final response without it is an
   // incomplete/malformed provider response, not a card decline (which would burn
@@ -584,6 +657,14 @@ function finalStoredCardChargeResult(
       windcaveTransactionId,
       error: "Windcave transaction response did not include an authorised result",
     };
+  }
+
+  // A reply for something other than this charge is neither an approval nor a decline.
+  const mismatch = storedCardChargeMismatch(data, charged);
+  if (mismatch) {
+    logAudit("CHARGE_STORED_CARD_MISMATCH", { xId, field: mismatch });
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: mismatch });
+    return { success: false, windcaveTransactionId, error: `integrity_mismatch:${mismatch}` };
   }
 
   const approved = data.authorised;
@@ -603,34 +684,31 @@ function finalStoredCardChargeResult(
  * platform credentials back to the configured Windcave origin/path; if a
  * malformed response supplies another host, reconstruct the URL from its id.
  */
+function storedCardTransactionId(value:unknown):string|undefined {
+  if(typeof value==='number' && (!Number.isSafeInteger(value) || value<=0))return undefined;
+  if(typeof value!=='string' && typeof value!=='number')return undefined;
+  const id=String(value);
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(id)?id:undefined;
+}
 function transactionPollUrl(data: any): string | undefined {
-  const selfHref = Array.isArray(data?.links)
-    ? data.links.find((link: any) => link?.rel === "self" && (!link.method || link.method === "GET"))?.href
-    : undefined;
+  const id=storedCardTransactionId(data?.id??data?.transactionId);
+  if(data?.id!==undefined && data?.transactionId!==undefined && storedCardTransactionId(data.id)!==storedCardTransactionId(data.transactionId))return undefined;
+  return id?`${TRANSACTION_URL}/${id}`:undefined;
+}
 
-  if (typeof selfHref === "string") {
-    try {
-      const candidate = new URL(selfHref);
-      const configured = new URL(TRANSACTION_URL);
-      const transactionPath = `${configured.pathname.replace(/\/+$/, "")}/`;
-      if (candidate.origin === configured.origin && candidate.pathname.startsWith(transactionPath)) {
-        return candidate.toString();
-      }
-    } catch {
-      // Fall through to the provider transaction id below.
-    }
-  }
-
-  const transactionId = data?.id ?? data?.transactionId;
-  if (typeof transactionId !== "string" && typeof transactionId !== "number") return undefined;
-  const value = String(transactionId).trim();
-  return value ? `${TRANSACTION_URL}/${encodeURIComponent(value)}` : undefined;
+/** R3 recovery queries an accepted transaction without repeating its purchase. */
+export async function queryStoredCardCharge(xId:string,transactionId:string,amount:string,merchantReference:string,
+  options:CardOnFileRequestOptions={}):Promise<ChargeStoredCardResult> {
+  const url=transactionPollUrl({id:transactionId});
+  if(!url)return {success:false,error:'Stored-card transaction identity could not be verified'};
+  return pollStoredCardCharge(xId,url,transactionId,{amount,merchantReference},options);
 }
 
 async function pollStoredCardCharge(
   xId: string,
   pollUrl: string,
   fallbackTransactionId: unknown,
+  charged: StoredCardCharge,
   options: CardOnFileRequestOptions,
 ): Promise<ChargeStoredCardResult> {
   const request = options.request ?? fetchWithTimeout;
@@ -648,11 +726,12 @@ async function pollStoredCardCharge(
     try {
       response = await request(pollUrl, {
         method: "GET",
+        redirect: "manual",
         headers: { Authorization: buildAuthHeader() },
       });
     } catch (err: any) {
-      logAudit("CHARGE_STORED_CARD_POLL_NETWORK_ERROR", { xId, pollAttempt: attempt, error: err.message });
-      return { success: false, windcaveTransactionId: fallbackId, error: err.message };
+      logAudit("CHARGE_STORED_CARD_POLL_NETWORK_ERROR", { xId, pollAttempt: attempt, error: transportFailure(err) });
+      return { success: false, windcaveTransactionId: fallbackId, error: transportFailure(err) };
     }
 
     const text = await response.text();
@@ -665,16 +744,16 @@ async function pollStoredCardCharge(
         xId,
         pollAttempt: attempt,
         status: response.status,
-        body: text.slice(0, 300),
+        bytes: text.length,
       });
       return {
         success: false,
         windcaveTransactionId: fallbackId,
-        error: `Windcave ${response.status}: ${text.slice(0, 200)}`,
+        error: providerFailure(response.status),
       };
     }
 
-    return finalStoredCardChargeResult(xId, parseWindcaveJson(text), fallbackId);
+    return finalStoredCardChargeResult(xId, parseWindcaveJson(text), charged, fallbackId);
   }
 
   logAudit("CHARGE_STORED_CARD_POLL_EXHAUSTED", { xId, pollLimit, txId: fallbackId });
@@ -690,6 +769,11 @@ export async function submitGooglePayToken(
   ajaxSubmitGooglePayUrl: string,
   googlePayToken: object
 ): Promise<{ success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }> {
+  // R2-T2: the wallet token goes only to this mode's documented Google Pay link.
+  // Thrown, as the route-level check it replaces did; the address is not logged.
+  if (!validateWindcaveLink(ajaxSubmitGooglePayUrl, "ajaxSubmitGooglePay", config.paymentMode).ok) {
+    throw new Error("Blocked a Google Pay link that is not this mode's Windcave address");
+  }
   logAudit("GOOGLEPAY_SUBMIT", { url: ajaxSubmitGooglePayUrl });
   try {
     // Body format confirmed from Windcave's official SDK source:
@@ -708,7 +792,7 @@ export async function submitGooglePayToken(
     });
 
     const text = await response.text();
-    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, body: text });
+    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, bytes: text.length });
 
     if (response.ok) {
       let data: any = {};
@@ -717,7 +801,7 @@ export async function submitGooglePayToken(
       // Windcave returns { links: [{ rel: "done"|"3DSecure", href: "..." }] }
       if (data.links && Array.isArray(data.links) && data.links.length > 0) {
         const link = data.links[0];
-        logAudit("GOOGLEPAY_LINK", { rel: link.rel, href: link.href?.slice(0, 200) });
+        logAudit("GOOGLEPAY_LINK", { rel: link.rel });
 
         if (link.rel === "done") {
           // href is our callback URL — result is embedded in the query string
@@ -727,7 +811,7 @@ export async function submitGooglePayToken(
 
         if (link.rel === "3DSecure") {
           // 3DS not supported in server-side submission — log and fall back to session query
-          logAudit("GOOGLEPAY_3DS_REQUIRED", { href: link.href?.slice(0, 200) });
+          logAudit("GOOGLEPAY_3DS_REQUIRED", {});
           return { success: false, error: "3DS_REQUIRED" };
         }
       }
@@ -737,55 +821,37 @@ export async function submitGooglePayToken(
       return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
     }
 
-    logAudit("GOOGLEPAY_ERROR_BODY", { status: response.status, body: text });
-    return { success: false, error: `Windcave GooglePay ${response.status}: ${text}` };
+    logAudit("GOOGLEPAY_ERROR_BODY", { status: response.status, bytes: text.length });
+    return { success: false, error: providerFailure(response.status, "Windcave GooglePay") };
   } catch (err: any) {
-    logAudit("GOOGLEPAY_ERROR", { error: err.message });
-    return { success: false, error: err.message };
+    logAudit("GOOGLEPAY_ERROR", { error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 }
 
-// Process a refund against an approved transaction
-export async function createWindcaveRefund(
-  originalTransactionId: string,
-  amount: string,
-  merchantReference: string
-): Promise<RefundResult> {
-  const xId = crypto.randomBytes(8).toString("hex");
-  logAudit("REFUND_REQUEST", { originalTransactionId, amount, merchantReference });
+// R4-T1 (plan §11.4): refund a captured transaction through the session client, under the
+// caller's X-ID (never generated here), never resent, and successful only when the reply is
+// strictly this refund. Everything else carries a typed outcome the route acts on.
+export type { RefundOutcome, RefundRequest } from "./windcave-client";
 
-  const body = {
-    type: "refund",
-    amount,
-    currency: "NZD",
-    merchantReference,
-    transaction2Id: originalTransactionId,
-  };
-
-  try {
-    const response = await fetchWithTimeout(TRANSACTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: buildAuthHeader(),
-        "X-ID": xId,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      logAudit("REFUND_SUCCESS", { refundTxId: data.id });
-      return { success: true, refundTransactionId: data.id };
-    }
-
-    const errorBody = await response.text().catch(() => "");
-    logAudit("REFUND_FAILED", { status: response.status, errorBody });
-    return { success: false, error: `Refund failed: ${response.status} ${errorBody}` };
-  } catch (err: any) {
-    logAudit("REFUND_ERROR", { error: err.message });
-    return { success: false, error: err.message };
+function refundFailureCode(outcome: Exclude<RefundOutcome, { kind: "refunded" }>): string {
+  switch (outcome.kind) {
+    case "rejected": return `rejected_${outcome.status}`;
+    case "unknown": return `unknown_${outcome.reason}`;
+    case "mismatch": return `mismatch_${outcome.field}`;
+    default: return outcome.kind;
   }
+}
+
+export async function createWindcaveRefund(request: RefundRequest): Promise<RefundResult> {
+  const outcome = await defaultSessionClient().createRefund(request);
+  if (outcome.kind === "mismatch") {
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: outcome.field });
+  }
+  if (outcome.kind === "refunded") {
+    return { success: true, refundTransactionId: outcome.refundTransactionId, outcome };
+  }
+  return { success: false, error: refundFailureCode(outcome), outcome };
 }
 
 export function isWindcaveConfigured(): boolean {
@@ -858,16 +924,16 @@ export async function createAttendedSession(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: err.message });
+    logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: transportFailure(err) });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
       return createAttendedSession(amount, merchantReference, retries + 1, xId);
     }
-    return { success: false, error: err.message };
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
-  logAudit("ATTENDED_SESSION_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+  logAudit("ATTENDED_SESSION_RESPONSE", { status: response.status, bytes: text.length });
 
   if (response.status === 200 || response.status === 202) {
     let data: any = {};
@@ -882,7 +948,7 @@ export async function createAttendedSession(
     return createAttendedSession(amount, merchantReference, retries + 1, xId);
   }
 
-  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  return { success: false, error: providerFailure(response.status) };
 }
 
 /**
@@ -921,16 +987,16 @@ export async function submitTapToPayToken(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: err.message });
+    logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: transportFailure(err) });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
       return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
     }
-    return { success: false, error: err.message };
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
-  logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+  logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, bytes: text.length });
 
   if (response.ok) {
     let data: any = {};
@@ -944,7 +1010,7 @@ export async function submitTapToPayToken(
     return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
   }
 
-  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  return { success: false, error: providerFailure(response.status) };
 }
 
 // Legacy service wrapper kept for backward compatibility with NFC routes

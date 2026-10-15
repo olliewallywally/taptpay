@@ -1,3 +1,5 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
+import {randomUUID} from "node:crypto";
 import "./support/test-env";
 
 // The capabilities these routes check before serving anyone (a flag needs enforce mode, config.ts):
@@ -9,14 +11,15 @@ process.env.ENV_VALIDATION_MODE = "enforce";
 
 import { memberMerchantSettingsDto, ownerMerchantDto } from "../http-contracts";
 import * as windcave from "../windcave";
-import { resetTestStorage, storage, VALID_PASSWORD } from "./support/http-harness";
+import { resetTestStorage, storage, VALID_PASSWORD, type SignedIn } from "./support/http-harness";
+import { businessSessionBegunBy } from "./support/session-browser";
 import {
   as,
   expectServed,
+  familyRows,
   paidMonth,
   sendServed,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -75,7 +78,7 @@ async function refund(ctx: ServedCtx, transactionId: number) {
 }
 const ids = (rows: Array<{ id: number }>) => rows.map((row) => row.id);
 const merchant = async (ctx: ServedCtx) => (await storage.getMerchant(ctx.merchantId))!;
-const signedIn = async (ctx: ServedCtx, token: string) => (await as(ctx, { token } as any).get("/api/auth/me")).status;
+const meStatus = async (ctx: ServedCtx, who: SignedIn) => (await as(ctx, who).get("/api/auth/me")).status;
 
 /** Per route: a request each allowed caller is served, and what that success looks like. */
 const RECIPES: Record<string, ServedRecipe> = {
@@ -147,17 +150,20 @@ const RECIPES: Record<string, ServedRecipe> = {
     },
     status: 200,
     check: async (res) => {
-      expect(res.body).toEqual({ message: "Password updated successfully", token: expect.any(String) });
-      // This login's other sessions end; this device carries on under the fresh token.
-      expect(await signedIn(ctx, who.token)).toBe(401);
-      expect(await signedIn(ctx, res.body.token)).toBe(200);
+      // No token is handed out (E3): the page gets the new session's CSRF token, the browser its cookie.
+      expect(res.body).toEqual({ message: "Password updated successfully", csrfToken: expect.any(String) });
+      // This login's other sessions end, the one that asked included; this device carries on under a
+      // new session (R1-T4 phase E).
+      expect(await meStatus(ctx, who)).toBe(401);
+      expect(await meStatus(ctx, businessSessionBegunBy(res))).toBe(200);
+      expect(String(res.headers["set-cookie"])).toMatch(/__Host-taptpay-session=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43};/);
     },
   }),
   // Its sales (paid access: a card on file and a paid month).
   "POST /api/transactions": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "post", path: "/api/transactions", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
+      req: { method: "post", path: "/api/transactions", headers: {"Idempotency-Key":requestCommandKey()}, body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
       status: 200,
       check: async (res) => {
         // A sale without a board has its own private link, given once, here.
@@ -170,7 +176,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   "POST /api/transactions/cash-sale": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "post", path: "/api/transactions/cash-sale", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
+      req: { method: "post", path: "/api/transactions/cash-sale", headers:{"Idempotency-Key":randomUUID()}, body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
       status: 200,
       check: async (res) => {
         expect(res.body.transaction).toMatchObject({ itemName: "Flat white", price: "5.50", status: "completed", paymentMethod: "cash" });
@@ -229,7 +235,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     const paid = await sale(ctx, "completed", "matrix-card-payment");
     jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
     const provider = jest.spyOn(windcave, "createWindcaveRefund")
-      .mockResolvedValue({ success: true, refundTransactionId: "matrix-refund" } as any);
+      .mockResolvedValue({ success: true, refundTransactionId: "matrix-refund", outcome: { kind: "refunded", refundTransactionId: "matrix-refund" } } as any);
     return {
       req: { method: "post", path: `/api/transactions/${paid}/refunds`, body: { refundAmount: "1.00", refundReason: "Changed their mind" } },
       status: 200,
@@ -239,7 +245,7 @@ const RECIPES: Record<string, ServedRecipe> = {
           refund: { transactionId: paid, refundAmount: "1.00", status: "completed", windcaveRefundId: "matrix-refund" },
           transaction: { id: paid, status: "partially_refunded" },
         });
-        expect(provider).toHaveBeenCalledWith("matrix-card-payment", "1.00", expect.any(String));
+        expect(provider).toHaveBeenCalledWith(expect.objectContaining({ originalTransactionId: "matrix-card-payment", amount: "1.00", xId: expect.any(String) }));
       },
     };
   },
@@ -308,7 +314,7 @@ const RECIPES: Record<string, ServedRecipe> = {
       req: { method: "put", path: url(ctx, `/stock-items/${made}`), body: { name: "Renamed", cost: "3.00" } }, status: 200,
       check: async (res) => {
         expect(res.body).toMatchObject({ id: made, name: "Renamed", cost: "3.00" });
-        expect(await storage.getStockItem(made)).toMatchObject({ name: "Renamed", cost: "3.00" });
+        expect(await storage.getStockItemForMerchant(made, ctx.merchantId)).toMatchObject({ name: "Renamed", cost: "3.00" });
       },
     };
   },
@@ -319,15 +325,14 @@ const RECIPES: Record<string, ServedRecipe> = {
       check: async (res) => {
         expect(res.body).toEqual({ message: expect.any(String) });
         // Kept, inactive (a sale may name it), and gone from the list the screen reads.
-        expect((await storage.getStockItem(made))?.isActive).toBe(false);
+        expect((await storage.getStockItemForMerchant(made, ctx.merchantId))?.isActive).toBe(false);
         expect(ids((await as(ctx, ctx.owner).get(url(ctx, "/stock-items"))).body)).toEqual([]);
       },
     };
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(merchants|transactions)(\/|$)/;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("business");
 const SERVED = servedPairs(ROWS);
 
 /**

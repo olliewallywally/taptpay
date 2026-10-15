@@ -1,3 +1,4 @@
+import {creationFetch} from '@/lib/creation-command';
 /* Desktop/tablet settings — design screens 2e/3e/4e, which differ only in the
    left column's branding and the vertical highlighted in the switcher, so all
    three verticals render this one component. Every row drives the same endpoint
@@ -8,10 +9,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
+import {billingCardCommandKey} from '@/lib/billing-card-command';
 import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
+import { useAppleConnection } from "@/hooks/use-apple-connection";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
-import { resyncThisDevicePush, stopThisDevicePush } from "@/lib/push-device";
+import { resyncThisDevicePush } from "@/lib/push-device";
+import { forgetThisDeviceSignIn, logOut } from "@/lib/log-out";
 import {
   BILLING_CARD_SESSION_KEY,
   useBillingCardReturn,
@@ -34,6 +38,9 @@ import {
   type DesktopRoutePageProps,
 } from "./DesktopPageScaffold";
 import { DesktopLoadFailure } from "./DesktopLoadFailure";
+import { replaceCsrfToken, sessionFetch } from "@/lib/session";
+import { requireResponseRecord } from "@/lib/response-data";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -162,7 +169,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const push = usePushNotifications();
-  const { confirmingCard } = useBillingCardReturn();
+  const { confirmingCard } = useBillingCardReturn(merchantId);
   const {
     restartTutorials,
     visitedPages: tutorialVisitedPages,
@@ -171,7 +178,10 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     canRestart: tutorialReady,
   } = useTutorial();
 
-  const [openSec, setOpenSec] = useState<SectionKey | null>("business");
+  // Apple's return to a connect lands on /settings?apple=<word> (R1-T5d): back on Account, where the
+  // owner left from.
+  const [openSec, setOpenSec] = useState<SectionKey | null>(() =>
+    new URLSearchParams(window.location.search).has("apple") ? "account" : "business");
   const [details, setDetails] = useState({ businessName: "", gstNumber: "", email: "" });
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [dailyGoal, setDailyGoal] = useState("");
@@ -184,41 +194,45 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
 
   const authFetch = async (path: string) => {
-    const token = localStorage.getItem("authToken");
-    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return res.json().then(requireResponseRecord);
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId })),
     enabled: !!merchantId,
   });
 
   const subscriptionQuery = useQuery<any>({
-    queryKey: ["/api/subscription"],
+    queryKey: [apiPath("GET /api/subscription")],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/subscription");
+      const res = await apiRequest(...apiTo("GET /api/subscription"));
       if (!res.ok) throw new Error("subscription");
-      return res.json();
+      return res.json().then(requireResponseRecord);
     },
     enabled: !!merchantId,
   });
 
   const authQuery = useQuery<{ user: { id: number; email: string; role: string } }>({
-    queryKey: ["/api/auth/me"],
+    queryKey: [apiPath("GET /api/auth/me")],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/auth/me");
+      const res = await apiRequest(...apiTo("GET /api/auth/me"));
       if (!res.ok) throw new Error("Failed to load account access");
-      return res.json();
+      const body = requireResponseRecord(await res.json());
+      requireResponseRecord(body.user);
+      return body as { user: { id: number; email: string; role: string } };
     },
     enabled: !!merchantId,
   });
   const isOwner = authQuery.data?.user?.role === "owner" || authQuery.data?.user?.role === "admin";
+  // R1-T5d: the owner's own "Sign in with Apple" row (Account). The server refuses everyone else.
+  const apple = useAppleConnection(authQuery.data?.user?.role === "owner");
 
   const cardQuery = useQuery<{ ready: boolean; card: { last4: string; brand: string | null; expiry: string | null } | null }>({
-    queryKey: ["/api/billing/card"],
+    queryKey: [apiPath("GET /api/billing/card")],
+    select: (body) => { requireResponseRecord(body); if (typeof body.ready !== "boolean") throw new Error("Invalid card response"); return body; },
     enabled: !!merchantId && isOwner,
   });
 
@@ -264,10 +278,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   /* ── mutations ── */
   const saveDetails = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}`, {
+      const res = await sessionFetch(apiPath("PUT /api/merchants/:id", { id: merchantId }), {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessName: details.businessName,
           gstNumber: details.gstNumber,
@@ -278,7 +291,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       setDetailsDirty(false);
       toast({ title: "Business details saved successfully" });
     },
@@ -287,26 +300,25 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const saveGoal = useMutation({
     mutationFn: async (goal: string) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/daily-goal`, {
+      const res = await sessionFetch(apiPath("PUT /api/merchants/:id/daily-goal", { id: merchantId }), {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dailyGoal: goal }),
       });
       if (!res.ok) throw new Error("Failed to update daily goal");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       toast({ title: "Daily goal saved" });
     },
     onError: () => toast({ title: "Failed to save daily goal", variant: "destructive" }),
   });
 
   const teamQuery = useQuery<{ members: TeamMember[]; seatLimit: number; seatsInUse: number }>({
-    queryKey: ["/api/team"],
+    queryKey: [apiPath("GET /api/team")],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/team");
+      const res = await apiRequest(...apiTo("GET /api/team"));
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to load team logins");
       return body;
@@ -315,9 +327,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   });
 
   const billingHistoryQuery = useQuery<{ history: BillingHistoryEntry[] }>({
-    queryKey: ["/api/subscription/billing-history"],
+    queryKey: [apiPath("GET /api/subscription/billing-history")],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/subscription/billing-history?limit=12");
+      const res = await apiRequest("GET", `${apiPath("GET /api/subscription/billing-history")}?limit=12`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to load billing history");
       return body;
@@ -326,15 +338,15 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   });
 
   const refreshBilling = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/team"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription/billing-history")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/team")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] });
   };
 
   const changePlan = useMutation({
     mutationFn: async (planId: PlanId) => {
-      const res = await apiRequest("PUT", "/api/subscription/plan", { planId });
+      const res = await apiRequest(...apiTo("PUT /api/subscription/plan"), { planId });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { message?: string }).message || "Failed to change plan");
       return body;
@@ -348,7 +360,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const inviteMember = useMutation({
     mutationFn: async (email: string) => {
-      const res = await apiRequest("POST", "/api/team/invite", { email });
+      const res = await apiRequest(...apiTo("POST /api/team/invite"), { email });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { message?: string }).message || "Failed to send invite");
       return body;
@@ -363,7 +375,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const removeMember = useMutation({
     mutationFn: async (userId: number) => {
-      const res = await apiRequest("DELETE", `/api/team/${userId}`, undefined);
+      const res = await apiRequest(...apiTo("DELETE /api/team/:userId", { userId }), undefined);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { message?: string }).message || "Failed to remove login");
       return body;
@@ -377,7 +389,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const memberStatus = useMutation({
     mutationFn: async ({ userId, status }: { userId: number; status: "active" | "disabled" }) => {
-      const res = await apiRequest("PUT", `/api/team/${userId}/status`, { status });
+      const res = await apiRequest(...apiTo("PUT /api/team/:userId/status", { userId }), { status });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to update login");
       return body;
@@ -391,7 +403,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const resendInvite = useMutation({
     mutationFn: async (userId: number) => {
-      const res = await apiRequest("POST", `/api/team/${userId}/resend`, {});
+      const res = await apiRequest(...apiTo("POST /api/team/:userId/resend", { userId }), {});
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to resend invite");
       return body;
@@ -405,7 +417,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const revokeInvite = useMutation({
     mutationFn: async (userId: number) => {
-      const res = await apiRequest("DELETE", `/api/team/${userId}/invite`, undefined);
+      const res = await apiRequest(...apiTo("DELETE /api/team/:userId/invite", { userId }), undefined);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to revoke invite");
       return body;
@@ -419,7 +431,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const cancelSubscription = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/cancel", { reason: cancellationReason.trim() });
+      const res = await apiRequest(...apiTo("POST /api/subscription/cancel"), { reason: cancellationReason.trim() });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to cancel subscription");
       return body;
@@ -435,7 +447,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const resumeSubscription = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/resume", {});
+      const res = await apiRequest(...apiTo("POST /api/subscription/resume"), {});
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to resume subscription");
       return body;
@@ -449,7 +461,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const changePassword = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PUT", `/api/merchants/${merchantId}/change-password`, pw);
+      const res = await apiRequest(...apiTo("PUT /api/merchants/:id/change-password", { id: merchantId }), pw);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as { message?: string }).message || "Failed to change password");
@@ -457,13 +469,13 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       return res.json();
     },
     onSuccess: (data: unknown) => {
-      // The change ended every session of this login (R1-T4 phase D); this device
-      // carries on under the fresh token the server returned.
-      const token = (data as { token?: unknown } | null)?.token;
-      if (typeof token === "string" && token) {
-        localStorage.setItem("authToken", token);
+      // The change ended every session of this login (R1-T4 phase D); this device carries on under
+      // the new session the server started, whose cookie it now holds, with its CSRF token (phase E).
+      const csrfToken = (data as { csrfToken?: unknown } | null)?.csrfToken;
+      if (typeof csrfToken === "string" && csrfToken) {
+        replaceCsrfToken("business", csrfToken);
         // The change also stopped every device's notifications; this one resumes.
-        void resyncThisDevicePush(token);
+        void resyncThisDevicePush();
       }
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
       toast({ title: "Password changed", description: "Your other devices have been signed out." });
@@ -476,8 +488,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const startCardSetup = async () => {
     setCardBusy("save");
     try {
-      const res = await apiRequest("POST", "/api/billing/card/session", {});
+      const res = await apiRequest(...apiTo("POST /api/billing/card/session"), {},{idempotencyKey:billingCardCommandKey(merchantId)});
       const body = await res.json().catch(() => ({}));
+      if(body?.pending){if(body.sessionId)sessionStorage.setItem(BILLING_CARD_SESSION_KEY,body.sessionId);throw new Error('Your original card setup is still being confirmed. Refresh shortly.');}
       if (!res.ok || !body?.redirectUrl) {
         throw new Error((body as { message?: string }).message || "Could not start card setup");
       }
@@ -492,16 +505,14 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const removeCard = async () => {
     setCardBusy("remove");
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch("/api/billing/card", {
+      const res = await creationFetch(apiPath("DELETE /api/billing/card"), {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to remove card");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+        queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] }),
+        queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/auth/me")] }),
       ]);
       toast({ title: "Card removed" });
     } catch (error: unknown) {
@@ -544,16 +555,17 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     setLocation(path);
   };
 
+  // After "Sign out of all devices" the server has already ended this session too.
   const signOutThisDevice = () => {
-    localStorage.removeItem("authToken");
+    forgetThisDeviceSignIn();
     setLocation("/login");
   };
 
-  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
-  // notifications, with the token it is discarding.
-  const logout = () => {
-    void stopThisDevicePush(localStorage.getItem("authToken"));
-    signOutThisDevice();
+  // R1-T4: Log Out stops this device's notifications (owner decision 2026-09-22), then ends this
+  // session on the server (phase E).
+  const logout = async () => {
+    await logOut();
+    setLocation("/login");
   };
 
   const signOutAllDevices = async () => {
@@ -671,7 +683,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                 </span>
                 <span className="ds-mode-text">
                   <span className="ds-mode-label" style={{ color: m.on ? NAVY : "#FFFFFF" }}>{m.label}</span>
-                  <span className="ds-mode-sub" style={{ color: m.on ? "rgba(10,17,40,0.66)" : "rgba(255,255,255,0.55)" }}>
+                  <span className="ds-mode-sub" style={{ color: m.on ? "#0A1128" : "rgba(255,255,255,0.7)" }}>
                     {m.sub}
                   </span>
                 </span>
@@ -1142,7 +1154,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                             : `${status} — contact support if you need help`}
                       </span>
                     </div>
-                    <div className="ds-row ds-row-last ds-row-tall">
+                    <div className={`ds-row${apple.visible ? "" : " ds-row-last"} ds-row-tall`}>
                       <span className="ds-row-label">Password</span>
                       <span className="ds-card-form">
                         <input
@@ -1179,6 +1191,51 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         </button>
                       </span>
                     </div>
+                    {/* R1-T5d: Sign in with Apple for this login. Drawn for the owner, where Apple can be
+                        connected or already is; connecting and disconnecting ask for the current password. */}
+                    {apple.visible && (
+                      <div className="ds-row ds-row-last ds-row-tall" data-testid="apple-connection">
+                        <span className="ds-row-text">
+                          <span className="ds-row-label">Sign in with Apple</span>
+                          <span className="ds-row-sub">
+                            {apple.connected
+                              ? `Connected${apple.email ? ` · ${apple.email}` : ""}${apple.isPrivateEmail ? " (Hide My Email)" : ""}`
+                              : "Not connected"}
+                          </span>
+                        </span>
+                        <span className="ds-card-form">
+                          <input
+                            className="ds-inline-input"
+                            type="password"
+                            autoComplete="current-password"
+                            value={apple.password}
+                            onChange={(e) => apple.setPassword(e.target.value)}
+                            placeholder="current password"
+                            aria-label="Current password for Apple"
+                            style={{ width: 150 }}
+                          />
+                          <button
+                            type="button"
+                            className="ds-primary ds-primary-sm"
+                            disabled={apple.busy || !apple.password}
+                            onClick={apple.submit}
+                            data-testid="button-apple-connection"
+                          >
+                            {apple.connected ? "Disconnect Apple" : "Connect Apple"}
+                          </button>
+                          {!apple.connected && (
+                            <button
+                              type="button"
+                              className="ds-ghost"
+                              onClick={() => setLocation("/forgot-password")}
+                              data-testid="link-apple-set-password"
+                            >
+                              No password yet?
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 

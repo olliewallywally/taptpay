@@ -131,8 +131,9 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
         {TIMEFRAMES.map((t, i) => (
           <button key={t} type="button" ref={el => (btnRefs.current[i] = el)}
             className="pd-tap" onPointerDown={pulse}
+            aria-pressed={tf === t}
             onClick={() => onPick(t)}
-            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? NAVY : 'rgba(88,171,255,0.55)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
+            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? NAVY : '#93BAFF', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
             {t}
           </button>
         ))}

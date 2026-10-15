@@ -1,21 +1,16 @@
 // Utility functions for authentication
+import { heldSession } from "./session";
 
-export function decodeJWT(token: string): any {
-  try {
-    const payload = token.split('.')[1];
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
-  } catch (error) {
-    console.error('Failed to decode JWT:', error);
-    return null;
-  }
-}
-
-export function getCurrentUser(): any {
-  const token = localStorage.getItem('authToken');
-  if (!token) return null;
-  
-  return decodeJWT(token);
+/**
+ * The signed-in business login, as the start-up check read it (R1-T4 phase E: the sign-in is an HttpOnly
+ * cookie the page cannot read, so nothing is decoded from storage). Null before the check has answered
+ * and when no one is signed in. `userId` is kept for the callers written against the old token's claims.
+ */
+export function getCurrentUser(): { id: number; userId: number; email: string; merchantId: number | null; role: string } | null {
+  const session = heldSession("business");
+  if (!session) return null;
+  const { user } = session;
+  return { id: user.id, userId: user.id, email: user.email, merchantId: user.merchantId, role: user.role };
 }
 
 export function getCurrentMerchantId(): number | null {

@@ -172,3 +172,82 @@ describe("customer-payment — a board's page is unchanged", () => {
     expect(screen.getByText("Waiting for Payment")).toBeInTheDocument();
   });
 });
+
+/**
+ * R1-T10c: found by the device matrix's look at what a customer opens. The server calls a board's
+ * "active" sale its newest open one, or else one completed in the last three minutes (so the
+ * business's own terminal can show that it was paid). The board's page showed "Something went wrong —
+ * We couldn't connect to the payment page" for any sale it was handed that was not waiting to be paid,
+ * with every request answered: so for three minutes after each sale, and while someone else was
+ * paying, the next customer to open the board was told of a fault that was not there.
+ */
+describe("customer-payment — a board whose sale is not waiting to be paid", () => {
+  beforeEach(() => {
+    mockParams = { merchantId: "1", stoneId: "3" };
+  });
+
+  const board = (sale: unknown) => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/merchants/1/stone/3/brand") return jsonResponse(200, { businessName: "Shop", customLogoUrl: null });
+      if (url === "/api/merchants/1/active-transaction?stoneId=3") return jsonResponse(200, sale);
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+  };
+  const settle = () => act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+
+  test.each([
+    ["has just been paid", "completed"],
+    ["is being paid by someone else", "processing"],
+  ])("a board whose newest sale %s waits for the next one, and reports no fault", async (_what, status) => {
+    board({ id: 9, status, taptStoneId: 3, splitEnabled: false, isSplit: false });
+
+    renderWithQuery(<CustomerPayment />);
+    expect(await screen.findByText("Waiting for Payment")).toBeInTheDocument();
+    await settle();
+
+    expect(screen.getByText("Waiting for Payment")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    expect(screen.queryByText("We couldn't connect to the payment page")).not.toBeInTheDocument();
+    expect(screen.queryByText("Payment Successful!")).not.toBeInTheDocument();
+    // It is nobody's to pay: the customer is not moved on, to checkout or to a receipt.
+    expect(mockSetLocation).not.toHaveBeenCalled();
+  });
+
+  test("on its way to checkout it shows the waiting screen, never the fault screen", async () => {
+    board({ id: 42, status: "pending", taptStoneId: 3, splitEnabled: false, isSplit: false });
+
+    renderWithQuery(<CustomerPayment />);
+    await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/checkout/42"));
+    await settle();
+
+    // Here the move is a stand-in, so the page stays up: what it shows is what a customer sees for the
+    // moment before checkout opens.
+    expect(screen.getByText("Waiting for Payment")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+
+  test("a sale that fails while the page is open is still said to have failed, with a way to try again", async () => {
+    board(null);
+    renderWithQuery(<CustomerPayment />);
+    await screen.findByText("Waiting for Payment");
+
+    emit("transaction_updated", { addressingMode: "board", stoneId: 3, transaction: { id: 42, status: "failed", taptStoneId: 3 } });
+
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(screen.getByTestId("button-retry")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for Payment")).not.toBeInTheDocument();
+  });
+
+  test("a sale paid while the page is open is still thanked for", async () => {
+    board(null);
+    renderWithQuery(<CustomerPayment />);
+    await screen.findByText("Waiting for Payment");
+
+    emit("transaction_updated", { addressingMode: "board", stoneId: 3, transaction: { id: 42, status: "completed", taptStoneId: 3 } });
+
+    expect(await screen.findByText("Payment Successful!")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+});

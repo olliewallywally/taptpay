@@ -14,6 +14,10 @@ import {
   getPortConflictHelp 
 } from "./port-manager";
 import { createGlobalErrorHandler } from "./http-error-handler";
+import {getPaymentRuntime} from './payment-runtime-default';
+import {startPaymentReconciliationLoop} from './payment-runtime';
+import {getSubscriptionPaymentRuntime,startSubscriptionPaymentLoop} from './subscription-payment-runtime';
+import {createPaymentDeliveryRuntime,startPaymentDeliveryLoop} from './payment-delivery-runtime';
 
 const isProduction = config.isProduction;
 
@@ -23,7 +27,7 @@ const app = createApp({ writeRequestLog: log });
 
 (async () => {
   for (const diagnostic of config.diagnostics) {
-    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.key}`);
+    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.message}`);
   }
 
   // ── Database connectivity verification ───────────────────────────────────
@@ -115,6 +119,17 @@ const app = createApp({ writeRequestLog: log });
 
 
   const server = await registerRoutes(app);
+  // Cash/manual command delivery also runs while provider querying is paused.
+  if(isDatabaseConnected()){
+    const delivery=createPaymentDeliveryRuntime();if(delivery)server.once('close',startPaymentDeliveryLoop(delivery));
+  }
+  // Reconciliation has its own reviewed switch; initiation switches are never
+  // consulted by the worker. Importing routes/tests starts no background work.
+  if(config.features.providerReconciliation && isDatabaseConnected() && config.windcave.username && config.windcave.apiKey){
+    const runtime=getPaymentRuntime();if(runtime){const stop=startPaymentReconciliationLoop(runtime);server.once('close',stop);}
+    const subscription=getSubscriptionPaymentRuntime(runtime?.repository);
+    if(subscription){const stop=startSubscriptionPaymentLoop(subscription);server.once('close',stop);}
+  }
 
   // Demo data is an explicit development/test action. A requested seed failure
   // is fatal instead of being hidden behind a warning.

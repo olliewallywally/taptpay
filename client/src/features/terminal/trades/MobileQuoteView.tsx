@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { QuoteViewProps } from './TradesTerminalView';
 import { formatNzd as money } from '@/lib/trades-money';
+import { inertWhen } from '../inert-when';
 import './mobile-quote-view.css';
 
 type Recipient = { name: string; email: string; address: string };
@@ -95,7 +96,7 @@ export function MobileQuoteView(p: MobileQuoteViewProps) {
               <button ref={directoryButton} type="button" className="mq-directory-trigger" aria-label="Choose client" aria-expanded={directoryOpen} aria-controls="mq-client-directory" data-demo-id="trades-quote-client" onClick={() => setDirectoryOpen(open => !open)}>
                 <span>{selected ? `${selected.firstName} ${selected.lastName}` : 'choose client'}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
-              <div className="mq-directory-reveal" aria-hidden={!directoryOpen} {...(!directoryOpen ? { inert: '' } as Record<string, string> : {})}>
+              <div className="mq-directory-reveal" aria-hidden={!directoryOpen} {...inertWhen(!directoryOpen)}>
                 <div className="mq-directory-clip"><div id="mq-client-directory" role="region" aria-label="Client directory" className="mq-directory-content">
                   <input aria-label="Search clients" placeholder="search clients" value={search} onChange={e => setSearch(e.target.value)} />
                   <div className="mq-directory-list">{directoryClients.map(c => <button type="button" key={c.id} aria-pressed={c.id === p.clientId} onClick={() => chooseClient(c.id)}><span className="mq-client-avatar" aria-hidden="true">{c.firstName?.[0]}{c.lastName?.[0]}</span><span><strong>{c.firstName} {c.lastName}</strong><small>{c.siteAddress || c.email || ''}</small></span></button>)}{directoryClients.length === 0 && <p>no clients found</p>}</div>

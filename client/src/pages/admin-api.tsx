@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { logOutAdmin } from "@/lib/session";
 import { 
   Key, 
   Plus, 
@@ -219,8 +220,9 @@ export default function AdminApi() {
             <div className="pt-4 mt-4 border-t border-gray-600">
               <button 
                 onClick={() => {
-                  localStorage.removeItem('admin-token');
-                  window.location.href = '/admin/login';
+                  // R1-T4 phase E: the server ends this admin session. (This cleared a storage key
+                  // no sign-in was ever kept under, and so signed no one out.)
+                  void logOutAdmin().then(() => { window.location.href = '/admin/login'; });
                 }}
                 className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors"
               >

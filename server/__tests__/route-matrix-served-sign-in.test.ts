@@ -2,10 +2,12 @@ import "./support/test-env";
 // The email a success sends goes through the mocked provider below, so its recipient and link are read.
 import "./support/resend-capture-env";
 import "./support/google-oauth-test-env";
+import { APPLE_TEST_SERVICES_ID } from "./support/apple-sign-in-test-env";
 import { ADMIN_TEST_PASSWORD } from "./support/admin-sign-in-test-env";
 
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 
 type Sent = { to: string | string[]; subject: string; html?: string; text?: string };
@@ -21,12 +23,13 @@ jest.mock("resend", () => ({
   })),
 }));
 
-import { VALID_PASSWORD, bearer, resetTestStorage, storage } from "./support/http-harness";
+import { VALID_PASSWORD, signedIn, type SignedIn, resetTestStorage, storage } from "./support/http-harness";
+import { adminSessionBegunBy, businessSessionBegunBy } from "./support/session-browser";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   type OwnServedCaller,
   type OwnServedRecipe,
   type ServedCtx,
@@ -50,6 +53,8 @@ jest.setTimeout(30_000);
 
 const OAUTH_COOKIE = "__Host-taptpay-google-oauth";
 const HANDOFF_COOKIE = "__Host-taptpay-google-handoff";
+const APPLE_OAUTH_COOKIE = "__Host-taptpay-apple-oauth";
+const APPLE_HANDOFF_COOKIE = "__Host-taptpay-apple-handoff";
 const DEVICE_COOKIE = "__Secure-taptpay-signin-device";
 const ADMIN_DEVICE_COOKIE = "__Secure-taptpay-admin-signin-device";
 const CONFIRM_SUBJECT = "Confirm your TaptPay email address";
@@ -71,7 +76,7 @@ const cookieValue = (line: string | undefined) => line?.split(";")[0].split("=")
 
 const signIn = (ctx: ServedCtx, address: string, password: string) =>
   request(ctx.app).post("/api/auth/login").send({ email: address, password });
-const me = (ctx: ServedCtx, token: string) => request(ctx.app).get("/api/auth/me").set(bearer({ token }));
+const me = (ctx: ServedCtx, who: SignedIn) => request(ctx.app).get("/api/auth/me").set(signedIn(who));
 
 /** Google's answers: its token exchange and the profile of the account that signed in. */
 let google: { id: string; email: string; name: string; verified_email: boolean };
@@ -82,6 +87,28 @@ function stubGoogle() {
       return new Response(JSON.stringify({ access_token: "synthetic-google-access-token" }), { status: 200 });
     }
     if (url === "https://www.googleapis.com/oauth2/v2/userinfo") return new Response(JSON.stringify(google), { status: 200 });
+    throw new Error(`unexpected outbound request in test: ${url}`);
+  });
+}
+
+/**
+ * Apple's answers (R1-T5b): its token exchange, answering with an identity token it signs for the
+ * person and the nonce this browser was given, and the key set that verifies it. The key is made here.
+ */
+const appleKey = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+function stubApple(person: { sub: string; email?: string }, nonce: string) {
+  const now = Math.floor(Date.now() / 1000);
+  const idToken = jwt.sign(
+    { iss: "https://appleid.apple.com", aud: APPLE_TEST_SERVICES_ID, sub: person.sub, nonce, iat: now - 5, exp: now + 600,
+      ...(person.email ? { email: person.email, email_verified: "true", is_private_email: "false" } : {}) },
+    appleKey.privateKey, { algorithm: "RS256", header: { alg: "RS256", kid: "apple-key-matrix" } as any },
+  );
+  jest.spyOn(global, "fetch").mockImplementation(async (input: any) => {
+    const url = String(input);
+    if (url === "https://appleid.apple.com/auth/keys") {
+      return new Response(JSON.stringify({ keys: [{ ...appleKey.publicKey.export({ format: "jwk" }), kid: "apple-key-matrix", use: "sig", alg: "RS256" }] }), { status: 200 });
+    }
+    if (url === "https://appleid.apple.com/auth/token") return new Response(JSON.stringify({ id_token: idToken }), { status: 200 });
     throw new Error(`unexpected outbound request in test: ${url}`);
   });
 }
@@ -106,6 +133,19 @@ async function resetLink(ctx: ServedCtx) {
 }
 
 const RECIPES: Record<string, OwnServedRecipe> = {
+  // R1-T4 phase E: the app's start-up check on a session cookie answers anyone, signed in or not.
+  "GET /api/auth/session": (ctx) => ({
+    req: get("/api/auth/session"), status: 200,
+    check: async (res) => {
+      expect(res.headers["cache-control"]).toMatch(/no-store/);
+      expect(res.body).toEqual({ signedIn: false });
+      // The same check with the owner's session cookie reads the owner.
+      const signIn = await request(ctx.app).post("/api/auth/login").send({ email: ctx.owner.user.email, password: VALID_PASSWORD });
+      const session = cookieValue(setCookies(signIn).get("__Host-taptpay-session"));
+      const read = await request(ctx.app).get("/api/auth/session").set("Cookie", `__Host-taptpay-session=${session}`);
+      expect(read.body).toMatchObject({ signedIn: true, user: { id: ctx.owner.user.id, merchantId: ctx.merchantId }, csrfToken: signIn.body.csrfToken });
+    },
+  }),
   // Google sign-in: the start, Google's return, and the browser redeeming its one-time code.
   "GET /api/auth/google": () => ({
     req: get("/api/auth/google"), status: 302,
@@ -140,6 +180,75 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       },
     };
   },
+  // Whether Sign in with Apple is offered here (R1-T5d): the login page asks before it shows the button.
+  "GET /api/auth/apple/available": () => ({
+    req: get("/api/auth/apple/available"), status: 200,
+    check: (res) => {
+      expect(res.body).toEqual({ available: true });
+      expect(res.headers["cache-control"]).toBe("no-store");
+    },
+  }),
+  // Sign in with Apple (R1-T5b): the start, Apple's form post back, and the browser redeeming its one-time code.
+  "GET /api/auth/apple": () => ({
+    req: get("/api/auth/apple"), status: 302,
+    check: (res) => {
+      const target = new URL(res.headers.location);
+      expect(target.origin + target.pathname).toBe("https://appleid.apple.com/auth/authorize");
+      expect(target.searchParams.get("response_mode")).toBe("form_post");
+      // The state and nonce it sends Apple are bound to this browser by an HttpOnly cookie that survives Apple's post back.
+      const cookie = setCookies(res).get(APPLE_OAUTH_COOKIE);
+      expect(cookie).toMatch(/HttpOnly/i);
+      expect(cookie).toMatch(/SameSite=None/i);
+      expect(cookieValue(cookie).split(".").slice(0, 2)).toEqual([target.searchParams.get("state"), target.searchParams.get("nonce")]);
+    },
+  }),
+  "POST /api/auth/apple/callback": async (ctx) => {
+    // Someone signs in with Apple for the first time, with an address no TaptPay login uses.
+    const person = { sub: `001234.${crypto.randomBytes(16).toString("hex")}.0123`, email: email("apple") };
+    const started = await request(ctx.app).get("/api/auth/apple");
+    const target = new URL(started.headers.location);
+    stubApple(person, target.searchParams.get("nonce")!);
+    const cookie = `${APPLE_OAUTH_COOKIE}=${cookieValue(setCookies(started).get(APPLE_OAUTH_COOKIE))}`;
+    return {
+      req: {
+        method: "post", path: "/api/auth/apple/callback",
+        // Apple's form post, from Apple's own origin.
+        form: { state: target.searchParams.get("state")!, code: "synthetic-apple-code" },
+        headers: { Cookie: cookie, Origin: "https://appleid.apple.com" },
+      },
+      status: 303,
+      check: async (res) => {
+        expect(res.headers.location).toBe("/login?apple=complete");
+        // A new business and its owner login, and a one-time code for that login: never a token in an address.
+        const business = await storage.getMerchantByEmail(person.email);
+        expect(business).toMatchObject({ email: person.email, status: "verified" });
+        const login = await storage.getUserByEmail(person.email);
+        const code = cookieValue(setCookies(res).get(APPLE_HANDOFF_COOKIE));
+        expect(await storage.consumeAuthHandoffCode(sha256(code), new Date())).toEqual({ userId: login!.id, newUser: true });
+        // The identity is that login's, by Apple's stable subject.
+        expect(await storage.getAppleIdentity({ issuer: "https://appleid.apple.com", clientId: APPLE_TEST_SERVICES_ID, subject: person.sub }))
+          .toMatchObject({ userId: login!.id, email: person.email });
+      },
+    };
+  },
+  "POST /api/auth/apple/session": async (ctx) => {
+    const code = crypto.randomBytes(32).toString("base64url");
+    await storage.createAuthHandoffCode({
+      codeHash: sha256(code), userId: ctx.owner.user.id, newUser: false, expiresAt: new Date(Date.now() + 60_000),
+    });
+    return {
+      req: post("/api/auth/apple/session", {}, { Cookie: `${APPLE_HANDOFF_COOKIE}=${code}` }), status: 200,
+      check: async (res) => {
+        expect(res.headers["cache-control"]).toMatch(/no-store/);
+        expect(res.body).toEqual({ merchantId: ctx.merchantId, newUser: false, csrfToken: expect.any(String) });
+        expect(setCookies(res).get("__Host-taptpay-session")).toMatch(/HttpOnly/i);
+        expect((await me(ctx, businessSessionBegunBy(res))).body.user).toMatchObject({ id: ctx.owner.user.id, merchantId: ctx.merchantId });
+        // The code is spent.
+        const again = await request(ctx.app).post("/api/auth/apple/session").set("Cookie", `${APPLE_HANDOFF_COOKIE}=${code}`);
+        expect(again.status).toBe(401);
+      },
+    };
+  },
   "POST /api/auth/google/session": async (ctx) => {
     const code = crypto.randomBytes(32).toString("base64url");
     await storage.createAuthHandoffCode({
@@ -149,8 +258,10 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       req: post("/api/auth/google/session", {}, { Cookie: `${HANDOFF_COOKIE}=${code}` }), status: 200,
       check: async (res) => {
         expect(res.headers["cache-control"]).toMatch(/no-store/);
-        expect(res.body).toEqual({ token: expect.any(String), merchantId: ctx.merchantId, newUser: false });
-        expect((await me(ctx, res.body.token)).body.user).toMatchObject({ id: ctx.owner.user.id, merchantId: ctx.merchantId });
+        // R1-T4 phase E: the sign-in is a session cookie and the page's CSRF token; no token is handed out (E3).
+        expect(res.body).toEqual({ merchantId: ctx.merchantId, newUser: false, csrfToken: expect.any(String) });
+        expect(setCookies(res).get("__Host-taptpay-session")).toMatch(/HttpOnly/i);
+        expect((await me(ctx, businessSessionBegunBy(res))).body.user).toMatchObject({ id: ctx.owner.user.id, merchantId: ctx.merchantId });
         // The code is spent.
         expect(await storage.consumeAuthHandoffCode(sha256(code), new Date())).toBeUndefined();
       },
@@ -161,18 +272,26 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     req: post("/api/auth/login", { email: ctx.owner.user.email, password: VALID_PASSWORD }), status: 200,
     check: async (res) => {
       expect(res.body.user).toEqual({ id: ctx.owner.user.id, email: ctx.owner.user.email, merchantId: ctx.merchantId, role: "owner" });
-      expect((await me(ctx, res.body.token)).status).toBe(200);
+      expect(Object.keys(res.body).sort()).toEqual(["csrfToken", "user"]); // no token is handed out (E3)
+      expect((await me(ctx, businessSessionBegunBy(res))).status).toBe(200);
       // This browser is now a known device for the login (its own sign-in slow-down).
       expect(setCookies(res).get(DEVICE_COOKIE)).toMatch(/HttpOnly/i);
+      // R1-T4 phase E: the sign-in is a session cookie, with the page's CSRF token in the body.
+      expect(setCookies(res).get("__Host-taptpay-session")).toMatch(/HttpOnly/i);
+      expect(res.body.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     },
   }),
   "POST /api/admin/auth/login": (ctx) => ({
     req: post("/api/admin/auth/login", { email: "admin@harness.test", password: ADMIN_TEST_PASSWORD }), status: 200,
     check: async (res) => {
       expect(res.body.user).toEqual({ id: 1, email: "admin@harness.test", merchantId: 0, role: "admin" });
-      const admin = await request(ctx.app).get("/api/admin/auth/me").set(bearer({ token: res.body.token }));
+      expect(Object.keys(res.body).sort()).toEqual(["csrfToken", "user"]); // no token is handed out (E3)
+      const admin = await request(ctx.app).get("/api/admin/auth/me").set(signedIn(adminSessionBegunBy(res)));
       expect(admin.status).toBe(200);
       expect(setCookies(res).get(ADMIN_DEVICE_COOKIE)).toMatch(/HttpOnly/i);
+      // R1-T4 phase E: the admin's own session cookie, with the page's CSRF token in the body.
+      expect(setCookies(res).get("__Host-taptpay-admin-session")).toMatch(/HttpOnly/i);
+      expect(res.body.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     },
   }),
   // A forgotten password: the link is emailed, checked, and used.
@@ -200,7 +319,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
         expect(res.body).toEqual({ message: expect.any(String) });
         // The new password signs in; every session from before is ended; the link is spent.
         expect((await signIn(ctx, ctx.owner.user.email, NEW_PASSWORD)).status).toBe(200);
-        expect((await me(ctx, ctx.owner.token)).body.code).toBe("SESSION_ENDED");
+        expect((await me(ctx, ctx.owner)).body.code).toBe("SESSION_ENDED");
         expect((await request(ctx.app).get(`/api/auth/validate-reset-token/${token}`)).body).toEqual({ valid: false });
       },
     };
@@ -272,8 +391,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(auth\/|admin\/auth\/login$|merchants\/signup$|team\/accept-invite$)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("sign-in");
 const SERVED = ownServedPairs(ROWS);
 
 /**
@@ -281,9 +399,14 @@ const SERVED = ownServedPairs(ROWS);
  * a review that stopped naming a caller (or started naming one) cannot quietly drop or add a case here.
  */
 const SERVED_BY: Record<string, OwnServedCaller[]> = {
+  "GET /api/auth/session": ["signed-out"],
   "GET /api/auth/google": ["signed-out"],
   "GET /api/auth/google/callback": ["signed-out"],
   "POST /api/auth/google/session": ["link-holder"],
+  "GET /api/auth/apple": ["signed-out"],
+  "GET /api/auth/apple/available": ["signed-out"],
+  "POST /api/auth/apple/callback": ["signed-out"],
+  "POST /api/auth/apple/session": ["link-holder"],
   "POST /api/auth/login": ["signed-out"],
   "POST /api/admin/auth/login": ["signed-out"],
   "POST /api/auth/forgot-password": ["signed-out"],

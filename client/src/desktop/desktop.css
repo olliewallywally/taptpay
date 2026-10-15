@@ -286,6 +286,18 @@
   overflow: visible;
 }
 
+/* Keep native text enlargement instead of refitting it away. The accepted
+   frame stays in place; keyboard focus and scrolling reach the larger canvas. */
+.tapt-desktop-scale-stage[data-browser-zoomed="true"] {
+  display: block;
+  overflow: auto;
+  scrollbar-width: auto;
+}
+.tapt-desktop-scale-stage[data-browser-zoomed="true"]::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
 .tapt-desktop-scale-content {
   position: absolute;
   top: 0;

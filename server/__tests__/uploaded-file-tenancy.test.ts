@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import * as auth from "../auth";
 import {
-  bearer,
+  signedIn, type SignedIn,
   createAdminPrincipal,
   createMemberPrincipal,
   createOwnerPrincipal,
@@ -14,6 +14,7 @@ import {
   resetTestStorage,
   storage,
 } from "./support/http-harness";
+import { ADMIN_COOKIE } from "./support/session-browser";
 
 /**
  * Gap 13 (R1-T7 / plan §8.5 "uploads", §22.8 "authenticate and tenant-authorize
@@ -33,10 +34,10 @@ const binaryParser = (res: any, callback: (err: Error | null, body: Buffer) => v
   res.on("end", () => callback(null, Buffer.concat(chunks)));
 };
 
-async function uploadInvoiceDocument(app: any, principal: { token: string }, bytes: Buffer = PDF_BYTES) {
+async function uploadInvoiceDocument(app: any, principal: SignedIn, bytes: Buffer = PDF_BYTES) {
   const res = await request(app)
     .post("/api/property/invoices/document")
-    .set(bearer(principal))
+    .set(signedIn(principal))
     .attach("document", bytes, { filename: "bill.pdf", contentType: "application/pdf" });
   expect(res.status).toBe(200);
   const documentUrl = res.body.documentUrl as string;
@@ -56,10 +57,10 @@ describe("gap 13 — uploaded files carry their tenant", () => {
 
     const { relPath } = await uploadInvoiceDocument(app, a);
 
-    expect((await storage.getUploadedFileForMerchant(relPath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
-    expect(await storage.getUploadedFileForMerchant(relPath, b.merchantId)).toBeUndefined();
-    expect(await storage.uploadedFileOwnedByMerchant(relPath, a.merchantId)).toBe(true);
-    expect(await storage.uploadedFileOwnedByMerchant(relPath, b.merchantId)).toBe(false);
+    expect((await storage.getCleanUploadedFileForMerchant(relPath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
+    expect(await storage.getCleanUploadedFileForMerchant(relPath, b.merchantId)).toBeUndefined();
+    expect(await storage.cleanUploadedFileOwnedByMerchant(relPath, a.merchantId)).toBe(true);
+    expect(await storage.cleanUploadedFileOwnedByMerchant(relPath, b.merchantId)).toBe(false);
   });
 
   it("a logo upload is stamped with its merchant", async () => {
@@ -68,20 +69,23 @@ describe("gap 13 — uploaded files carry their tenant", () => {
 
     const upload = await request(app)
       .post(`/api/merchants/${a.merchantId}/logo`)
-      .set(bearer(a))
+      .set(signedIn(a))
       .attach("logo", PNG_BYTES, "logo.png");
     expect(upload.status).toBe(200);
 
-    expect(await storage.uploadedFileOwnedByMerchant(`logos/merchant-${a.merchantId}.png`, a.merchantId)).toBe(true);
+    // A logo is not a document: it is not scanned, so no document reader finds it (R1-T7 S6a).
+    // Its stamp is what the tenant-scoped delete and the gap-13 ownership rule go by.
+    expect((storage as any).uploadedFileBlobs.get(`logos/merchant-${a.merchantId}.png`)).toMatchObject({ merchantId: a.merchantId });
+    expect(await storage.cleanUploadedFileOwnedByMerchant(`logos/merchant-${a.merchantId}.png`, a.merchantId)).toBe(false);
   });
 
   it("tenant-scoped reads reject a non-positive or non-integer tenant instead of matching anything", async () => {
     const a = await createOwnerPrincipal();
-    await storage.saveUploadedFile("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", "application/pdf", PDF_BYTES, a.merchantId);
+    await storage.saveScannedUploadedFile("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", "application/pdf", PDF_BYTES, a.merchantId, { scanner: "simulation" });
 
     for (const bad of [0, -1, 1.5, Number.NaN]) {
-      expect(await storage.getUploadedFileForMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBeUndefined();
-      expect(await storage.uploadedFileOwnedByMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBe(false);
+      expect(await storage.getCleanUploadedFileForMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBeUndefined();
+      expect(await storage.cleanUploadedFileOwnedByMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBe(false);
     }
   });
 
@@ -89,32 +93,32 @@ describe("gap 13 — uploaded files carry their tenant", () => {
     const a = await createOwnerPrincipal();
     const b = await createOwnerPrincipal();
     const samePath = "invoices/invoice-1700000000000-bbbbbbbbbbbbbbbb.pdf";
-    await storage.saveUploadedFile(samePath, "application/pdf", PDF_BYTES, a.merchantId);
+    await storage.saveScannedUploadedFile(samePath, "application/pdf", PDF_BYTES, a.merchantId, { scanner: "simulation" });
 
     await expect(
-      storage.saveUploadedFile(samePath, "application/pdf", Buffer.from("%PDF-1.4\nattacker"), b.merchantId),
+      storage.saveScannedUploadedFile(samePath, "application/pdf", Buffer.from("%PDF-1.4\nattacker"), b.merchantId, { scanner: "simulation" }),
     ).rejects.toThrow();
 
-    expect((await storage.getUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
-    expect(await storage.getUploadedFileForMerchant(samePath, b.merchantId)).toBeUndefined();
+    expect((await storage.getCleanUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
+    expect(await storage.getCleanUploadedFileForMerchant(samePath, b.merchantId)).toBeUndefined();
 
     // The owner may still overwrite their own path (logo re-upload relies on this).
     const v2 = Buffer.from("%PDF-1.4\nowner-v2");
-    await storage.saveUploadedFile(samePath, "application/pdf", v2, a.merchantId);
-    expect((await storage.getUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(v2)).toBe(true);
+    await storage.saveScannedUploadedFile(samePath, "application/pdf", v2, a.merchantId, { scanner: "simulation" });
+    expect((await storage.getCleanUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(v2)).toBe(true);
   });
 
   it("deleting is tenant-scoped: another merchant's delete removes nothing", async () => {
     const a = await createOwnerPrincipal();
     const b = await createOwnerPrincipal();
     const rel = "invoices/invoice-1700000000000-cccccccccccccccc.pdf";
-    await storage.saveUploadedFile(rel, "application/pdf", PDF_BYTES, a.merchantId);
+    await storage.saveScannedUploadedFile(rel, "application/pdf", PDF_BYTES, a.merchantId, { scanner: "simulation" });
 
     await storage.deleteUploadedFile(rel, b.merchantId);
-    expect(await storage.uploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(true);
+    expect(await storage.cleanUploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(true);
 
     await storage.deleteUploadedFile(rel, a.merchantId);
-    expect(await storage.uploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(false);
+    expect(await storage.cleanUploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(false);
   });
 
   it("logo delete cannot remove another merchant's blob even if this merchant's customLogoUrl points at it", async () => {
@@ -123,7 +127,7 @@ describe("gap 13 — uploaded files carry their tenant", () => {
     const b = await createOwnerPrincipal();
     const bUpload = await request(app)
       .post(`/api/merchants/${b.merchantId}/logo`)
-      .set(bearer(b))
+      .set(signedIn(b))
       .attach("logo", PNG_BYTES, "logo.png");
     expect(bUpload.status).toBe(200);
 
@@ -132,7 +136,7 @@ describe("gap 13 — uploaded files carry their tenant", () => {
     // depend on every caller having sanitised the URL.
     await storage.updateMerchantLogoUrl(a.merchantId, `/uploads/logos/merchant-${b.merchantId}.png`);
 
-    const del = await request(app).delete(`/api/merchants/${a.merchantId}/logo`).set(bearer(a));
+    const del = await request(app).delete(`/api/merchants/${a.merchantId}/logo`).set(signedIn(a));
     expect(del.status).toBe(200);
 
     const stillServed = await request(app).get(`/uploads/logos/merchant-${b.merchantId}.png`);
@@ -156,7 +160,7 @@ describe("gap 13 — the public /uploads route serves logos only", () => {
     const a = await createOwnerPrincipal();
     const upload = await request(app)
       .post(`/api/merchants/${a.merchantId}/logo`)
-      .set(bearer(a))
+      .set(signedIn(a))
       .attach("logo", PNG_BYTES, "logo.png");
     expect(upload.status).toBe(200);
 
@@ -206,7 +210,7 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
 
     const res = await request(app)
       .get(`/api/invoice-documents/${name}`)
-      .set(bearer(a))
+      .set(signedIn(a))
       .buffer(true)
       .parse(binaryParser);
 
@@ -223,7 +227,7 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
     const member = await createMemberPrincipal(a.merchantId);
     const { name } = await uploadInvoiceDocument(app, a);
 
-    const res = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(member));
+    const res = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(member));
 
     expect(res.status).toBe(200);
   });
@@ -234,10 +238,10 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
     const b = await createOwnerPrincipal();
     const { name } = await uploadInvoiceDocument(app, a);
 
-    const foreign = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(b));
+    const foreign = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(b));
     const missing = await request(app)
       .get("/api/invoice-documents/invoice-1700000000000-eeeeeeeeeeeeeeee.pdf")
-      .set(bearer(b));
+      .set(signedIn(b));
 
     expect(foreign.status).toBe(404);
     expect(missing.status).toBe(404);
@@ -259,13 +263,13 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
     const a = await createOwnerPrincipal();
     const upload = await request(app)
       .post(`/api/merchants/${a.merchantId}/logo`)
-      .set(bearer(a))
+      .set(signedIn(a))
       .attach("logo", PNG_BYTES, "logo.png");
     expect(upload.status).toBe(200);
 
     const res = await request(app)
       .get(`/api/invoice-documents/merchant-${a.merchantId}.png`)
-      .set(bearer(a));
+      .set(signedIn(a));
 
     expect(res.status).toBe(404);
   });
@@ -279,7 +283,7 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
 
-    const res = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(a));
+    const res = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(a));
 
     expect(res.status).toBe(404);
   });
@@ -297,12 +301,12 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
   it("lets the validated platform admin read another merchant's document, privately", async () => {
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const { name } = await uploadInvoiceDocument(app, a);
 
     const res = await request(app)
       .get(`/api/invoice-documents/${name}`)
-      .set(bearer(admin))
+      .set(signedIn(admin))
       .buffer(true)
       .parse(binaryParser);
 
@@ -317,12 +321,12 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
     const b = await createOwnerPrincipal();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const docA = await uploadInvoiceDocument(app, a, Buffer.concat([PDF_BYTES, Buffer.from("-a")]));
     const docB = await uploadInvoiceDocument(app, b, Buffer.concat([PDF_BYTES, Buffer.from("-b")]));
 
     for (const doc of [docA, docB]) {
-      const res = await request(app).get(`/api/invoice-documents/${doc.name}`).set(bearer(admin));
+      const res = await request(app).get(`/api/invoice-documents/${doc.name}`).set(signedIn(admin));
       expect(res.status).toBe(200);
     }
   });
@@ -330,15 +334,15 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
   it("writes an audit event for an admin read — and none for a merchant reading its own document", async () => {
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const { name } = await uploadInvoiceDocument(app, a);
     const log = jest.spyOn(auth, "logSecurityEvent").mockImplementation(() => undefined);
 
-    const own = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(a));
+    const own = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(a));
     expect(own.status).toBe(200);
     expect(log).not.toHaveBeenCalledWith("ADMIN_INVOICE_DOCUMENT_READ", expect.anything());
 
-    const adminRead = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(admin));
+    const adminRead = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(admin));
     expect(adminRead.status).toBe(200);
     expect(log).toHaveBeenCalledWith(
       "ADMIN_INVOICE_DOCUMENT_READ",
@@ -351,12 +355,12 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
 
   it("does not log an access when there was nothing to read", async () => {
     const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const log = jest.spyOn(auth, "logSecurityEvent").mockImplementation(() => undefined);
 
     const res = await request(app)
       .get("/api/invoice-documents/invoice-1700000000000-eeeeeeeeeeeeeeee.pdf")
-      .set(bearer(admin));
+      .set(signedIn(admin));
 
     expect(res.status).toBe(404);
     expect(log).not.toHaveBeenCalledWith("ADMIN_INVOICE_DOCUMENT_READ", expect.anything());
@@ -365,10 +369,10 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
   it("gives the admin no wider reach through this route: malformed names and other folders stay 404", async () => {
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const upload = await request(app)
       .post(`/api/merchants/${a.merchantId}/logo`)
-      .set(bearer(a))
+      .set(signedIn(a))
       .attach("logo", PNG_BYTES, "logo.png");
     expect(upload.status).toBe(200);
 
@@ -378,38 +382,53 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
       `merchant-${a.merchantId}.png`, // a logo, not an invoice document
       "invoice-1700000000000-gggggggggggggggg.pdf",
     ]) {
-      const res = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(admin));
+      const res = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(admin));
       expect(res.status).toBe(404);
     }
   });
 
   it("is still not reachable by a token that merely CLAIMS the admin role", async () => {
-    // The unlock is the validated principal, not the word "admin": these are
-    // rejected by authenticateToken before the route runs (JWT-signed with the
-    // harness secret so they are genuine tokens carrying unvalidated claims).
+    // The unlock is the admin area's own session, not the word "admin" in a token (JWT-signed with the
+    // harness secret, so each is genuinely the server's signature over unvalidated claims). The last
+    // is the very token the server once issued to the admin: R1-T4 phase E3 retired it.
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
     const { name } = await uploadInvoiceDocument(app, a);
     const secret = process.env.JWT_SECRET as string;
-    const adminEmail = createAdminPrincipal().user.email;
-    const forged = [
+    const adminEmail = (await createAdminPrincipal()).user.email;
+    const claimed = [
       // a merchant-principal token that says role: admin
       { principal: "user", userId: a.user.id, email: a.user.email, merchantId: a.merchantId, role: "admin" },
       // the admin principal, but not the configured admin email
       { principal: "admin", userId: 1, email: "someone-else@harness.test", merchantId: 0, role: "admin" },
       // the admin principal and email, but scoped to a merchant
       { principal: "admin", userId: 1, email: adminEmail, merchantId: a.merchantId, role: "admin" },
+      // the admin principal and email, with no merchant: what the admin's own sign-in was once given
+      { principal: "admin", userId: 1, email: adminEmail, merchantId: 0, role: "admin" },
     ];
 
-    for (const claims of forged) {
+    for (const claims of claimed) {
       const res = await request(app)
         .get(`/api/invoice-documents/${name}`)
         .set({ Authorization: `Bearer ${jwt.sign(claims, secret, { expiresIn: "1h" })}` })
         .buffer(true)
         .parse(binaryParser);
-      expect(res.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
+      expect({ claims, status: res.status }).toEqual({ claims, status: 401 }); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
       expect((res.body as Buffer).equals(PDF_BYTES)).toBe(false);
     }
+  });
+
+  it("is not reachable by another business's session presented under the admin's cookie name", async () => {
+    const { app } = await createTestApp();
+    const a = await createOwnerPrincipal();
+    const b = await createOwnerPrincipal();
+    const { name } = await uploadInvoiceDocument(app, a);
+    const asAdmin = { cookie: b.cookie.replace(/^[^=]+=/, `${ADMIN_COOKIE}=`), csrf: b.csrf };
+
+    const res = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(asAdmin)).buffer(true).parse(binaryParser);
+
+    expect(res.status).toBe(401);
+    expect((res.body as Buffer).equals(PDF_BYTES)).toBe(false);
   });
 });
 

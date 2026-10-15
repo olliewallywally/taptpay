@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { TradesReportsButton } from "@/components/reports/TradesReportsButton";
+import { apiPath } from "@shared/api-path";
 
 /* ── Design tokens (trades palette; mirrors property-analytics) ──
    The trades accent is near-black, so property's bright sky-blue accent role
@@ -16,7 +17,7 @@ const C = {
   sheet:     '#F4F4F4',
   handle:    'rgba(0,0,0,0.08)',
   textDark:  TRADES_THEME.INK,
-  textMuted: 'rgba(0,0,0,0.35)',
+  textMuted: '#586079',
   green:     '#22C55E',
   red:       '#EF4444',
 };
@@ -166,8 +167,8 @@ export default function TradesAnalytics() {
   const [totVis, setTotVis] = useState(true);
 
   const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/invoices'],
-    queryFn: () => tradesFetch('/api/trades/invoices').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/trades/invoices")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/invoices")).then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
   });
@@ -265,7 +266,7 @@ export default function TradesAnalytics() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+    <div className="accessibility-scroll-page" tabIndex={0} role="region" aria-label="Trades analytics" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
       <div ref={topRef} style={{ padding: '52px 24px 0' }}>
@@ -276,7 +277,7 @@ export default function TradesAnalytics() {
         {/* Period pills */}
         <div data-tutorial-id="ta-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
-            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button key={p} aria-pressed={tf === p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.7)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
             </button>
           ))}
@@ -284,7 +285,7 @@ export default function TradesAnalytics() {
 
         {/* Total */}
         <div data-tutorial-id="ta-total" style={{ textAlign: 'center', marginBottom: 4 }}>
-          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.7)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
           <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' }}>
             {totalStr}
           </p>
@@ -299,6 +300,7 @@ export default function TradesAnalytics() {
       {/* ── Swipeable white sheet ── */}
       <div
         ref={sheetRef}
+        className="analytics-history-sheet"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           height: '100svh',

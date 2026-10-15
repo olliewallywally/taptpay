@@ -3,7 +3,7 @@ import "./support/push-test-env";
 
 import request from "supertest";
 import {
-  bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
+  signedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
 } from "./support/http-harness";
 
 /**
@@ -16,12 +16,12 @@ beforeEach(() => resetTestStorage());
 
 const fcm = (name: string) => `https://fcm.googleapis.com/fcm/send/${name}`;
 const subscribe = (app: App, who: Principal, endpoint: string) =>
-  request(app).post("/api/push/subscribe").set(bearer(who))
+  request(app).post("/api/push/subscribe").set(signedIn(who))
     .send({ subscription: { endpoint, keys: { p256dh: `p256dh-${endpoint}`, auth: `auth-${endpoint}` } } });
 const setSwitches = (app: App, who: Principal, switches: Record<string, boolean>) =>
-  request(app).put("/api/push/preferences").set(bearer(who)).send(switches);
+  request(app).put("/api/push/preferences").set(signedIn(who)).send(switches);
 const switchesOf = async (app: App, who: Principal) =>
-  (await request(app).get("/api/push/preferences").set(bearer(who))).body.preferences;
+  (await request(app).get("/api/push/preferences").set(signedIn(who))).body.preferences;
 const rowOf = async (merchantId: number, endpoint: string) =>
   (await storage.getPushSubscriptionsByMerchant(merchantId)).find((sub) => sub.endpoint === endpoint);
 
@@ -67,7 +67,7 @@ describe("a device registers only through a browser push service", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const res = await request(app).post("/api/push/native-subscribe").set(bearer(owner)).send({ deviceToken: "owner-phone-token" });
+    const res = await request(app).post("/api/push/native-subscribe").set(signedIn(owner)).send({ deviceToken: "owner-phone-token" });
 
     expect(res.status).toBe(200);
     expect(await rowOf(owner.merchantId, "apns://owner-phone-token")).toMatchObject({ isActive: true });
@@ -137,10 +137,10 @@ describe("each login has its own notification switches", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
-    await request(app).post("/api/push/native-subscribe").set(bearer(owner)).send({ deviceToken: "owner-phone-token" });
+    await request(app).post("/api/push/native-subscribe").set(signedIn(owner)).send({ deviceToken: "owner-phone-token" });
 
-    const mine = await request(app).get("/api/push/status").set(bearer(member));
-    const theirs = await request(app).get("/api/push/status").set(bearer(owner));
+    const mine = await request(app).get("/api/push/status").set(signedIn(member));
+    const theirs = await request(app).get("/api/push/status").set(signedIn(owner));
 
     expect(mine.body).toMatchObject({ subscribed: false, deviceCount: 0, nativeSubscribed: false, preferences: DEFAULTS });
     expect(theirs.body).toMatchObject({ subscribed: true, deviceCount: 1, nativeSubscribed: true });

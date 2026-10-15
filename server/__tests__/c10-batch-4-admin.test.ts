@@ -3,7 +3,7 @@ import "./support/test-env";
 import crypto from "crypto";
 import request from "supertest";
 import {
-  bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
+  signedIn, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
 } from "./support/http-harness";
 
 /**
@@ -22,7 +22,7 @@ beforeEach(() => {
 describe("activating a business with a password (admin)", () => {
   it("refuses a business with no waiting application, and never touches another business", async () => {
     const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const target = await createOwnerPrincipal();
     const bystander = await createOwnerPrincipal();
     await storage.updateMerchant(bystander.merchantId, { status: "pending", verificationToken: "" } as any);
@@ -30,7 +30,7 @@ describe("activating a business with a password (admin)", () => {
 
     const res = await request(app)
       .post(`/api/admin/merchants/${target.merchantId}/activate`)
-      .set(bearer(admin))
+      .set(signedIn(admin))
       .send({ password: "Password1!" });
 
     expect(res.status).toBe(409);
@@ -40,7 +40,7 @@ describe("activating a business with a password (admin)", () => {
 
   it("still activates a waiting application, with the password given", async () => {
     const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const token = crypto.randomBytes(32).toString("hex");
     const waiting = await storage.createMerchantWithSignup({
       name: "Waiting Owner", businessName: "Waiting Ltd", businessType: "retail",
@@ -50,7 +50,7 @@ describe("activating a business with a password (admin)", () => {
 
     const res = await request(app)
       .post(`/api/admin/merchants/${waiting.id}/activate`)
-      .set(bearer(admin))
+      .set(signedIn(admin))
       .send({ password: "Password1!" });
 
     expect(res.status).toBe(200);
@@ -78,9 +78,10 @@ describe("verify and set-active accept only what the business page offers", () =
   it("verify refuses an active business, and changes nothing", async () => {
     const { app } = await createTestApp();
     const active = await createOwnerPrincipal();
+    const admin = await createAdminPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).post(`/api/admin/merchants/${active.merchantId}/verify`).set(bearer(createAdminPrincipal()));
+    const res = await request(app).post(`/api/admin/merchants/${active.merchantId}/verify`).set(signedIn(admin));
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ message: "Only a waiting application can be verified" });
@@ -91,7 +92,7 @@ describe("verify and set-active accept only what the business page offers", () =
     const { app } = await createTestApp();
     const waiting = await waitingApplication();
 
-    const res = await request(app).post(`/api/admin/merchants/${waiting.id}/verify`).set(bearer(createAdminPrincipal()));
+    const res = await request(app).post(`/api/admin/merchants/${waiting.id}/verify`).set(signedIn(await createAdminPrincipal()));
 
     expect(res.status).toBe(200);
     expect(await storage.getMerchant(waiting.id)).toMatchObject({ status: "verified" });
@@ -100,9 +101,10 @@ describe("verify and set-active accept only what the business page offers", () =
   it("set-active refuses a waiting application, and changes nothing", async () => {
     const { app } = await createTestApp();
     const waiting = await waitingApplication();
+    const admin = await createAdminPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).post(`/api/admin/merchants/${waiting.id}/set-active`).set(bearer(createAdminPrincipal()));
+    const res = await request(app).post(`/api/admin/merchants/${waiting.id}/set-active`).set(signedIn(admin));
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ message: "Only a verified business can be activated" });
@@ -114,7 +116,7 @@ describe("verify and set-active accept only what the business page offers", () =
     const verified = await waitingApplication();
     await storage.updateMerchantStatus(verified.id, "verified");
 
-    const res = await request(app).post(`/api/admin/merchants/${verified.id}/set-active`).set(bearer(createAdminPrincipal()));
+    const res = await request(app).post(`/api/admin/merchants/${verified.id}/set-active`).set(signedIn(await createAdminPrincipal()));
 
     expect(res.status).toBe(200);
     expect(await storage.getMerchant(verified.id)).toMatchObject({ status: "active" });
@@ -143,9 +145,10 @@ describe("the admin's state conflicts are 409 (R1-T3, P2.2)", () => {
   ])("%s: 409, and nothing changes", async (_label, status, address, body) => {
     const { app } = await createTestApp();
     const merchant: any = await signup(status);
+    const admin = await createAdminPrincipal();
     const before = storageSnapshot();
 
-    let pending = request(app).post(address(merchant.id)).set(bearer(createAdminPrincipal()));
+    let pending = request(app).post(address(merchant.id)).set(signedIn(admin));
     if (body) pending = pending.send(body);
     const res = await pending;
 
@@ -156,9 +159,10 @@ describe("the admin's state conflicts are 409 (R1-T3, P2.2)", () => {
   it("resend-verification, a business no longer waiting: 409, and nothing is sent", async () => {
     const { app } = await createTestApp();
     const merchant: any = await signup("verified");
+    const admin = await createAdminPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/admin/resend-verification").set(bearer(createAdminPrincipal())).send({ email: merchant.email });
+    const res = await request(app).post("/api/admin/resend-verification").set(signedIn(admin)).send({ email: merchant.email });
 
     expect(res.status).toBe(409);
     expect(storageSnapshot()).toBe(before);

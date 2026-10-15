@@ -1,3 +1,4 @@
+import { requireResponseRecord } from "@/lib/response-data";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -34,6 +35,7 @@ import {
 } from "../data/property-terminal-model";
 import { filterByProperty } from "@/lib/property-dashboard-data";
 import { AnimatedListRow, AnimatedScrollList } from "@/components/AnimatedScrollList";
+import { apiPath } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -65,7 +67,7 @@ const REMINDER_DEFAULTS = {
   rentReminderMaxCount: 3,
 };
 
-const REMINDER_KEY = ["/api/property/reminder-settings"] as const;
+const REMINDER_KEY = [apiPath("GET /api/property/reminder-settings")] as const;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -183,6 +185,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   );
   const [reqFlash, setReqFlash] = useState(false);
   const [billFlash, setBillFlash] = useState(false);
+  const [requestDelivered,setRequestDelivered]=useState(false);
+  const [billDelivered,setBillDelivered]=useState(false);
   /* The row action popover: which invoice, where it sits in `.pt-stack`, and
      whether the destructive branch has been asked for. */
   const [rowMenu, setRowMenu] = useState<{ id: string; top: number } | null>(null);
@@ -208,9 +212,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     /* A failed answer is a failure, not "no settings": read as null, it showed the
        defaults as the merchant's own and let them be changed from there (R1-T9). */
     queryFn: () =>
-      propFetch("/api/property/reminder-settings").then((r) => {
+      propFetch(apiPath("GET /api/property/reminder-settings")).then((r) => {
         if (!r.ok) throw new Error("load failed");
-        return r.json();
+        return r.json().then(requireResponseRecord);
       }),
     staleTime: 60_000,
     retry: false,
@@ -312,7 +316,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       const now = new Date();
       const due = new Date(now);
       due.setDate(due.getDate() + 7);
-      const res = await fetch("/api/property/invoices", {
+      const res = await propFetch(apiPath("POST /api/property/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({
@@ -335,7 +339,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       /* Recurring: first request goes now, automation starts one interval on. */
       if (frequency !== "once") {
         const startDate = addInterval(now, frequency);
-        const sr = await fetch(`/api/property/tenants/${tenantId}/schedules`, {
+        const sr = await fetch(apiPath("POST /api/property/tenants/:tenantId/schedules", { tenantId }), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...propHeaders() },
           body: JSON.stringify({
@@ -352,7 +356,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       }
       return invoice;
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
+      setRequestDelivered(invoice.delivered===true);
       queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
       if (frequency !== "once") {
         queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.schedules as any });
@@ -378,7 +383,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     mutationFn: async () => {
       const due = new Date();
       due.setDate(due.getDate() + dueDays);
-      const res = await fetch("/api/property/invoices", {
+      const res = await propFetch(apiPath("POST /api/property/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({
@@ -403,7 +408,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
+      setBillDelivered(invoice.delivered===true);
       queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
       setBillFlash(true);
       setTimeout(() => setBillFlash(false), 1600);
@@ -428,7 +434,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       invoiceId: string;
       reference?: string;
     }) => {
-      const res = await fetch(`/api/property/invoices/${invoiceId}/mark-paid-external`, {
+      const res = await fetch(apiPath("POST /api/property/invoices/:id/mark-paid-external", { id: invoiceId }), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         /* The column exists and the phone captures it; the desktop used to
@@ -450,7 +456,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
      otherwise. The phone omits this; the desktop send paths already do it. */
   const resendOne = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const res = await fetch(`/api/property/invoices/${invoiceId}/resend`, {
+      const res = await fetch(apiPath("POST /api/property/invoices/:id/resend", { id: invoiceId }), {
         method: "POST",
         headers: propHeaders(),
       });
@@ -472,7 +478,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const voidInvoice = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const res = await fetch(`/api/property/invoices/${invoiceId}/void`, {
+      const res = await fetch(apiPath("POST /api/property/invoices/:id/void", { id: invoiceId }), {
         method: "POST",
         headers: propHeaders(),
       });
@@ -571,7 +577,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
      a cadence chip that waits for the server feels broken. */
   const updateReminders = useMutation({
     mutationFn: async (patch: Record<string, unknown>) => {
-      const res = await fetch("/api/property/reminder-settings", {
+      const res = await fetch(apiPath("PUT /api/property/reminder-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify(patch),
@@ -597,7 +603,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const setScheduleStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "active" | "paused" }) => {
-      const res = await fetch(`/api/property/schedules/${id}`, {
+      const res = await fetch(apiPath("PUT /api/property/schedules/:id", { id }), {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({ status }),
@@ -612,7 +618,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const cancelSchedule = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/property/schedules/${id}`, {
+      const res = await fetch(apiPath("DELETE /api/property/schedules/:id", { id }), {
         method: "DELETE",
         headers: propHeaders(),
       });
@@ -662,7 +668,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     try {
       const body = new FormData();
       body.append("document", file);
-      const res = await fetch("/api/property/invoices/document", {
+      const res = await fetch(apiPath("POST /api/property/invoices/document"), {
         method: "POST",
         headers: propHeaders(),
         body,
@@ -794,11 +800,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   });
 
   const reqLabel = reqFlash
-    ? "request sent ✓"
+    ? requestDelivered?"request sent ✓":"request created · delivery pending"
     : sendRequest.isPending
       ? "sending…"
       : "send rent request";
-  const billLabel = billFlash ? "bill sent ✓" : sendBill.isPending ? "sending…" : "send bill";
+  const billLabel = billFlash ? (billDelivered?"bill sent ✓":"bill created · delivery pending") : sendBill.isPending ? "sending…" : "send bill";
 
   /* Collapsed line: the chosen frequency, then enough of the automation state to
      tell whether anything is running without opening the panel. */
@@ -1120,6 +1126,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
             <AnimatedScrollList
               className="pt-rows"
+              tabIndex={0} role="region" aria-label="Rent requests"
               scrollRef={rowsRef}
               wrapperRef={stackRowsWrapRef}
             >
@@ -1139,9 +1146,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     aria-haspopup="menu"
                     aria-expanded={rowMenu?.id === r.id}
                     aria-label={`actions for ${r.name}, ${r.label}`}
+                    aria-describedby={`pt-request-${r.id}-amount`}
                     onClick={(e) => toggleRowMenu(r.id, e.currentTarget)}
                   >
-                    <span className="pt-avatar">{r.initials}</span>
+                    <span className="pt-avatar" aria-hidden="true">{r.initials}</span>
                     <span className="pt-row-mid">
                       <span className="pt-row-name">{r.name}</span>
                       <span className="pt-row-status">
@@ -1160,7 +1168,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                         )}
                       </span>
                     </span>
-                    <span className="pt-row-right">
+                    <span className="pt-row-right" id={`pt-request-${r.id}-amount`}>
                       <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
                       {r.partPaid && (
                         <span className="pt-row-cap">left of {fmtNZD(r.fullAmountCents)}</span>
@@ -1340,7 +1348,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     type="button"
                     className="pt-auto-toggle"
                     aria-expanded={autoOpen}
-                    aria-label="automation"
+                    aria-label={`repeat & reminders: ${autoSummary}`}
                     onClick={() => setAutoOpen((o) => !o)}
                   >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></svg>
@@ -1783,7 +1791,7 @@ const PT_CSS = `
 .pt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; position:relative; --dt-i:7; }
 .pt-mode { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .pt-mode-head { font-weight:300; font-size:15px; color:${KP_INK}; }
-.pt-mode-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); max-width:430px; }
+.pt-mode-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.65); max-width:430px; }
 
 /* request */
 .pt-req-top { position:absolute; top:62px; width:445px; }
@@ -1800,7 +1808,7 @@ const PT_CSS = `
 .pt-edit { margin-left:auto; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; background:transparent; cursor:pointer; }
 .pt-edit-inline { margin-left:0; }
 .pt-send-via { display:flex; flex-direction:column; gap:1px; min-width:0; }
-.pt-send-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); }
+.pt-send-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.65); }
 .pt-send-to { font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pt-switch { margin-left:auto; flex:0 0 auto; width:42px; height:25px; border-radius:9999px; padding:3px; box-sizing:border-box; display:flex; align-items:center; cursor:pointer; transition:background .18s ease; }
 .pt-switch-knob { width:19px; height:19px; border-radius:50%; background:#fff; transition:transform .18s ease; }
@@ -1844,7 +1852,7 @@ const PT_CSS = `
 .pt-bill-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:54px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .pt-bill-name { margin-top:12px; font-weight:300; font-size:15px; color:${TEXT_SOFT}; }
 .pt-bill-sub { margin-top:3px; font-weight:500; font-size:12.5px; color:rgba(244,246,255,0.5); }
-.pt-bill-label { margin-top:24px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-bill-label { margin-top:24px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 .pt-bill-chips { margin-top:12px; display:flex; flex-wrap:wrap; gap:10px; max-width:430px; }
 .pt-bill-chip { padding:11px 20px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
 .pt-bill-input { margin-top:12px; width:430px; height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:${INK}; font-family:'Outfit',sans-serif; font-weight:600; font-size:14px; }
@@ -1876,10 +1884,10 @@ const PT_CSS = `
 .pt-auto-head-mid { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
 .pt-auto-title { font-weight:700; font-size:13.5px; color:${TEXT_SOFT}; }
 .pt-auto-cap { font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
-.pt-auto-label { margin-top:12px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-auto-label { margin-top:12px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 .pt-auto-chips { margin-top:7px; display:flex; gap:8px; }
 .pt-auto-chip { flex:1; height:36px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
-.pt-auto-summary { margin-top:12px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.45); }
+.pt-auto-summary { margin-top:12px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.65); }
 .pt-auto-list { margin-top:10px; display:flex; flex-direction:column; }
 /* Running vs paused reads from weight and opacity in the one blue palette. */
 .pt-state-pill { flex:0 0 auto; padding:3px 9px; border-radius:9999px; font-weight:700; font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase; background:rgba(94,158,255,0.18); color:${ACCENT_SOFT}; }

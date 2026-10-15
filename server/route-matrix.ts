@@ -18,34 +18,42 @@
  * serves the callers its review's branches name (anyone, a link's holder, the provider, the scheduler,
  * an API key).
  */
-import { expandFacts } from "./route-facts";
+import { expandFacts, type RecordedRouteFacts } from "./route-facts";
 import { ROUTE_POLICY } from "./route-policy";
 import { ROUTE_REVIEW } from "./route-review";
 
+/** The callers the matrix answers for, and what each is (the inventory table lists them). */
+export const MATRIX_CALLER_MEANING = {
+  "signed-out": "no credential at all; on a public route, anyone",
+  "invalid-session": "a session cookie that is no one's: a real session's id with a secret that is not its own",
+  "disabled-login": "a teammate whose login the owner disabled, holding a session begun before",
+  "suspended-business": "the owner of a business that is no longer verified or active",
+  owner: "the business's owner",
+  member: "a teammate of the business",
+  "other-owner": "the owner of another business",
+  "platform-admin": "the validated platform admin (no business of its own)",
+  "link-as-sign-in": "a payment link's token presented as a sign-in (as the session cookie, and as Authorization: Bearer)",
+  "old-token": "the owner's account token of the kind the app held before sessions (Authorization: Bearer, correctly signed, unexpired)",
+  "old-admin-token": "the platform admin's account token of that kind",
+  "no-secret": "the scheduler's routes without x-cron-secret",
+  "wrong-secret": "the scheduler's routes with a secret that is not the scheduler's",
+  "no-key": "the ecommerce API without a key",
+  "unknown-key": "the ecommerce API with a key nobody was issued",
+  "key-without-permission": "the ecommerce API with a live key that lacks the route's permission",
+  "unknown-link": "a link route asked with a token, state or code that is no one's",
+  "unknown-board": "a board's public route asked with a board that is not the business's, or does not exist",
+  "removed-board": "a board's public route asked with a board the business has removed",
+  "sale-with-its-own-link": "a numbered route asked for a sale that has its own payment link",
+  "wrong-webhook-key": "the WhatsApp webhook with a key that is not the provider's",
+  "unknown-reference": "a provider's call naming a session, return state or message that is no one's",
+  "link-holder": "the holder of the route's own link: its token, return state, handoff code or invite",
+  provider: "the payment or messaging provider's servers, naming their own reference",
+  scheduler: "the scheduler, with its secret",
+  "api-key": "the ecommerce API with a live key that has the route's permission",
+} as const;
+
 /** The callers the matrix answers for. */
-export type MatrixCaller =
-  | "signed-out" // no credential at all
-  | "invalid-token" // a token that does not verify (malformed, forged or expired)
-  | "disabled-login" // a teammate whose login the owner disabled, holding a token minted before
-  | "suspended-business" // the owner of a business that is no longer verified or active
-  | "owner" // the business's owner
-  | "member" // a teammate of the business
-  | "other-owner" // the owner of another business
-  | "platform-admin" // the validated platform admin (no business of its own)
-  | "link-as-sign-in" // a payment link's token presented as a sign-in (Authorization: Bearer)
-  | "no-secret" // the scheduler's routes without x-cron-secret
-  | "wrong-secret" // ... with a secret that is not the scheduler's
-  | "no-key" // the ecommerce API without a key
-  | "unknown-key" // ... with a key nobody was issued
-  | "key-without-permission" // ... with a live key that lacks the route's permission
-  | "unknown-link" // a link route asked with a token, state or code that is no one's
-  | "sale-with-its-own-link" // a numbered route asked for a sale that has its own payment link
-  | "wrong-webhook-key" // the WhatsApp webhook with a key that is not the provider's
-  // The callers the routes with their own gates serve (with "signed-out": anyone, on a public route):
-  | "link-holder" // the holder of the route's own link: its token, return state, handoff code or invite
-  | "provider" // the payment or messaging provider's servers, naming their own reference
-  | "scheduler" // the scheduler, with its secret
-  | "api-key"; // the ecommerce API with a live key that has the route's permission
+export type MatrixCaller = keyof typeof MATRIX_CALLER_MEANING;
 
 /**
  * A refusal's status. A few are answered 200 by design (the WhatsApp webhook acknowledges every call
@@ -80,33 +88,60 @@ export const RECORD_ROUTES_NAMING_THE_BUSINESS: Record<string, string> = {
 
 /**
  * Callers every gated route refuses before any route-specific work. A payment link's token is never a
- * sign-in (the plan's safe default: a public checkout token never grants merchant API access).
+ * sign-in (the plan's safe default: a public checkout token never grants merchant API access). Nor is an
+ * Authorization header: the sign-in is the session cookie and nothing else (R1-T4 phase E3), so the
+ * account token the app once held is refused however well it is signed.
  */
-export const GATE_REFUSED: readonly MatrixCaller[] = ["signed-out", "invalid-token", "disabled-login", "suspended-business", "link-as-sign-in"];
+export const GATE_REFUSED: readonly MatrixCaller[] = [
+  "signed-out", "invalid-session", "disabled-login", "suspended-business", "link-as-sign-in", "old-token", "old-admin-token",
+];
+
+/**
+ * The gate-refused callers who bring only an Authorization header. On the two reads a business also
+ * makes signed in (below), which are told a signed-in read by its session cookie, a header is not
+ * looked at: these callers are answered as anyone is, not refused as a sign-in.
+ */
+export const HEADER_ONLY_CALLERS: readonly MatrixCaller[] = ["old-token", "old-admin-token"];
 
 /**
  * A link route's answer to a token, state or code that is no one's, where it is not 404: each is the
  * route's reviewed answer. The sign-in handoff and the pages that read a token from the body answer as
- * their screens expect; the checkout's browser return goes home.
+ * their screens expect (400 for those pages: kept by the owner's decision, 2026-09-29, where P2.2 would
+ * say 401); the checkout's browser return goes home.
  */
 export const UNKNOWN_LINK_ANSWER: Record<string, MatrixAnswer> = {
   "POST /api/auth/google/session": 401,
+  "POST /api/auth/apple/session": 401,
   "POST /api/auth/reset-password": 400,
   "GET /api/auth/validate-reset-token/:token": 200,
   "POST /api/auth/confirm-email": 400,
   "POST /api/team/accept-invite": 400,
-  "GET /api/checkout/callback": 302,
+  "GET /api/checkout/callback": 404,
 };
 
-function gateOf(key: string): MatrixGate {
-  const facts = expandFacts(ROUTE_POLICY[key].facts);
+/**
+ * A board's public routes that serve only the boards a business still uses: a removed one is answered as
+ * a missing one (404). The board's QR image is drawn for any of the business's boards.
+ */
+export const IN_USE_BOARDS_ONLY: Record<string, string> = {
+  "GET /api/merchants/:id/active-transaction": "a removed board's page no longer shows the sale left open on it (owner decision 2026-09-29)",
+  "GET /api/merchants/:id/events": "a board's stream is for the business's boards in use",
+  "GET /api/merchants/:id/stone/:stoneId/brand": "a board's brand is for the business's boards in use (owner decision 2026-09-26)",
+};
+
+function gateOf(recorded: RecordedRouteFacts): MatrixGate {
+  const facts = expandFacts(recorded);
   if (facts.middleware.includes("authenticateAdmin")) return "admin";
   if (facts.middleware.includes("authenticateToken")) return "session";
   return "own";
 }
 
-export function matrixRowFor(key: string): MatrixRow {
-  const gate = gateOf(key);
+/**
+ * A route's row, from its review and its recorded facts (the generator passes the facts it has just read,
+ * before route-policy.ts is rewritten with them).
+ */
+export function matrixRowFor(key: string, recorded: RecordedRouteFacts = ROUTE_POLICY[key].facts): MatrixRow {
+  const gate = gateOf(recorded);
   const answers: MatrixRow["answers"] = {};
   if (gate === "own") {
     // The routes with their own gates, by what their review says selects the caller.
@@ -119,11 +154,13 @@ export function matrixRowFor(key: string): MatrixRow {
     if (principals.has("provider")) answers.provider = "allowed";
     if (principals.has("cron")) answers.scheduler = "allowed";
     if (principals.has("api-key")) answers["api-key"] = "allowed";
-    // A business reading its own board routes signed in (its open sale, its live updates): with an
-    // Authorization header the handler runs the sign-in gate and the business check itself.
+    // A business reading its own board routes signed in (its open sale, its live updates): with a session
+    // cookie and no board named, the handler runs the sign-in gate and the business check itself.
     const signedIn = branches.find((branch) => branch.principal === "merchant");
     if (signedIn) {
-      for (const caller of GATE_REFUSED) if (caller !== "signed-out") answers[caller] = 401;
+      for (const caller of GATE_REFUSED) {
+        if (caller !== "signed-out" && !HEADER_ONLY_CALLERS.includes(caller)) answers[caller] = 401;
+      }
       answers.owner = "allowed";
       answers.member = signedIn.roles?.includes("member") ? "allowed" : 403;
       answers["platform-admin"] = signedIn.platformAdmin ? "allowed" : 403;
@@ -139,17 +176,23 @@ export function matrixRowFor(key: string): MatrixRow {
       answers["key-without-permission"] = 403;
     }
     if (principals.has("public-bearer") && tenants.has("token")) answers["unknown-link"] = UNKNOWN_LINK_ANSWER[key] ?? 404;
+    // A board's page names the business and the board: another business's board is a missing one (P2.2).
+    if (tenants.has("board")) answers["unknown-board"] = 404;
+    if (key in IN_USE_BOARDS_ONLY) answers["removed-board"] = 404;
     // A sale with its own link is answered like a missing one (tenant-safe, P2.2): 404, or for the
     // Windcave browser return, which sends a missing sale home, the same redirect.
     if (tenants.has("number")) answers["sale-with-its-own-link"] = key === "GET /api/windcave/callback" ? 302 : 404;
     if (key === "POST /api/webhooks/whatsapp") answers["wrong-webhook-key"] = 200;
+    // A provider's call names its resource: one that is no one's is acknowledged (200) and nothing done.
+    if (principals.has("provider") && (tenants.has("provider-session") || tenants.has("token"))) answers["unknown-reference"] = 200;
     return { gate, answers };
   }
   for (const caller of GATE_REFUSED) answers[caller] = 401;
   if (gate === "admin") {
-    // authenticateAdmin: signed in, but not the validated platform admin.
-    answers.owner = 403;
-    answers.member = 403;
+    // authenticateAdmin reads only the admin area's own session (R1-T4 phase E): a business's session is
+    // not a sign-in there, so its logins are answered as anyone not signed in to the admin area is.
+    answers.owner = 401;
+    answers.member = 401;
     answers["platform-admin"] = "allowed";
     return { gate, answers };
   }
@@ -175,6 +218,25 @@ export function matrixRowFor(key: string): MatrixRow {
   return { gate, answers };
 }
 
+// Only reviewed routes have a row: the generator loads this module before it rewrites route-policy.ts,
+// so a route just removed (its review with it) must not stop it. route-matrix.test.ts holds every route
+// of the policy to a row, as the review tests hold it to a review.
 export const ROUTE_MATRIX: Record<string, MatrixRow> = Object.fromEntries(
-  Object.keys(ROUTE_POLICY).map((key) => [key, matrixRowFor(key)]),
+  Object.keys(ROUTE_POLICY).filter((key) => key in ROUTE_REVIEW).map((key) => [key, matrixRowFor(key)]),
 );
+
+/**
+ * A row in words, for the inventory table: the callers served, then each refusal's status with the
+ * callers refused with it (callers in MATRIX_CALLER_MEANING's order).
+ */
+export function describeMatrixRow(row: MatrixRow): { served: string; refused: string } {
+  const callers = (Object.keys(MATRIX_CALLER_MEANING) as MatrixCaller[]).filter((caller) => row.answers[caller] !== undefined);
+  const named = (answer: MatrixAnswer) => callers.filter((caller) => row.answers[caller] === answer).map((caller) => `\`${caller}\``).join(", ");
+  const statuses = [...new Set(callers.map((caller) => row.answers[caller]))]
+    .filter((answer): answer is Exclude<MatrixAnswer, "allowed"> => typeof answer === "number")
+    .sort((a, b) => a - b);
+  return {
+    served: named("allowed") || "—",
+    refused: statuses.map((status) => `${status}: ${named(status)}`).join("; ") || "—",
+  };
+}

@@ -8,7 +8,7 @@
 import request from "supertest";
 import { ROUTE_MATRIX, type MatrixCaller, type MatrixGate } from "../../route-matrix";
 import {
-  bearer,
+  signedIn,
   createAdminPrincipal,
   createMemberPrincipal,
   createOwnerPrincipal,
@@ -17,6 +17,7 @@ import {
   storage,
   type EventStream,
   type Principal,
+  type SignedIn,
 } from "./http-harness";
 
 /** The signed-in callers a gated route can serve. */
@@ -36,6 +37,8 @@ export interface ServedRequest {
   method: "get" | "post" | "put" | "patch" | "delete";
   path: string;
   body?: Record<string, unknown>;
+  /** A form post (application/x-www-form-urlencoded), as another site's page sends one. */
+  form?: Record<string, string>;
   /** A file sent as multipart form data. */
   attach?: { field: string; bytes: Buffer; filename: string; contentType: string };
   /** A download: its bytes are the body. */
@@ -63,7 +66,7 @@ export async function servedContext(): Promise<ServedCtx> {
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   const member = await createMemberPrincipal(owner.merchantId);
-  return { app, owner, member, admin: createAdminPrincipal(), merchantId: owner.merchantId };
+  return { app, owner, member, admin: await createAdminPrincipal(), merchantId: owner.merchantId };
 }
 
 export function principalFor(ctx: ServedCtx, caller: ServedCaller): Principal {
@@ -80,21 +83,22 @@ function bytes(res: any, done: (error: Error | null, body: Buffer) => void) {
 /** Sends a recipe's request, as the signed-in caller when there is one. */
 export async function sendServed(ctx: ServedCtx, who: Principal | null, req: ServedRequest) {
   let pending = request(ctx.app)[req.method](req.path);
-  if (who) pending = pending.set(bearer(who));
+  if (who) pending = pending.set(signedIn(who));
   for (const [name, value] of Object.entries(req.headers ?? {})) pending = pending.set(name, value);
   if (req.attach) pending = pending.attach(req.attach.field, req.attach.bytes, { filename: req.attach.filename, contentType: req.attach.contentType });
+  else if (req.form) pending = pending.type("form").send(req.form);
   else if (req.body) pending = pending.send(req.body);
   if (req.binary) pending = pending.buffer(true).parse(bytes);
   return pending;
 }
 
 /** Short requests as one caller, for fixtures and for reading back what a success did. */
-export function as(ctx: ServedCtx, who: Principal) {
+export function as(ctx: Pick<ServedCtx, "app">, who: SignedIn) {
   return {
-    get: (path: string) => request(ctx.app).get(path).set(bearer(who)),
-    post: (path: string, body: Record<string, unknown> = {}) => request(ctx.app).post(path).set(bearer(who)).send(body),
-    put: (path: string, body: Record<string, unknown>) => request(ctx.app).put(path).set(bearer(who)).send(body),
-    delete: (path: string) => request(ctx.app).delete(path).set(bearer(who)),
+    get: (path: string) => request(ctx.app).get(path).set(signedIn(who)),
+    post: (path: string, body: Record<string, unknown> = {}) => request(ctx.app).post(path).set(signedIn(who)).send(body),
+    put: (path: string, body: Record<string, unknown>) => request(ctx.app).put(path).set(signedIn(who)).send(body),
+    delete: (path: string) => request(ctx.app).delete(path).set(signedIn(who)),
   };
 }
 
@@ -110,6 +114,44 @@ export async function paidMonth(ctx: Pick<ServedCtx, "merchantId">) {
     async () => ({ success: true as const, approved: true, windcaveTransactionId: "matrix-first-month" }),
   );
   if (!done.ok) throw new Error(`fixture: paid month failed ${done.reason}`);
+}
+
+/** The served tests (route-matrix-served-<family>.test.ts). */
+export type ServedFamily =
+  | "account" | "business" | "property" | "trades" | "admin"
+  | "sign-in" | "public" | "retail-pay" | "checkout" | "provider";
+
+/**
+ * Which served test holds which routes: its routes' gate and key pattern. Every route that serves a caller
+ * falls in exactly one family (route-matrix.test.ts), and each family's test has a request for every one
+ * of its routes, so a new route cannot arrive with its allowed callers untested.
+ */
+export const SERVED_FAMILIES: Record<ServedFamily, { gate: MatrixGate; family: RegExp }> = {
+  account: {
+    gate: "session",
+    family: /^[A-Z]+ \/api\/(auth\/(me|sign-out-everywhere|logout|apple\/(connection|connect|disconnect))$|tutorial\/|push\/|subscription|team|billing\/|board-builder\/|invoice-documents\/)/,
+  },
+  business: { gate: "session", family: /^[A-Z]+ \/api\/(merchants|transactions)(\/|$)/ },
+  property: { gate: "session", family: /^[A-Z]+ \/api\/property\// },
+  trades: { gate: "session", family: /^[A-Z]+ \/api\/trades\// },
+  admin: { gate: "admin", family: /^[A-Z]+ \/api\/admin\// },
+  "sign-in": { gate: "own", family: /^[A-Z]+ \/api\/(auth\/|admin\/auth\/login$|merchants\/signup$|team\/accept-invite$)/ },
+  public: {
+    gate: "own",
+    family: /^[A-Z]+ \/(robots\.txt|sitemap\.xml|\.well-known\/|nfc\/|uploads\/|api\/(merchants\/:id\/|nfc\/capabilities|windcave\/env|push\/(capabilities|vapid-key)|billing\/card\/callback|info-pack-leads))/,
+  },
+  "retail-pay": { gate: "own", family: /^[A-Z]+ \/api\/(pay\/(t\/|return\/)|transactions\/:id|split-payments\/:id|windcave\/callback)/ },
+  checkout: { gate: "own", family: /^[A-Z]+ \/api\/(checkout\/|trades\/quotes\/token\/)/ },
+  provider: {
+    gate: "own",
+    family: /^[A-Z]+ \/api\/(pay\/notification\/|windcave\/(notification|rent-notification|trades-notification)$|billing\/card\/notification$|webhooks\/|internal\/cron|v1\/)/,
+  },
+};
+
+/** A served test's routes: the matrix's rows of its family, each served to at least one caller. */
+export function familyRows(name: ServedFamily) {
+  const { gate, family } = SERVED_FAMILIES[name];
+  return gate === "own" ? ownServedRows(family) : servedRows(family, gate);
 }
 
 /** The matrix's rows of a family (by route key) behind the given gate, served to at least one caller. */
@@ -137,17 +179,48 @@ export async function expectServed(recipes: Record<string, ServedRecipe>, key: s
   await expectSuccess(ctx, who, caller, served);
 }
 
+/** The storage methods keyed by a business's own row (R1-T7 S5a); each takes the business first. */
+export const MERCHANT_ROW_METHODS = [
+  "getMerchant", "updateMerchantSettings", "updateMerchantDetails", "updateMerchantTheme", "updateMerchantLogoUrl",
+] as const;
+
+/**
+ * Runs a request and returns every business its handling named to the row's own methods. The methods
+ * are wrapped in place (a test's own stand-in included) and put back, so nothing a recipe set up moves.
+ */
+export async function namingMerchantRows<T>(send: () => Promise<T>): Promise<{ result: T; named: Array<[string, unknown]> }> {
+  const held = storage as any;
+  const named: Array<[string, unknown]> = [];
+  const originals = MERCHANT_ROW_METHODS.map((name) => [name, held[name]] as const);
+  for (const [name, original] of originals) {
+    held[name] = function (this: unknown, ...args: unknown[]) {
+      named.push([name, args[0]]);
+      return original.apply(this, args);
+    };
+  }
+  try {
+    return { result: await send(), named };
+  } finally {
+    for (const [name, original] of originals) held[name] = original;
+  }
+}
+
 async function expectSuccess(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
   if (served.req.stream) return expectStreamServed(ctx, who, caller, served);
-  const res = await sendServed(ctx, who, served.req);
+  const { result: res, named } = await namingMerchantRows(() => sendServed(ctx, who, served.req));
   expect({ caller, status: res.status, body: res.status === served.status ? "…" : res.body })
     .toEqual({ caller, status: served.status, body: "…" });
+  // R1-T7 S5a: a business's login is only ever served from its own business's row. (The platform
+  // admin names a business by the path; a caller with no sign-in is the public lanes' own tests'.)
+  if (who && caller !== "platform-admin") {
+    expect(named.filter(([, merchantId]) => merchantId !== who.merchantId)).toEqual([]);
+  }
   await served.check(res);
 }
 
 /** A live event stream is served when it opens with the route's status; the check reads its events. */
 async function expectStreamServed(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
-  const stream = await openEventStream(ctx.app, served.req.path, { ...(who ? bearer(who) : {}), ...served.req.headers });
+  const stream = await openEventStream(ctx.app, served.req.path, { ...(who ? signedIn(who) : {}), ...served.req.headers });
   try {
     expect({ caller, status: stream.status }).toEqual({ caller, status: served.status });
     const first = await stream.nextEvent();

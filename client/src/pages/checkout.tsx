@@ -1,3 +1,4 @@
+import {checkoutCommand,completeCheckoutCommand,rememberCheckoutConfirmation,restoreCheckoutConfirmation,assignInvoiceShare,invoiceCheckoutEmail,readInvoiceCheckoutIntent,releaseExpiredCheckoutCommand} from '@/lib/checkout-command';
 import { useState, useEffect, useMemo, useRef, Component, type ReactNode } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ import {
   type PaymentCheckoutSource,
 } from "@/lib/payment-addressing";
 import { checkoutBusiness } from "@/lib/checkout-business";
+import { CHECKOUT_RESOLVE_KEY, QUOTE_TOKEN_KEY, TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 // Window augmentations are declared centrally in client/src/global.d.ts.
 
 // ── Error boundary — catches any render crash and shows a safe fallback ──
@@ -46,7 +48,7 @@ class CheckoutErrorBoundary extends Component<{ children: ReactNode }, { hasErro
           <div style={{ background: "#fff", borderRadius: 24, padding: 32, textAlign: "center", maxWidth: 320 }}>
             <XCircle size={48} color="#e53e3e" style={{ margin: "0 auto 16px" }} />
             <h2 style={{ color: "#e53e3e", fontWeight: 700, marginBottom: 8 }}>Something went wrong</h2>
-            <p style={{ color: "#666", marginBottom: 20 }}>Please scan the QR code again to restart your payment.</p>
+            <p style={{ color: "#666", marginBottom: 20 }}>Please reopen your original payment link or ask staff to check the payment. Avoid paying again until the result is confirmed.</p>
             <button
               onClick={() => window.history.back()}
               style={{ background: "#040D6D", color: "#fff", border: "none", borderRadius: 14, padding: "12px 24px", fontWeight: 600, cursor: "pointer" }}
@@ -123,8 +125,8 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   const search = useSearch();
   const txId = activeSource?.kind === "retail-legacy" ? activeSource.transactionId : null;
   const urlParams = new URLSearchParams(search);
-  const overrideAmount = urlParams.get("amount");
-  useTokenPagePrivacy(isRetailToken);
+  const overrideAmount = activeSource?.kind==='retail-legacy' ? urlParams.get("amount") : null;
+  useTokenPagePrivacy(isRetailToken || isInvoice);
 
   // Source-specific endpoints. A retail token is never exchanged for an ID.
   const sessionEndpoint = paymentSource ? checkoutSessionEndpoint(paymentSource) : "";
@@ -138,13 +140,18 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   // Invoice split state (no-op for retail transactions).
   const [splitChoosing, setSplitChoosing] = useState(false);
   const [payerEmail, setPayerEmail] = useState("");
+  const [invoiceEmailFrozen,setInvoiceEmailFrozen]=useState(false);
   const [splitBusy, setSplitBusy] = useState(false);
+  const [invoiceAmountChosen,setInvoiceAmountChosen]=useState(false);
+  const [invoicePreparing,setInvoicePreparing]=useState(false);
+  const [invoicePreparedCents,setInvoicePreparedCents]=useState<number|null>(null);
 
   const [cardOpen, setCardOpen] = useState(false);
   const [applePayAvailable, setApplePayAvailable] = useState(false);
   const [googlePayAvailable, setGooglePayAvailable] = useState(false);
   const [hfReady, setHfReady] = useState(false);
   const [payState, setPayState] = useState<"idle" | "processing" | "success" | "error">("idle");
+  const [processingSession,setProcessingSession]=useState<any>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const inAppEnv = detectInAppBrowser();
@@ -155,6 +162,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   const hfInitialised = useRef(false);
   const googleClient = useRef<any>(null);
   const sessionRef = useRef<any>(null);
+  const invoiceSessionPromise=useRef<Promise<any>|null>(null);
   const applePayOptions = useRef<any>(null);
   const applePaySdkLoaded = useRef(false);
   const applePaySdkFailed = useRef(false);
@@ -179,9 +187,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   const [googlePreSessionTrigger, setGooglePreSessionTrigger] = useState(0);
 
   const { data: rawTransaction, isLoading: rawTxLoading } = useQuery({
-    queryKey: ["/api/transactions", txId],
+    queryKey: [TRANSACTIONS_KEY, txId],
     queryFn: async () => {
-      const res = await fetch(`/api/transactions/${txId}`);
+      const res = await fetch(apiPath("GET /api/transactions/:id", { id: txId }));
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
@@ -212,9 +220,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
   // Invoice resolve — amount, merchant, label, and split state for /r/:token.
   const { data: invoiceData, isLoading: invoiceLoading, error: invoiceError, refetch: refetchInvoice } = useQuery({
-    queryKey: ["/api/checkout/resolve", token],
+    queryKey: [CHECKOUT_RESOLVE_KEY, token],
     queryFn: async () => {
-      const res = await fetch(`/api/checkout/resolve/${token}`);
+      const res = await fetch(apiPath("GET /api/checkout/resolve/:token", { token }));
       if (res.status === 404) throw new Error("not-found");
       if (res.status === 410) throw new Error("voided");
       if (!res.ok) throw new Error("error");
@@ -229,9 +237,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   // quote "viewed" server-side; if it was already accepted it also returns the
   // minted invoice so a revisit jumps straight to the payment step.
   const { data: quoteData, isLoading: quoteLoading, error: quoteError } = useQuery<any>({
-    queryKey: ["/api/trades/quotes/token", quoteToken],
+    queryKey: [QUOTE_TOKEN_KEY, quoteToken],
     queryFn: async () => {
-      const res = await fetch(`/api/trades/quotes/token/${quoteToken}`);
+      const res = await fetch(apiPath("GET /api/trades/quotes/token/:token", { token: quoteToken }));
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Quote not found");
       return res.json();
     },
@@ -266,14 +274,14 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   }, [quoteMode, quoteData?.invoice?.token, acceptedInvoiceToken]);
 
   const openQuotePdf = () => {
-    if (quoteToken) window.open(`/api/trades/quotes/token/${quoteToken}/pdf`, "_blank", "noopener,noreferrer");
+    if (quoteToken) window.open(apiPath("GET /api/trades/quotes/token/:token/pdf", { token: quoteToken }), "_blank", "noopener,noreferrer");
   };
   const respondToQuote = async (accept: boolean) => {
     if (!quoteToken || quoteResponding) return;
     setQuoteResponding(true);
     setQuoteRespondError("");
     try {
-      const res = await fetch(`/api/trades/quotes/token/${quoteToken}/respond`, {
+      const res = await fetch(apiPath("POST /api/trades/quotes/token/:token/respond", { token: quoteToken }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accept }),
@@ -305,9 +313,8 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   const splitPaid: number = invoiceData?.splitPaidCount ?? 0;
   const splitActive = !!invoiceData?.splitEnabled && splitCount > 0;
   const shareBase = splitCount ? Math.floor(totalCents / splitCount) : 0;
-  const isLastShare = splitCount ? splitPaid === splitCount - 1 : false;
-  const shareCents = splitCount ? (isLastShare ? totalCents - shareBase * (splitCount - 1) : shareBase) : totalCents;
-  const invoiceChargeCents = splitActive ? shareCents : totalCents;
+  const shareCents = splitCount ? shareBase+(splitPaid+1<=totalCents%splitCount?1:0) : totalCents;
+  const invoiceChargeCents = invoicePreparedCents ?? (splitActive ? shareCents : totalCents);
 
   // Normalize both sources into the transaction shape the rest of the page uses.
   const transaction: any = isInvoice
@@ -341,24 +348,30 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       : rawTransaction;
 
   const txLoading = isInvoice ? invoiceLoading : isRetailToken ? tokenPaymentLoading : rawTxLoading;
-  const tokenShareIndex = isRetailToken ? currentTokenShareIndex(tokenPayment ?? {}) : 0;
+  const tokenShareIndex = isRetailToken ? currentTokenShareIndex(tokenPayment ?? {}) : isInvoice
+    ? (splitActive?splitPaid+1:0) : rawTransaction?.isSplit?(rawTransaction.completedSplits??0)+1:0;
 
   const getTokenIdempotencyKey = (shareIndex = tokenShareIndex) => {
-    if (!isRetailToken || !activeSource) return null;
-    return getOrCreatePaymentIdempotencyKey(activeSource, shareIndex);
+    if (!paymentSource) return null;
+    return checkoutCommand(paymentSource,shareIndex).idempotencyKey;
+  };
+  const requestSession=async()=>{
+    const body=buildSessionBody(),command=checkoutCommand(paymentSource!,tokenShareIndex);
+    try{return await apiRequest('POST',sessionEndpoint,body);}
+    catch(error){if(releaseExpiredCheckoutCommand(paymentSource!,command,error))setInvoiceEmailFrozen(false);throw error;}
   };
 
   const hydrateSession = (data: any) => {
-    if (!isRetailToken || !retailToken || !activeSource) return data;
+    if (!paymentSource) return data;
     const shareIndex = Number.isInteger(data?.shareIndex) ? data.shareIndex : tokenShareIndex;
-    const idempotencyKey = getTokenIdempotencyKey(tokenShareIndex);
-    bindPaymentIdempotencyKey(activeSource, tokenShareIndex, shareIndex, idempotencyKey!);
-    if (data?.returnState) rememberPaymentReturnState(data.returnState, retailToken);
+    let command=checkoutCommand(paymentSource,tokenShareIndex);
+    if(isInvoice && Number.isInteger(data?.shareIndex))command=assignInvoiceShare(paymentSource,command,shareIndex);
+    const idempotencyKey = command.idempotencyKey;
+    if (data?.returnState && retailToken) rememberPaymentReturnState(data.returnState, retailToken);
     return { ...data, shareIndex, __clientIdempotencyKey: idempotencyKey };
   };
 
   const completionBody = (session: any, extra: Record<string, any>) => {
-    if (!isRetailToken) return { sessionId: session.sessionId, ...extra };
     const shareIndex = Number.isInteger(session?.shareIndex) ? session.shareIndex : tokenShareIndex;
     return tokenCompletionRequest({
       sessionId: session.sessionId,
@@ -368,20 +381,20 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   };
 
   const reconcileTokenAttempt = (result: any, session: any) => {
-    if (!isRetailToken || !activeSource) return;
+    if (!paymentSource) return;
     if (!["approved", "declined", "cancelled"].includes(result?.outcome)) return;
     const shareIndex = Number.isInteger(session?.shareIndex) ? session.shareIndex : tokenShareIndex;
-    clearPaymentIdempotencyKey(activeSource, shareIndex);
-    refetchTokenPayment();
+    if(session.__clientIdempotencyKey)completeCheckoutCommand(paymentSource,{shareIndex,idempotencyKey:session.__clientIdempotencyKey});
+    if(isInvoice && session.__clientIdempotencyKey)setInvoiceEmailFrozen(false);
+    if(isRetailToken)refetchTokenPayment();else if(isInvoice)refetchInvoice();
   };
 
   // Body for the create-session call, per source.
   const buildSessionBody = (): Record<string, any> => {
-    if (isInvoice) return payerEmail ? { payerEmail } : {};
-    if (isRetailToken) {
-      return tokenSessionRequest(getTokenIdempotencyKey()!);
-    }
-    const body: Record<string, any> = { merchantId: transaction.merchantId };
+    const command=checkoutCommand(paymentSource!,tokenShareIndex);
+    if (isInvoice){const email=invoiceCheckoutEmail(paymentSource!,command,payerEmail);setPayerEmail(email??'');setInvoiceEmailFrozen(true);return {...command,reserveShare:true,...(email?{payerEmail:email}:{})};}
+    if (isRetailToken)return command;
+    const body: Record<string, any> = {...command,merchantId: transaction.merchantId};
     if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
     if (overrideAmount) body.amount = overrideAmount;
     return body;
@@ -405,9 +418,58 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   };
 
   const { data: envData } = useQuery({
-    queryKey: ["/api/windcave/env"],
-    queryFn: async () => (await fetch("/api/windcave/env")).json(),
+    queryKey: [apiPath("GET /api/windcave/env")],
+    queryFn: async () => (await fetch(apiPath("GET /api/windcave/env"))).json(),
   });
+
+  function savePaymentConfirmation(session:any) {
+    if(paymentSource && session?.returnState && session.__clientIdempotencyKey)rememberCheckoutConfirmation(paymentSource,
+      {shareIndex:session.shareIndex,idempotencyKey:session.__clientIdempotencyKey},session.returnState,
+      {sessionId:session.sessionId,submitted:true});
+  }
+  function waitForPaymentConfirmation(session:any) {
+    if(isInvoice)setInvoiceAmountChosen(true);
+    savePaymentConfirmation(session);
+    sessionRef.current=session;setProcessingSession(session);setPayState('processing');
+    setErrorMsg('');
+  }
+  useEffect(()=>{
+    if(!paymentSource || txLoading || !transaction)return;
+    try{
+      const intent=isInvoice?readInvoiceCheckoutIntent(paymentSource):undefined;
+      if(intent){setPayerEmail(intent.email??'');setInvoiceEmailFrozen(true);}
+      const saved=restoreCheckoutConfirmation(paymentSource);
+      const returned=isInvoice?urlParams.get('paymentState'):null;
+      if(returned && /^[A-Za-z0-9_-]{43}$/.test(returned)){
+        waitForPaymentConfirmation(saved?.returnState===returned?{...saved,__clientIdempotencyKey:saved.idempotencyKey}:{returnState:returned});
+      }else if(saved && saved.submitted!==false)waitForPaymentConfirmation({...saved,__clientIdempotencyKey:saved.idempotencyKey});
+    }catch{setPayState('processing');setErrorMsg('Your original payment needs confirmation. Reopen its payment link.');}
+  },[payId,txLoading,search]);
+  useEffect(()=>{
+    const state=processingSession?.returnState;
+    if(!state)return;
+    let stopped=false,busy=false;
+    const poll=async()=>{
+      if(stopped || busy)return;busy=true;
+      try {
+        let response=await fetch(apiPath('GET /api/pay/return/:state',{state}),{headers:{'Cache-Control':'no-cache'}});
+        let scopedCompletion=false;
+        if(response.status===410 && processingSession.sessionId && processingSession.__clientIdempotencyKey){
+          response=await apiRequest('POST',hfCompleteEndpoint,completionBody(processingSession,{}));scopedCompletion=true;
+        }
+        if(!response.ok)return;
+        const result=await response.json();if(stopped || !['approved','declined','cancelled'].includes(result?.outcome))return;
+        if(!scopedCompletion && ((isInvoice && result.invoiceId!==invoiceData?.invoiceId) ||
+          (txId!==null && result.transactionId!==txId)))return;
+        reconcileTokenAttempt(result,processingSession);setProcessingSession(null);
+        if(result.outcome==='approved'){setPayState('success');navigateAfterSuccess(result);}
+        else{setPayState('error');setErrorMsg('The payment did not complete. You can try again.');}
+      }catch {/* Keep the original command and truthful processing state. */}
+      finally {busy=false;}
+    };
+    void poll();const timer=setInterval(()=>void poll(),1500);
+    return ()=>{stopped=true;clearInterval(timer);};
+  },[processingSession?.returnState]);
 
   // The business's name and logo come with what the page holds (owner decision 2026-09-26).
   const merchant = checkoutBusiness(activeSource?.kind, { tokenPayment, invoiceData, rawTransaction });
@@ -479,7 +541,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   // preSessionRef, and create a race where the user taps between the clear and
   // the new async completing. Using stable primitives stops that churn.
   useEffect(() => {
-    if (!applePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession) return;
+    if (isInvoice || !applePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession || processingSession) return;
     let cancelled = false;
 
     // Clear the stale pre-session only when a payment was attempted — that is,
@@ -495,7 +557,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
     (async () => {
       try {
-        const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
+        const res = await requestSession();
         if (!cancelled && res.ok) {
           const data = hydrateSession(await res.json());
           if (data.ajaxSubmitApplePayUrl) {
@@ -517,7 +579,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   // previously happened after loadPaymentData() resolved, which added latency
   // at the most sensitive moment.  Same pattern as the Apple Pay pre-session.
   useEffect(() => {
-    if (!googlePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession) return;
+    if (isInvoice || !googlePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession || processingSession) return;
     let cancelled = false;
 
     // As for Apple Pay: a ready session is good only for the amount it was opened for.
@@ -527,7 +589,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
     (async () => {
       try {
-        const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
+        const res = await requestSession();
         if (!cancelled && res.ok) {
           const data = hydrateSession(await res.json());
           if (data?.sessionId) {
@@ -951,11 +1013,14 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
   async function createSession() {
     if (!payId || !transaction || !tokenCanCreateSession) return null;
+    if(isInvoice && sessionRef.current?.sessionId)return sessionRef.current;
+    if(isInvoice && invoiceSessionPromise.current)return invoiceSessionPromise.current;
+    const send=async()=>{
     try {
-      const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
+      const res = await requestSession();
       if (!res.ok) return null;
       const data = hydrateSession(await res.json());
-      if (isRetailToken && ["approved", "declined", "cancelled"].includes(data?.attemptState)) {
+      if (["approved", "declined", "cancelled"].includes(data?.attemptState)) {
         const result = {
           approved: data.attemptState === "approved",
           outcome: data.attemptState,
@@ -971,17 +1036,40 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
         }
         return { ...data, __terminal: true };
       }
+      if(data?.processing || data?.kind==='processing'){waitForPaymentConfirmation(data);return {...data,__processing:true};}
       sessionRef.current = data;
+      if(isInvoice && typeof data.amountStr==='string' && /^\d+\.\d{2}$/.test(data.amountStr)){
+        const [units,fraction]=data.amountStr.split('.');const cents=Number(units)*100+Number(fraction);
+        if(Number.isSafeInteger(cents) && cents>0)setInvoicePreparedCents(cents);
+      }
       return data;
     } catch { return null; }
+    };
+    const promise=send();if(isInvoice)invoiceSessionPromise.current=promise;
+    try{return await promise;}finally{if(isInvoice && invoiceSessionPromise.current===promise)invoiceSessionPromise.current=null;}
+  }
+
+  async function prepareInvoicePayment() {
+    if(!isInvoice || invoicePreparing)return;
+    const email=payerEmail.trim();
+    if(email && (email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))){setErrorMsg('Enter a valid email, or leave it blank.');return;}
+    setInvoicePreparing(true);setErrorMsg('');
+    try {
+      const session=await createSession();
+      if(session?.__terminal || session?.__processing)return;
+      if(!session?.sessionId){setInvoiceAmountChosen(true);setPayState('error');setErrorMsg('We could not prepare your payment. Retry to check the same payment.');return;}
+      await refetchInvoice();
+      preSessionRef.current=session;googlePreSessionRef.current=session;setInvoiceAmountChosen(true);setPayState('idle');
+    }finally{setInvoicePreparing(false);}
   }
 
   async function finaliseCard(session: any) {
     try {
       const res = await apiRequest("POST", hfCompleteEndpoint, completionBody(session, { paymentMethod: "card" }));
       const result = await res.json();
+      if(!res.ok || !['approved','declined','cancelled'].includes(result?.outcome)){waitForPaymentConfirmation(session);return;}
       reconcileTokenAttempt(result, session);
-      if (result.approved) {
+      if (result.outcome==='approved') {
         trackEvent("payment_succeeded", { payment_method: "card", source: activeSource?.kind ?? "legacy" });
         setPayState("success");
         navigateAfterSuccess(result);
@@ -992,8 +1080,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       }
     } catch {
       trackEvent("payment_failed", { payment_method: "card", reason: "completion_error", source: activeSource?.kind ?? "legacy" });
-      setPayState("error");
-      setErrorMsg("Something went wrong. Please try again.");
+      waitForPaymentConfirmation(session);
     }
   }
 
@@ -1001,7 +1088,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     trackEvent("payment_attempted", { payment_method: "card", source: activeSource?.kind ?? "legacy" });
     setPayState("processing");
     const session = await createSession();
-    if (session?.__terminal) return;
+    if (session?.__terminal || session?.__processing) return;
     if (!session?.sessionId) {
       trackEvent("payment_failed", { payment_method: "card", reason: "session_error", source: activeSource?.kind ?? "legacy" });
       setPayState("error");
@@ -1018,6 +1105,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       (results: any) => {
         const allValid = Object.values(results as Record<string, any>).every((r: any) => r.isValidationPass);
         if (!allValid) { setPayState("idle"); return; }
+        savePaymentConfirmation(session);
         hfController.current!.submit(
           session.ajaxSubmitCardUrl,
           // Generous timeout (20 min) so a slow bank 3DS challenge is never cut
@@ -1030,15 +1118,12 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
               // Any non-"done" terminal status (abandoned / timed-out 3DS, etc.).
               // Surface a retryable error instead of leaving the spinner hanging
               // forever — the customer can tap "Try again" as many times as needed.
-              console.warn("HF submit non-done status:", status);
-              setPayState("error");
-              setErrorMsg("Card payment didn't complete. Please try again.");
+              waitForPaymentConfirmation(session);
             }
           },
           (err: any) => {
-            console.error("HF submit:", err);
-            setPayState("error");
-            setErrorMsg("Card payment failed. Please try again.");
+            console.error('[CARD_SUBMISSION_UNCONFIRMED]');
+            waitForPaymentConfirmation(session);
           }
         );
       },
@@ -1097,9 +1182,10 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
               paymentMethod: "apple_pay",
             }));
             const result = await res.json();
+            if(!res.ok || !['approved','declined','cancelled'].includes(result?.outcome)){notify(false);waitForPaymentConfirmation(preSession);return;}
             reconcileTokenAttempt(result, preSession);
-            notify(result.approved === true);
-            if (result.approved) {
+            notify(result.outcome === 'approved');
+            if (result.outcome==='approved') {
               trackEvent("payment_succeeded", { payment_method: "apple_pay", source: activeSource?.kind ?? "legacy" });
               setPayState("success");
               setPreSessionTrigger(t => t + 1); // queue a fresh session for any retry
@@ -1113,9 +1199,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
           } catch {
             trackEvent("payment_failed", { payment_method: "apple_pay", reason: "completion_error", source: activeSource?.kind ?? "legacy" });
             notify(false);
-            setPayState("error");
-            setErrorMsg("Apple Pay failed.");
-            setPreSessionTrigger(t => t + 1);
+            waitForPaymentConfirmation(preSession);
           }
         } else {
           // Any non-"done" state (e.g. "cancel") — user dismissed the sheet.
@@ -1127,7 +1211,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       (stage: string, msg: string) => {
         // SDK error callback. Distinguish early-stage failures (sheet never
         // appeared) from later failures (payment was in progress).
-        console.error("Apple Pay:", stage, msg);
+        console.error('[APPLE_PAY_SUBMISSION_UNCONFIRMED]');
         const beforeSheet = ["setup", "pre-submit"].includes(stage);
         if (beforeSheet) {
           // Error before the payment sheet appeared — reset to idle so the
@@ -1136,14 +1220,12 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
           setPreSessionTrigger(t => t + 1);
         } else {
           // Error during or after the sheet — show error state.
-          setPayState("error");
-          setErrorMsg("Apple Pay payment failed.");
-          setPreSessionTrigger(t => t + 1);
+          waitForPaymentConfirmation(preSession);
         }
       },
       (_: string, next: () => void) => { next(); },
       // Callback 5 (pre-submit): URL is already in opts.url — just pass through.
-      (next: () => void, _cancel: () => void) => { next(); }
+      (next: () => void, _cancel: () => void) => { savePaymentConfirmation(preSession);next(); }
     );
   }
 
@@ -1182,20 +1264,23 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       // Use pre-created session if available (no blocking network call).
       // Fall back to creating a new session if the pre-session wasn't ready.
       const session = googlePreSessionRef.current || await createSession();
+      sessionRef.current=session;
       googlePreSessionRef.current = null; // consume the session
-      if (session?.__terminal) return;
+      if (session?.__terminal || session?.__processing) return;
       if (!session) { setPayState("error"); setErrorMsg("Unable to start payment."); return; }
       // Trigger a new pre-session for retry after failed/cancelled payment
       if (!isRetailToken) setGooglePreSessionTrigger(t => t + 1);
       // NOTE: ajaxSubmitGooglePayUrl is intentionally NOT sent — the backend looks it
       // up from its server-side cache to prevent SSRF attacks.
+      savePaymentConfirmation(session);
       const res = await apiRequest("POST", gpayCompleteEndpoint, completionBody(session, {
         googlePayToken,
       }));
       const result = await res.json();
+      if(!res.ok || !['approved','declined','cancelled'].includes(result?.outcome)){waitForPaymentConfirmation(session);return;}
       reconcileTokenAttempt(result, session);
       if (isRetailToken) setGooglePreSessionTrigger(t => t + 1);
-      if (result.approved) {
+      if (result.outcome==='approved') {
         trackEvent("payment_succeeded", { payment_method: "google_pay", source: activeSource?.kind ?? "legacy" });
         setPayState("success");
         navigateAfterSuccess(result);
@@ -1207,8 +1292,8 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     } catch (e: any) {
       if (e?.statusCode === "CANCELED") { setPayState("idle"); return; }
       trackEvent("payment_failed", { payment_method: "google_pay", reason: "completion_error", source: activeSource?.kind ?? "legacy" });
-      setPayState("error");
-      setErrorMsg("Google Pay payment failed.");
+      if(sessionRef.current?.sessionId){waitForPaymentConfirmation(sessionRef.current);return;}
+      setPayState("error");setErrorMsg("Unable to open Google Pay. Please try again.");
     }
   }
 
@@ -1216,6 +1301,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     setCardOpen(false);
     setErrorMsg("");
     sessionRef.current = null;
+    if(isInvoice){void prepareInvoicePayment();return;}
     setPayState("idle");
     // A token retry re-resolves the same durable attempt with the same UUID.
     // The UUID is cleared only after an explicit reconciled terminal outcome,
@@ -1230,7 +1316,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     if (!isInvoice || splitBusy) return;
     setSplitBusy(true);
     try {
-      const res = await fetch(`/api/checkout/${token}/split`, {
+      const res = await fetch(apiPath("POST /api/checkout/:token/split", { token }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ count }),
@@ -1238,8 +1324,11 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       if (res.ok) {
         setSplitChoosing(false);
         await refetchInvoice();
+        await prepareInvoicePayment();
+      }else{
+        setErrorMsg(res.status===409?'This bill already has a payment in progress, so its split cannot change.':'We could not split this bill. Please try again.');
       }
-    } catch {} finally {
+    } catch {setErrorMsg('We could not split this bill. Please try again.');} finally {
       setSplitBusy(false);
     }
   }
@@ -1440,13 +1529,17 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       subtitle={subtitle}
       isInvoice={isInvoice}
       invoiceDocumentAvailable={!!(isInvoice && invoiceData?.kind === "charge" && invoiceData?.documentUrl)}
-      splitEnabled={!!invoiceData?.splitEnabled}
+      splitEnabled={!!invoiceData?.splitEnabled && !invoiceAmountChosen}
       splitActive={splitActive}
       splitChoosing={splitChoosing}
       splitBusy={splitBusy}
       splitCount={splitCount}
       splitPaid={splitPaid}
       payerEmail={payerEmail}
+      payerEmailFrozen={invoiceEmailFrozen}
+      amountSelection={isInvoice && !invoiceAmountChosen}
+      amountPreparing={invoicePreparing}
+      onConfirmAmount={prepareInvoicePayment}
       inAppBrowser={inAppEnv.isInApp}
       inAppIOS={inAppEnv.isIOS}
       inAppAndroid={inAppEnv.isAndroid}

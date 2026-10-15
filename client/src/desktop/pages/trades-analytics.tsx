@@ -1,3 +1,4 @@
+import { tabListKeyDown } from '@/lib/tab-list-keyboard';
 import {
   useCallback,
   useEffect,
@@ -61,8 +62,8 @@ const INK = "#12162E";
 const DEEP_BLUE = "#1D48C8";
 const SHEET_BG = "#F4F5F8";
 const SHEET_INK = "#04103A";
-const SHEET_DIM = "#8A90A4";
-const SHEET_LABEL = "#9AA0B2";
+const SHEET_DIM = "#586079";
+const SHEET_LABEL = "#586079";
 const DONUT_COLORS = ["#5E9EFF", "#93BAFF", "#DCE7FF", "rgba(94,158,255,0.35)", "rgba(94,158,255,0.18)"];
 
 /* Sheet geometry, straight from the prototype. */
@@ -460,7 +461,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
                 )}
               </div>
 
-              <div className="ta-segs" role="tablist" aria-label="revenue range" data-tutorial-id="ta-period">
+              <div className="ta-segs" role="tablist" onKeyDown={tabListKeyDown} aria-label="revenue range" data-tutorial-id="ta-period">
                 {RANGES.map((range) => {
                   const on = range.k === tf;
                   return (
@@ -469,10 +470,11 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
                       type="button"
                       role="tab"
                       aria-selected={on}
+                      tabIndex={on ? 0 : -1}
                       className="ta-seg"
                       style={{
                         background: on ? ACTIVE : "transparent",
-                        color: on ? NAVY : "#6B7BB8",
+                        color: on ? NAVY : "#93BAFF",
                         fontWeight: on ? 700 : 600,
                       }}
                       onClick={() => setTf(range.k)}
@@ -902,7 +904,7 @@ const TA_CSS = `
 .ta-hero-pill { margin-top:10px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:14px; color:#7FB2FF; white-space:nowrap; }
 .ta-hero-sub { font-weight:600; font-size:14px; color:#4A86F0; }
 .ta-hero-out { margin-top:26px; font-family:Outfit,sans-serif; font-weight:700; font-size:47px; line-height:0.92; letter-spacing:-0.015em; color:#5E9EFF; opacity:0.61; font-variant-numeric:tabular-nums; }
-.ta-hero-sub-dim { font-weight:300; opacity:0.61; }
+.ta-hero-sub-dim { font-weight:300; opacity:1; }
 .ta-segs { display:flex; align-items:center; padding:4px; border-radius:9999px; background:#0F1747; }
 .ta-seg { padding:8px 0; width:70px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .18s ease, color .18s ease; }
 

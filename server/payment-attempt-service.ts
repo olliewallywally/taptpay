@@ -2,8 +2,10 @@ import {
   PAYMENT_ATTEMPT_MAX_LEASE_MS,
   PAYMENT_RETURN_STATE_MAX_AGE_MS,
   paymentAttemptOutcomes,
+  paymentProviderEnvironments,
   type PaymentAttempt,
   type PaymentAttemptOutcome,
+  type PaymentProviderEnvironment,
   type SplitPayment,
   type Transaction,
 } from "@shared/schema";
@@ -11,6 +13,13 @@ import {
   hashBearerCredential,
   PAYMENT_TOKEN_PATTERN,
 } from "./payment-credential";
+import type { InboxClaim, VerifiedOutcome } from "./durable-payment-contract";
+
+// decimal(10,2) on the ledger: 99,999,999.99.
+const MAX_EXPECTED_CENTS = 9_999_999_999;
+const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+// A reconciliation code is ours, never provider text: lowercase words, digits, `_` and `:`.
+const RECONCILIATION_CODE_PATTERN = /^[a-z][a-z0-9_:]{0,63}$/;
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,8 +57,43 @@ export interface AttachPaymentAttemptSessionRecordInput {
   now: Date;
 }
 
+export interface RecordPaymentAttemptExpectedValuesRecordInput {
+  attemptId: string;
+  amountCents: number;
+  currency: string;
+  merchantReference: string;
+  providerEnvironment: PaymentProviderEnvironment;
+  now: Date;
+}
+
+/**
+ * R2-T4: "reused" means the same values were already recorded (before or after a
+ * session was attached); "conflict" means different values are recorded, or the
+ * attempt already has a session without any (attached before migration 0034).
+ */
+export type RecordPaymentAttemptExpectedValuesResult =
+  | { kind: "recorded"; attempt: PaymentAttempt }
+  | { kind: "reused"; attempt: PaymentAttempt }
+  | { kind: "expired"; attempt: PaymentAttempt }
+  | { kind: "terminal"; attempt: PaymentAttempt }
+  | { kind: "conflict"; attempt: PaymentAttempt }
+  | { kind: "not-found" };
+
+/** R2-T6: the last provider query's sanitized outcome on an attempt. */
+export interface RecordPaymentAttemptReconciliationRecordInput {
+  attemptId: string;
+  code: string;
+  now: Date;
+}
+
+export type RecordPaymentAttemptReconciliationResult =
+  | { kind: "recorded"; attempt: PaymentAttempt }
+  | { kind: "not-found" };
+
 export type AttachPaymentAttemptSessionResult =
   | { kind: "attached"; attempt: PaymentAttempt }
+  /** R2-T4: a session is attached only after the attempt's expected values. */
+  | { kind: "expected-values-missing"; attempt: PaymentAttempt }
   | { kind: "reused"; attempt: PaymentAttempt }
   | { kind: "expired"; attempt: PaymentAttempt }
   | { kind: "terminal"; attempt: PaymentAttempt }
@@ -77,18 +121,20 @@ export interface FinalizePaymentAttemptRecordInput {
   outcome: PaymentAttemptOutcome;
   receiptShare: number | null;
   now: Date;
+  reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome };
 }
 
 export interface FinalizedPaymentAttemptEffects {
   transaction: Transaction;
   splitPayment: SplitPayment | null;
   counterIncremented: boolean;
+  eventId?: string;
 }
 
 export type FinalizePaymentAttemptResult =
   | ({ kind: "finalized"; attempt: PaymentAttempt } & FinalizedPaymentAttemptEffects)
   | ({ kind: "reused"; attempt: PaymentAttempt } & FinalizedPaymentAttemptEffects)
-  | { kind: "conflict"; attempt: PaymentAttempt }
+  | { kind: "conflict"; attempt: PaymentAttempt; reason?: "lease-lost" }
   | { kind: "not-found" };
 
 export interface PaymentAttemptRepository {
@@ -104,6 +150,12 @@ export interface PaymentAttemptRepository {
   claimPaymentAttemptRecord(
     input: ClaimPaymentAttemptRecordInput,
   ): Promise<ClaimPaymentAttemptResult>;
+  recordPaymentAttemptExpectedValuesRecord(
+    input: RecordPaymentAttemptExpectedValuesRecordInput,
+  ): Promise<RecordPaymentAttemptExpectedValuesResult>;
+  recordPaymentAttemptReconciliationRecord(
+    input: RecordPaymentAttemptReconciliationRecordInput,
+  ): Promise<RecordPaymentAttemptReconciliationResult>;
   attachPaymentAttemptSessionRecord(
     input: AttachPaymentAttemptSessionRecordInput,
   ): Promise<AttachPaymentAttemptSessionResult>;
@@ -133,7 +185,12 @@ export class PaymentAttemptInputError extends Error {
       | "paymentMethod"
       | "returnState"
       | "receiptShare"
-      | "outcome",
+      | "outcome"
+      | "amountCents"
+      | "currency"
+      | "merchantReference"
+      | "providerEnvironment"
+      | "reconciliationCode",
     message: string,
   ) {
     super(message);
@@ -177,6 +234,47 @@ export class PaymentAttemptService {
       now,
       leaseExpiresAt: new Date(now.getTime() + PAYMENT_ATTEMPT_MAX_LEASE_MS),
     });
+  }
+
+  /**
+   * R2-T4 (plan §9.4): fix what the provider must confirm before its session is
+   * created. Recorded once; the same values again are "reused", different values a
+   * "conflict"; once a session is attached they cannot change.
+   */
+  recordExpectedValues(input: {
+    attemptId: string;
+    amountCents: number;
+    currency: string;
+    merchantReference: string;
+    providerEnvironment: PaymentProviderEnvironment;
+  }): Promise<RecordPaymentAttemptExpectedValuesResult> {
+    assertUuid(input.attemptId, "attemptId");
+    if (!Number.isSafeInteger(input.amountCents) || input.amountCents < 0 || input.amountCents > MAX_EXPECTED_CENTS) {
+      throw new PaymentAttemptInputError("amountCents", "amountCents must be whole cents within the ledger's range");
+    }
+    if (!CURRENCY_PATTERN.test(input.currency)) {
+      throw new PaymentAttemptInputError("currency", "currency must be an uppercase ISO 4217 code");
+    }
+    if (typeof input.merchantReference !== "string" || input.merchantReference.length < 1 || input.merchantReference.length > 64) {
+      throw new PaymentAttemptInputError("merchantReference", "merchantReference must be 1 to 64 characters");
+    }
+    if (!(paymentProviderEnvironments as readonly string[]).includes(input.providerEnvironment)) {
+      throw new PaymentAttemptInputError("providerEnvironment", "providerEnvironment must be uat or production");
+    }
+    return this.repository.recordPaymentAttemptExpectedValuesRecord({ ...input, now: this.clock() });
+  }
+
+  /**
+   * R2-T6 (plan §9.4): what the last provider query for this attempt answered, as a
+   * sanitized code ("approved", "pending", "integrity_mismatch:amount", ...) and the
+   * time. It changes nothing else about the attempt.
+   */
+  recordReconciliation(input: { attemptId: string; code: string }): Promise<RecordPaymentAttemptReconciliationResult> {
+    assertUuid(input.attemptId, "attemptId");
+    if (typeof input.code !== "string" || !RECONCILIATION_CODE_PATTERN.test(input.code)) {
+      throw new PaymentAttemptInputError("reconciliationCode", "reconciliationCode must be a short lowercase code");
+    }
+    return this.repository.recordPaymentAttemptReconciliationRecord({ ...input, now: this.clock() });
   }
 
   attachSession(input: {
@@ -290,6 +388,7 @@ export class PaymentAttemptService {
     paymentMethod?: string | null;
     outcome: PaymentAttemptOutcome;
     receiptShare?: number | null;
+    reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome };
   }): Promise<FinalizePaymentAttemptResult> {
     assertUuid(input.attemptId, "attemptId");
     assertNonEmpty(input.processorSessionId, "processorSessionId");
@@ -329,6 +428,7 @@ export class PaymentAttemptService {
       outcome: input.outcome,
       receiptShare,
       now: this.clock(),
+      ...(input.reconciliation ? { reconciliation: input.reconciliation } : {}),
     });
   }
 }

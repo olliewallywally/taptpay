@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { consumeSnap, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 import { propFetch } from "@/lib/property-api";
+import { businessCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 /* ── Design tokens ── */
 const C = {
@@ -11,7 +13,7 @@ const C = {
   btn:   '#3F9BFF',
   white: '#FFFFFF',
   gray:  '#E7E6E5',
-  mute:  '#8C8C8C',
+  mute:  '#586079',
 };
 
 const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
@@ -20,9 +22,9 @@ const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: s
   upcoming: { dot: C.btn,    bg: 'rgba(63,155,255,0.22)', fg: C.sky,    label: 'upcoming' },
 };
 
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie.
 function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return businessCsrfHeader();
 }
 
 const EVENT_KINDS: Record<string, { color: string; icon: string; fg: string }> = {
@@ -111,23 +113,23 @@ export default function TenantProfile() {
   useLayoutEffect(() => { signalPropertyReady(); }, []);
 
   const { data: tenant, isLoading } = useQuery<any>({
-    queryKey: ['/api/property/tenants', tenantId],
-    queryFn: () => propFetch(`/api/property/tenants/${tenantId}`).then(r => r.ok ? r.json() : null),
+    queryKey: [apiPath("GET /api/property/tenants"), tenantId],
+    queryFn: () => propFetch(apiPath("GET /api/property/tenants/:id", { id: tenantId })).then(r => r.ok ? r.json() : null),
     enabled: !!tenantId,
     retry: false,
   });
 
   const { data: events = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/tenants', tenantId, 'events'],
-    queryFn: () => propFetch(`/api/property/tenants/${tenantId}/events`).then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/property/tenants"), tenantId, 'events'],
+    queryFn: () => propFetch(apiPath("GET /api/property/tenants/:id/events", { id: tenantId })).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices', { tenantProfileId: tenantId }],
-    queryFn: () => propFetch(`/api/property/invoices?tenantProfileId=${tenantId}`).then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/property/invoices"), { tenantProfileId: tenantId }],
+    queryFn: () => propFetch(`${apiPath("GET /api/property/invoices")}?tenantProfileId=${tenantId}`).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
@@ -135,7 +137,7 @@ export default function TenantProfile() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const r = await fetch(`/api/property/tenants/${tenantId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() }, body: JSON.stringify(data) });
+      const r = await fetch(apiPath("PUT /api/property/tenants/:id", { id: tenantId }), { method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() }, body: JSON.stringify(data) });
       if (!r.ok) {
         const msg = await r.json().then((d: any) => d.message).catch(() => `Error ${r.status}`);
         throw new Error(msg);
@@ -143,7 +145,7 @@ export default function TenantProfile() {
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants', tenantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/tenants"), tenantId] });
       setEditError(null);
       setEditing(false);
     },
@@ -152,12 +154,12 @@ export default function TenantProfile() {
 
   const archiveMutation = useMutation({
     mutationFn: async () => {
-      const r = await fetch(`/api/property/tenants/${tenantId}/archive`, { method: 'POST', headers: propHeaders() });
+      const r = await fetch(apiPath("POST /api/property/tenants/:id/archive", { id: tenantId }), { method: 'POST', headers: propHeaders() });
       if (!r.ok) throw new Error('Failed to archive');
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/tenants")] });
       startPropertyBack(() => setLocation('/property/tenants'));
     },
   });
@@ -224,7 +226,7 @@ export default function TenantProfile() {
       {/* Top bar — slides down from above as the hero morphs into place */}
       <div className="pt-slide-top" style={{ '--pt-d': '0ms' } as any}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 18px 14px' }}>
-          <button onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <button aria-label="Back to tenants" onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>
           </button>
           <div style={{ fontWeight: 600, fontSize: 11, color: C.navy, letterSpacing: '0.16em', textTransform: 'uppercase' }}>tenant profile</div>

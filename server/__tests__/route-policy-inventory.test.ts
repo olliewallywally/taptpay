@@ -201,3 +201,20 @@ describe("R1-T2 — every middleware registration has policy (C10)", () => {
     expect(afterRoutes[0].handle.length).toBe(4); // (error, req, res, next): an error handler
   });
 });
+
+describe('unusual Express registrations cannot disappear from the source inventory', () => {
+  it.each(['head', 'options', 'connect', 'trace', 'propfind', 'del'])('records app.%s', (method) => {
+    const source = `const app = express(); app.${method}("/new", handler);`;
+    expect(extractSourceInventory(source, 'server/index.ts').registrations).toEqual([
+      expect.objectContaining({method: method === 'del' ? 'DELETE' : method.toUpperCase(), path: '/new'}),
+    ]);
+  });
+  it('records literal computed methods', () => {
+    expect(extractSourceInventory('app["options"]("/new", handler)', 'server/index.ts').registrations).toHaveLength(1);
+  });
+  it.each(['app[method]("/new", handler)', 'app.get(path, handler)', 'app.route("/new").get(handler)'])(
+    'requires manual inventory support for %s', source => {
+      expect(() => extractSourceInventory(source, 'server/index.ts')).toThrow(/Express/);
+    },
+  );
+});

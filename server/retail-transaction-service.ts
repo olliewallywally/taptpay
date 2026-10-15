@@ -1,5 +1,6 @@
 import type { Transaction } from "@shared/schema";
 import { createPaymentCredential, type PaymentCredential } from "./payment-credential";
+import {deriveRetailCreationCredential,CreationCredentialUnavailable} from './payment-creation-command';
 import {
   toTransactionStorageInput,
   type TransactionStorageInput,
@@ -19,6 +20,7 @@ export interface RetailTransactionWriter {
 export interface CreatedRetailTransaction {
   transaction: Transaction;
   rawToken?: string;
+  reused?:boolean;
 }
 
 export class PaymentCredentialCollisionError extends Error {
@@ -58,6 +60,8 @@ export async function createRetailTransaction(
   options: {
     credentialFactory?: () => PaymentCredential;
     maxCredentialAttempts?: number;
+    creationKey?:string;
+    returnStateSecret?:string;
   } = {},
 ): Promise<CreatedRetailTransaction> {
   if (linkMode === "per_payment" && input.taptStoneId != null) {
@@ -65,14 +69,14 @@ export async function createRetailTransaction(
   }
 
   if (linkMode === "legacy") {
-    return {
-      transaction: await writer.createTransaction(
+    const transaction=await writer.createTransaction(
         toTransactionStorageInput(input as any),
-      ),
-    };
+      );
+    return {transaction,...(options.creationKey?{reused:!!(transaction as any).creationReused}:{})};
   }
 
-  const credentialFactory = options.credentialFactory ?? createPaymentCredential;
+  const credentialFactory = options.creationKey?()=>deriveRetailCreationCredential(input.merchantId!,options.creationKey!,options.returnStateSecret??''):
+    options.credentialFactory ?? createPaymentCredential;
   const maxAttempts = options.maxCredentialAttempts ?? 5;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const credential = credentialFactory();
@@ -80,7 +84,8 @@ export async function createRetailTransaction(
       const transaction = await writer.createTransaction(
         toTransactionStorageInput(input as any, { paymentTokenHash: credential.hash }),
       );
-      return { transaction, rawToken: credential.rawToken };
+      if(transaction.paymentTokenHash!==credential.hash)throw new CreationCredentialUnavailable();
+      return { transaction, rawToken: credential.rawToken,...(options.creationKey?{reused:!!(transaction as any).creationReused}:{}) };
     } catch (error) {
       if (!isPaymentTokenUniqueViolation(error)) throw error;
     }

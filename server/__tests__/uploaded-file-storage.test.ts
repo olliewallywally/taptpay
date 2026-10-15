@@ -1,7 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
+import { signedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
 
 // A minimal buffer that passes the logo route's PNG magic-byte check.
 const PNG_MAGIC_ONLY = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
@@ -26,7 +26,7 @@ describe("R1-T7 uploaded file blobs go through storage, not `db` directly", () =
 
     const upload = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
     expect(upload.status).toBe(200);
     expect(upload.body.logoUrl).toMatch(/^\/uploads\/logos\/merchant-\d+\.png$/);
@@ -52,7 +52,7 @@ describe("R1-T7 uploaded file blobs go through storage, not `db` directly", () =
 
     const upload = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
     expect(upload.status).toBe(200);
 
@@ -67,11 +67,11 @@ describe("R1-T7 uploaded file blobs go through storage, not `db` directly", () =
 
     const upload = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
     expect(upload.status).toBe(200);
 
-    const remove = await request(app).delete(`/api/merchants/${owner.merchantId}/logo`).set(bearer(owner));
+    const remove = await request(app).delete(`/api/merchants/${owner.merchantId}/logo`).set(signedIn(owner));
     expect(remove.status).toBe(200);
 
     const servedAfterDelete = await request(app).get(upload.body.logoUrl);
@@ -110,7 +110,7 @@ describe("R1-T3 UPL-5 — logo re-upload does not orphan a blob under a client-c
 
     const first = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
     expect(first.status).toBe(200);
     expect(first.body.logoUrl).toBe(`/uploads/logos/merchant-${owner.merchantId}.png`);
@@ -121,7 +121,7 @@ describe("R1-T3 UPL-5 — logo re-upload does not orphan a blob under a client-c
     // trusts the multipart Content-Type header for fileFilter, not the name).
     const second = await request(app)
       .post(`/api/merchants/${owner.merchantId}/logo`)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .attach("logo", PNG_MAGIC_ONLY, { filename: "photo.jpg", contentType: "image/png" });
     expect(second.status).toBe(200);
 
@@ -135,7 +135,7 @@ describe("R1-T3 UPL-5 — logo re-upload does not orphan a blob under a client-c
 
     // Deleting the (single) logo cleans up the one blob that exists — nothing
     // left behind under any other extension.
-    const remove = await request(app).delete(`/api/merchants/${owner.merchantId}/logo`).set(bearer(owner));
+    const remove = await request(app).delete(`/api/merchants/${owner.merchantId}/logo`).set(signedIn(owner));
     expect(remove.status).toBe(200);
     const stillServed = await request(app).get(second.body.logoUrl);
     expect(stillServed.status).toBe(404);

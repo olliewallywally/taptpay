@@ -53,7 +53,7 @@ export function DesktopShell({
       data-desktop-vertical={vertical}
     >
       <header className="tapt-desktop-header">
-        <span className="tapt-desktop-wordmark" aria-label="taptpay">
+        <span className="tapt-desktop-wordmark" role="img" aria-label="taptpay">
           <span>tapt</span>
           <span className="tapt-desktop-wordmark-pay">pay</span>
         </span>

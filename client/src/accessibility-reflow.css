@@ -1,0 +1,107 @@
+/* Native 200% zoom can reduce a phone-sized browser to 195 CSS pixels.
+   Reflow content at narrow widths while preserving its authored text size.
+   The accepted matrix layouts start at 390px and do not use these rules. */
+@media (max-width: 260px) {
+  html { scroll-padding-bottom: 100px; }
+  main, section, form, header { max-width: 100%; }
+  div, span, p, input, select, textarea { min-width: 0 !important; }
+  input, select, textarea { max-width: 100%; }
+  h1, h2, h3, p, label, button, code, span,
+  div[style*="white-space: nowrap"] {
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+  }
+  button { scroll-margin-bottom: 100px; }
+  div[style*="text-overflow: ellipsis"] { overflow: visible !important; }
+  .flex.items-center { flex-wrap: wrap; }
+  html .step-indicator-row { flex-wrap: wrap; gap: 16px; }
+  html .step-indicator { min-width: 60px !important; }
+  html .step-indicator-inner { flex-shrink: 0; }
+  .grid, div[style*="grid-template-columns"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .flex.justify-between,
+  div[style*="justify-content: space-between"] {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  [data-demo-id="terminal-dock"] > div {
+    max-width: calc(100vw - 16px);
+  }
+  div[data-demo-id="dock-terminal"] {
+    width: calc(100vw - 16px) !important;
+    padding: 0 2px !important;
+  }
+  div[data-demo-id="dock-terminal"] > button {
+    padding: 4px !important;
+    flex-shrink: 0;
+  }
+  div[data-demo-id="dock-terminal"] > button { min-height: 36px; }
+  html .tp-viewport { height: calc(100svh - 100px) !important; min-height: 0; overflow: auto !important; scroll-padding-block: 8px; }
+  html .tp-viewport .tp-layer:not(.leaving) { position: relative; overflow: visible; }
+  html .tp-viewport .tp-screen:is(.tp-home, .tp-feature, .tp-plain) { position: relative; inset: auto; height: auto; overflow: visible; }
+  html .tp-viewport .tp-screen.tp-home,
+  html .tp-viewport .tp-screen.tp-feature { display: flex; flex-direction: column; overflow: visible; }
+  html .tp-viewport .tp-hero { container-type: inline-size; }
+  html .tp-viewport .tp-panel,
+  html .tp-viewport .tp-panel-body { container-type: inline-size; height: auto !important; overflow: visible; }
+  html .tp-viewport .tp-home-hero { overflow: visible; padding-bottom: 24px !important; }
+  html .tp-viewport .tp-home-chrome { display: none; }
+  html .tp-viewport .tp-overlay { position: static; }
+  html .tp-viewport .tp-overlay > :is(.tp-pfab, .tp-psubbar).show {
+    position: relative; top: auto !important; left: auto; right: auto;
+    transform: none !important; margin: 12px auto; display: flex; justify-content: center;
+  }
+  html .tp-viewport .tp-overlay > :is(.tp-pfab, .tp-psubbar).hide { display: none; }
+  html .tp-viewport .tp-home-stack { overflow: visible; padding-bottom: 100px !important; }
+  html .property-analytics-view { height: auto !important; overflow: visible !important; padding-bottom: 100px; }
+  html .property-analytics-view .pa-history-sheet { position: relative !important; height: auto !important; transform: none !important; overflow: visible !important; }
+  html .property-analytics-view .pa-history-sheet > div:first-child { display: none; }
+  html .tp-viewport .tp-stack-scroll { flex: none !important; max-height: min(280px, calc(100svh - 116px)); overflow: auto; }
+  html :is(.retail-terminal-view, .property-terminal-view, .trades-terminal-view).tp-viewport .tp-home-hero .tp-amount {
+    font-size: var(--amount-authored, 88px) !important;
+  }
+  html .tp-viewport .tp-amount { font-size: var(--amount-authored, 88px) !important; }
+  html .tp-viewport .tp-psubbar { width: 100%; padding-inline: 8px; flex-wrap: wrap; }
+  html .tp-viewport .tp-subbar-center,
+  html .tp-viewport .tp-subbar-wrap { width: 100%; }
+  html .tp-viewport .tp-subbar.tp-bar { grid-auto-columns: minmax(0, 1fr); width: 100%; height: auto; min-height: 44px; }
+  html .tp-viewport .tp-subbar.tp-bar .tp-bar-btn { padding: 4px; min-height: 36px; flex-wrap: wrap; }
+  .tdir-row, .cdir-row { grid-template-columns: minmax(0, 1fr) !important; }
+  .stock-header-row { flex-wrap: wrap; }
+  .accessibility-scroll-page { height: calc(100svh - 100px) !important; min-height: 0 !important; overflow: auto !important; }
+  .accessibility-scroll-page .analytics-history-sheet { position: relative !important; transform: none !important; height: auto !important; overflow: visible !important; }
+  html .directory-page { height: 100svh; padding-bottom: 100px !important; display: flex; flex-direction: column; box-sizing: border-box; }
+  html .directory-page :is(.tdir-hero, .cdir-hero) { height: auto; padding: 32px 20px; flex-shrink: 0; }
+  html .directory-page :is(.tdir-body, .cdir-body) { flex: 1; min-height: 0; overflow: auto; }
+  nav.fixed.bottom-0 > .grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+  [role="dialog"] [data-testid="button-cancel-edit"],
+  [role="dialog"] [data-testid="button-confirm-add"] { min-height: 44px; }
+  .tdir-name, .tdir-address, .cdir-name, .cdir-address,
+  .tp-stack-name, .tp-amount, .step-label {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .tp-stack-row { height: auto !important; min-height: 44px; }
+  html .tp-viewport .tp-stack-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  html .tp-viewport .tp-stack-row > div { flex: none !important; max-width: 100%; }
+  .step-number { flex-shrink: 0; }
+  [data-demo-id="retail-dashboard-reports"] { max-width: 100%; }
+  .rounded-2xl > button.w-full.flex.items-center.gap-4 {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .retail-dashboard-view,
+  main > section { overflow-wrap: anywhere; }
+  [data-testid="button-add-product"] { white-space: normal; }
+}
+@media (max-width: 767px) {
+  .admin-workspace > main { height: calc(100svh - 64px); overflow: auto; }
+}
+/* Keep native keyboard focus above the phone's fixed terminal dock. */
+.property-terminal-view .tp-stack-row,
+.trades-terminal-view .tp-stack-row {
+  scroll-margin-block: 100px;
+}

@@ -24,6 +24,7 @@ import { isNativeIOS, canTapToPay } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
+import { sessionFetch } from "@/lib/session";
 
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -157,9 +158,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -169,7 +168,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const { data: activeTransaction } = useQuery({
     queryKey: ["/api/merchants", merchantId, "active-transaction"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/active-transaction`);
+      const response = await sessionFetch(`/api/merchants/${merchantId}/active-transaction`);
       if (!response.ok) throw new Error("Failed to fetch active transaction");
       return response.json();
     },
@@ -180,7 +179,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const { data: taptStones = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
+      const response = await sessionFetch(`/api/merchants/${merchantId}/tapt-stones`);
       if (!response.ok) throw new Error("Failed to fetch tapt stones");
       return response.json();
     },
@@ -190,9 +189,8 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const { data: stockItems = EMPTY_STOCK_ITEMS } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items`, {
         headers: {
-          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
           "Content-Type": "application/json"
         }
       });
@@ -312,10 +310,9 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
       }
 
       setTapToPayStatus("processing");
-      const authToken = localStorage.getItem("authToken");
-      const response = await fetch("/api/transactions/tap-to-pay", {
+      const response = await sessionFetch("/api/transactions/tap-to-pay", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
           transactionId: transaction.id,
@@ -419,9 +416,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
 
   // Set up SSE connection
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-    sseClient.connectMerchant(merchantId, token);
+    sseClient.connectMerchant(merchantId);
     
     sseClient.subscribe("transaction_updated", (message) => {
       // Route through the query cache only — the [activeTransaction] effect
@@ -453,7 +448,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   useEffect(() => {
     const checkCapabilities = async () => {
       try {
-        const response = await fetch('/api/nfc/capabilities');
+        const response = await sessionFetch('/api/nfc/capabilities');
         const capabilities = await response.json();
         setNfcCapabilities(capabilities);
         
@@ -1204,9 +1199,7 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
   const { data: allTransactions = [] } = useQuery<any[]>({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       return res.json();
     },
     refetchInterval: 3000,

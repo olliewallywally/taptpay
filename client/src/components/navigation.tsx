@@ -3,7 +3,8 @@ import { useLocation } from "wouter";
 import { LogOut, Menu, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { getCurrentMerchantId, getCurrentUser } from "@/lib/auth";
+import { logOut } from "@/lib/log-out";
 import taptLogoUrl from "@assets/tapt logo_1751676012286.png";
 
 export function Navigation() {
@@ -14,11 +15,9 @@ export function Navigation() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
+  // R1-T4 phase E: the signed-in login as the start-up check read it (nothing is kept in storage).
   useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      try { setUser(JSON.parse(userData)); } catch {}
-    }
+    setUser(getCurrentUser());
   }, []);
 
   // Close dropdown on click outside or Escape key
@@ -39,10 +38,8 @@ export function Navigation() {
     };
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("merchantId");
+  const handleLogout = async () => {
+    await logOut();
     setLocation("/");
   };
 

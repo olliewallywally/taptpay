@@ -3,7 +3,7 @@ import "./support/test-env";
 import crypto from "crypto";
 import request from "supertest";
 import {
-  bearer,
+  signedIn,
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -64,7 +64,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .post(`/api/team/${encodeURIComponent(garbage)}/resend`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
     });
@@ -76,7 +76,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .post("/api/team/abc/resend")
-        .set(bearer(member));
+        .set(signedIn(member));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
     });
@@ -89,7 +89,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .post(`/api/team/${invite.user.id}/resend`)
-        .set(bearer(member));
+        .set(signedIn(member));
       expect(response.status).toBe(403);
       expect(response.body.message).toBe("Only the account owner can resend invites");
     });
@@ -100,7 +100,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .post("/api/team/999999/resend")
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(404);
       expect(response.body.message).toBe("Invite not found");
     });
@@ -112,7 +112,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .post(`/api/team/${invite.user.id}/resend`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(200);
       expect(response.body.member.id).toBe(invite.user.id);
     });
@@ -125,7 +125,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${encodeURIComponent(garbage)}/invite`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
     });
@@ -137,7 +137,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete("/api/team/abc/invite")
-        .set(bearer(member));
+        .set(signedIn(member));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
     });
@@ -150,7 +150,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${invite.user.id}/invite`)
-        .set(bearer(member));
+        .set(signedIn(member));
       expect(response.status).toBe(403);
       expect(response.body.message).toBe("Only the account owner can revoke invites");
     });
@@ -161,7 +161,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete("/api/team/999999/invite")
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(404);
       expect(response.body.message).toBe("Invite not found");
     });
@@ -174,7 +174,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${otherInvite.user.id}/invite`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(404);
     });
 
@@ -185,7 +185,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${invite.user.id}/invite`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(200);
       expect(response.body.message).toBe("Invite revoked");
     });
@@ -198,7 +198,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .put(`/api/team/${encodeURIComponent(garbage)}/status`)
-        .set(bearer(owner))
+        .set(signedIn(owner))
         .send({ status: "disabled" });
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
@@ -211,7 +211,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .put("/api/team/abc/status")
-        .set(bearer(member))
+        .set(signedIn(member))
         .send({ status: "disabled" });
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
@@ -225,7 +225,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .put(`/api/team/${target.user.id}/status`)
-        .set(bearer(member))
+        .set(signedIn(member))
         .send({ status: "disabled" });
       expect(response.status).toBe(403);
       expect(response.body.message).toBe("Only the account owner can change logins");
@@ -238,7 +238,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .put(`/api/team/${target.user.id}/status`)
-        .set(bearer(owner))
+        .set(signedIn(owner))
         .send({ status: "not-a-real-status" });
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid request");
@@ -251,7 +251,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .put(`/api/team/${target.user.id}/status`)
-        .set(bearer(owner))
+        .set(signedIn(owner))
         .send({ status: "disabled" });
       expect(response.status).toBe(200);
       expect(response.body.member.id).toBe(target.user.id);
@@ -266,7 +266,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${encodeURIComponent(garbage)}`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
     });
@@ -278,7 +278,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete("/api/team/abc")
-        .set(bearer(member));
+        .set(signedIn(member));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid userId");
     });
@@ -291,7 +291,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${target.user.id}`)
-        .set(bearer(member));
+        .set(signedIn(member));
       expect(response.status).toBe(403);
       expect(response.body.message).toBe("Only the account owner can remove logins");
     });
@@ -302,7 +302,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete("/api/team/999999")
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(404);
     });
 
@@ -314,7 +314,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${otherMember.user.id}`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(404);
     });
 
@@ -325,7 +325,7 @@ describe("R1-T6 — /api/team/:userId identifier batch", () => {
 
       const response = await request(app)
         .delete(`/api/team/${target.user.id}`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(200);
       expect(response.body.message).toBe("Login removed");
 

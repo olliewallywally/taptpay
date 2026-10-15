@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { csvCell } from "@/lib/report-utils";
 import QRCode from "qrcode";
+import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 interface Transaction {
   id: number;
@@ -33,7 +35,7 @@ const C = {
   sheet:  '#F4F4F4',
   handle: 'rgba(0,0,0,0.08)',
   dark:   '#1a1a1a',
-  muted:  'rgba(0,0,0,0.35)',
+  muted:  '#586079',
 };
 
 type Timeframe = 'day' | 'week' | 'month' | 'year';
@@ -114,24 +116,18 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   const { toast } = useToast();
 
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },
   });
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -140,7 +136,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
   const refundMutation = useMutation({
     mutationFn: async ({ txId, amount, reason }: { txId: number; amount: string; reason: string }) => {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/refunds`, {
+      const res = await apiRequest(...apiTo("POST /api/transactions/:transactionId/refunds", { transactionId: txId }), {
         refundAmount: amount,
         refundReason: reason,
         refundMethod: "original_payment_method",
@@ -155,7 +151,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
       if (data.transaction) {
         setSelectedTx((prev) => prev ? { ...prev, ...data.transaction } : null);
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
     },
     onError: (err: any) => {
       toast({ title: "Refund failed", description: err.message || "Could not process refund.", variant: "destructive" });
@@ -182,10 +178,8 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   };
 
   const fetchPdfBlob = async (txId: number): Promise<Blob> => {
-    const token = localStorage.getItem("authToken");
-    const response = await fetch(`/api/transactions/${txId}/receipt-pdf`, {
+    const response = await sessionFetch(apiPath("POST /api/transactions/:id/receipt-pdf", { id: txId }), {
       method: "POST",
-      headers: { "Authorization": `Bearer ${token}` },
     });
     if (!response.ok) throw new Error("Failed to generate PDF");
     return response.blob();
@@ -263,6 +257,12 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
   const defaultOffset = measuredTop ?? 340;
   const currentOffset = sheetOffset ?? defaultOffset;
+
+  // The expanded sheet covers this region. Keep its controls out of focus and hit testing
+  // until the graph is revealed again, using the sheet's existing expanded-state threshold.
+  useEffect(() => {
+    if (topRef.current) topRef.current.inert = currentOffset < 40;
+  }, [currentOffset]);
 
   const onDragStart = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -378,10 +378,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
   const handleDownloadPDF = async () => {
     try {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/export/pdf`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/export/pdf", { id: merchantId }));
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -432,7 +429,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
     <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
-      <div ref={topRef} style={{ padding: '52px 24px 0' }}>
+      <div ref={topRef} aria-hidden={currentOffset < 40 || undefined} style={{ padding: '52px 24px 0' }}>
         <div style={{ marginBottom: 20 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>analytics</span>
         </div>
@@ -440,7 +437,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
         {/* Period pills */}
         <div data-tutorial-id="tx-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
-            <button className="tap-target" key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button className="tap-target" key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.7)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
             </button>
           ))}
@@ -448,7 +445,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
         {/* Total */}
         <div style={{ textAlign: 'center', marginBottom: 4 }}>
-          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Revenue · {totalTransactions} transactions</p>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.7)', margin: 0, letterSpacing: '0.04em' }}>Revenue · {totalTransactions} transactions</p>
           <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' as any }}>
             ${totalRevenue.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
@@ -465,7 +462,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
             const tipPt = pCoords[7] ?? { x: W - pad, y: H / 2 };
             return (
               <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
-                <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block', overflow: 'visible' }}>
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
                   <defs>
                     <linearGradient id="ra1" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.sky} stopOpacity="0.22" />
@@ -522,7 +519,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
             <button className="tap-target"
               data-tutorial-id="tx-export"
               onClick={() => setShowDownloads(v => !v)}
-              style={{ fontSize: 12, fontWeight: 600, color: C.sky, background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{ fontSize: 12, fontWeight: 600, color: C.navy, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               {showDownloads ? 'hide exports' : 'export →'}
             </button>

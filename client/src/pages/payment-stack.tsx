@@ -4,16 +4,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MerchantGate } from "@/components/merchant-gate";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { cancelRefusalMessage } from "@/lib/cancel-refusal";
 import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { Transaction } from "@shared/schema";
+import { businessCsrfHeader } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 const BRAND = "#00DFC8";
 const SURFACE = "rgba(26, 86, 255, 0.08)";
 const BORDER = "rgba(26, 86, 255, 0.18)";
 
 const statusConfig: Record<string, { color: string; label: string }> = {
-  pending:    { color: "#3B82F6", label: "Awaiting Payment" },
+  pending:    { color: "#93BAFF", label: "Awaiting Payment" },
   processing: { color: "#F59E0B", label: "Processing"       },
   completed:  { color: BRAND,    label: "Complete"          },
   failed:     { color: "#EF4444", label: "Failed"           },
@@ -27,9 +30,9 @@ function timeAgo(dateStr: string | Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie, which the browser sends itself.
 function authHeaders(): Record<string, string> {
-  const authToken = localStorage.getItem("authToken");
-  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  return businessCsrfHeader();
 }
 
 export default function PaymentStack() {
@@ -43,10 +46,10 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const { data: allTransactions = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
       // Both reads are signed in (authenticateToken reads only this header).
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`, { headers: authHeaders() });
+      const r = await fetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }), { headers: authHeaders() });
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
@@ -54,9 +57,9 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
   });
 
   const { data: taptStones = [] } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, { headers: authHeaders() });
+      const r = await fetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId }), { headers: authHeaders() });
       if (!r.ok) throw new Error();
       return r.json();
     },
@@ -64,17 +67,22 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
 
   const cancelMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      const r = await apiRequest("POST", `/api/transactions/${transactionId}/cancel`, {});
+      const r = await apiRequest(...apiTo("POST /api/transactions/:id/cancel", { id: transactionId }), {});
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
       toast({ title: "Transaction cancelled" });
       setExpandedId(null);
     },
-    onError: () => {
-      toast({ title: "Failed to cancel", variant: "destructive" });
+    onError: (error: Error) => {
+      const refusal = cancelRefusalMessage(error);
+      if (refusal) {
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+      }
+      toast({ title: "Failed to cancel", description: refusal ?? undefined, variant: "destructive" });
     },
   });
 
@@ -101,11 +109,9 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
     <div className="min-h-screen text-white" style={{ background: "#060D1F" }}>
       <div className="px-5 pt-12 pb-4">
         <div className="flex items-center gap-3 mb-1">
-          <Link href="/terminal">
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
-              <ArrowLeft size={16} className="text-white/60" />
-            </button>
+          <Link href="/terminal" aria-label="Back to terminal" className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+            <ArrowLeft size={16} className="text-white/60" />
           </Link>
           <div className="flex items-center gap-2">
             <Layers size={20} className="text-white/60" />
@@ -118,13 +124,13 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
             </span>
           )}
         </div>
-        <p className="text-white/30 text-sm pl-12">Active &amp; pending transactions</p>
+        <p className="text-white/70 text-sm pl-12">Active &amp; pending transactions</p>
       </div>
 
       <div className="px-5 space-y-3 pb-36">
         {isLoading && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-white/30" />
+            <Loader2 className="h-8 w-8 animate-spin text-white/70" />
           </div>
         )}
 
@@ -177,7 +183,7 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
                   <div className="text-white font-bold tabular-nums" style={{ fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.5px" }}>
                     ${amount.toFixed(2)}
                   </div>
-                  <p className="text-white/50 text-sm mt-0.5 truncate">{tx.itemName}</p>
+                  <p className="text-white/50 text-sm mt-0.5 whitespace-normal break-words">{tx.itemName}</p>
                 </div>
 
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -185,11 +191,11 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
                     style={{ backgroundColor: `${sc.color}22`, color: sc.color }}>
                     {sc.label}
                   </span>
-                  <span className="text-white/30 text-xs">{timeAgo(tx.createdAt as any)}</span>
+                  <span className="text-white/70 text-xs">{timeAgo(tx.createdAt as any)}</span>
                 </div>
 
                 <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
-                  <ChevronRight size={16} className="text-white/30 flex-shrink-0" />
+                  <ChevronRight size={16} className="text-white/70 flex-shrink-0" />
                 </motion.div>
               </motion.button>
 

@@ -2,7 +2,7 @@ import "./support/test-env";
 
 import request from "supertest";
 import {
-  bearer, createOwnerPrincipal, createTestApp, mintPaymentCredential, resetTestStorage, storage,
+  signedIn, createOwnerPrincipal, createTestApp, mintPaymentCredential, resetTestStorage, storage,
 } from "./support/http-harness";
 
 /**
@@ -96,7 +96,7 @@ describe("a board's page gets its business's name and logo from the board", () =
   it("answers for one of the business's active boards, and for nothing else", async () => {
     const { app } = await createTestApp();
     const owner = await business();
-    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(bearer(owner)).send({});
+    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(signedIn(owner)).send({});
     expect(board.status).toBe(200);
     const other = await createOwnerPrincipal();
 
@@ -115,7 +115,7 @@ describe("a board's page gets its business's name and logo from the board", () =
 
     const removed = await request(app)
       .delete(`/api/merchants/${owner.merchantId}/tapt-stones/${board.body.id}`)
-      .set(bearer(owner));
+      .set(signedIn(owner));
     expect(removed.status).toBeLessThan(300);
     expect((await request(app).get(`/api/merchants/${owner.merchantId}/stone/${board.body.id}/brand`)).status).toBe(404);
   });

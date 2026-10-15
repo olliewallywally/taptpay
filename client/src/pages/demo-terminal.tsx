@@ -1,3 +1,4 @@
+import {cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
@@ -13,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { sessionFetch } from "@/lib/session";
+import { logOut } from "@/lib/log-out";
 
 interface Merchant {
   id: number;
@@ -248,9 +251,6 @@ export default function DemoTerminal() {
   useEffect(() => {
     if (!merchantId) return;
 
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
     const handleTransaction = (data: any) => {
       if (!data.transaction) return;
       // The authenticated merchant stream includes every board; retain the demo's
@@ -264,7 +264,7 @@ export default function DemoTerminal() {
         }
       }
     };
-    sseClient.connectMerchant(merchantId, token);
+    sseClient.connectMerchant(merchantId);
     sseClient.subscribe("transaction_update", handleTransaction);
     sseClient.subscribe("transaction_updated", handleTransaction);
 
@@ -434,9 +434,9 @@ export default function DemoTerminal() {
     },
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    // R1-T4 phase E: the server ends this session; the page forgets it.
+    await logOut();
     setLocation("/login");
   };
 
@@ -1064,14 +1064,19 @@ export default function DemoTerminal() {
                       }
                       setCashSaleLoading(true);
                       try {
-                        const token = localStorage.getItem("authToken");
-                        const res = await fetch("/api/transactions/cash-sale", {
+                        if(!merchantId) throw new Error('Sign in before recording a cash sale');
+                        const body={merchantId,itemName:cashItemName.trim(),price:parseFloat(cashAmount).toFixed(2),stoneId:selectedStoneId};
+                        const key=cashCommandKey(body);
+                        const res = await sessionFetch("/api/transactions/cash-sale", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                          body: JSON.stringify({ merchantId, itemName: cashItemName.trim(), price: parseFloat(cashAmount).toFixed(2), stoneId: selectedStoneId }),
+                          headers: { "Content-Type": "application/json", "Idempotency-Key":key },
+                          body: JSON.stringify(body),
                         });
                         if (!res.ok) throw new Error("Failed to record cash sale");
                         const { transaction } = await res.json();
+                        if(!Number.isSafeInteger(transaction?.id) || transaction.id<1 || transaction.merchantId!==merchantId || transaction.paymentMethod!=='cash')
+                          throw new Error('Cash sale confirmation is incomplete');
+                        completeCashCommand(merchantId,key);
                         setCashSaleTransaction(transaction);
                         setShowCashModal(true);
                         setActiveDropdown(null);
@@ -1380,10 +1385,8 @@ export default function DemoTerminal() {
             <button
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem("authToken");
-                  const res = await fetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
+                  const res = await sessionFetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${token}` },
                   });
                   if (!res.ok) throw new Error("Failed");
                   const blob = await res.blob();
@@ -1408,10 +1411,8 @@ export default function DemoTerminal() {
             <button
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem("authToken");
-                  const res = await fetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
+                  const res = await sessionFetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${token}` },
                   });
                   if (!res.ok) throw new Error("Failed");
                   const blob = await res.blob();

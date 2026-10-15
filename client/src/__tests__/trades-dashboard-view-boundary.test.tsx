@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { tutorialStepsForDevice } from "@/features/tutorial/tutorial-registry";
 import {
   TradesDashboardView,
   type TradesDashboardViewProps,
@@ -41,6 +42,18 @@ const baseProps = (
 });
 
 describe("TradesDashboardView extraction boundary", () => {
+  test("phone tutorial anchors identify the overview and the quote/invoice shortcuts", () => {
+    const { container } = render(<TradesDashboardView {...baseProps()} />);
+    const steps = tutorialStepsForDevice('trades-dashboard', 'mobile');
+    const overview = container.querySelector(steps[0].target);
+    const shortcuts = container.querySelector(steps[1].target);
+    expect(overview).not.toBeNull();
+    expect(overview).toHaveTextContent('clients');
+    expect(overview).toHaveTextContent('outstanding');
+    expect(shortcuts).not.toBeNull();
+    expect(shortcuts).toContainElement(screen.getByRole('button', { name: 'new quote' }));
+    expect(shortcuts).toContainElement(screen.getByRole('button', { name: 'quick invoice' }));
+  });
   test("keeps production queries, reports, navigation, and storage out of the view", () => {
     const source = fs.readFileSync(viewPath, "utf8");
     for (const rule of forbidden) expect(source).not.toMatch(rule);

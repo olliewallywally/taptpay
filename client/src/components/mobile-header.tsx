@@ -1,6 +1,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Link } from "wouter";
+import { logOut } from "@/lib/log-out";
 
 interface MobileHeaderProps {
   title: string;
@@ -67,8 +68,9 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
             <div className="pt-4 mt-4 border-t border-gray-600">
               <button 
                 onClick={() => {
-                  localStorage.removeItem('auth-token');
-                  window.location.href = '/login';
+                  // R1-T4 phase E: the server ends this session. (This cleared a storage key no
+                  // sign-in was ever kept under, and so signed no one out.)
+                  void logOut().then(() => { window.location.href = '/login'; });
                 }}
                 className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors font-medium"
               >

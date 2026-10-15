@@ -3,6 +3,7 @@ import { access, mkdir } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import { installBusinessSessionFixture, assertBusinessSessionFixture } from "./browser-session-fixture.mjs";
 
 const BASE_URL = process.env.P0_BASE_URL ?? "http://127.0.0.1:5000";
 /* The bundled Playwright Chromium is broken on this host (missing libnspr4), so
@@ -111,34 +112,15 @@ async function fulfillJson(route, body, status = 200) {
   });
 }
 
-async function installMocks(page, { tutorialGate = null, tutorialEnabled = false } = {}) {
+async function installMocks(page, { tutorialGate = null, tutorialEnabled = false } = {}, errors) {
   await page.addInitScript(({ merchantId }) => {
-    const payload = window.btoa(
-      JSON.stringify({
-        userId: 1,
-        email: "p0-browser@example.invalid",
-        merchantId,
-        role: "owner",
-      }),
-    );
-    localStorage.setItem("authToken", `p0.${payload}.dummy`);
     localStorage.setItem("merchantId", String(merchantId));
     localStorage.setItem("taptMode", "retail");
   }, { merchantId: MERCHANT_ID });
 
-  await page.route("**/api/auth/me", (route) =>
-    fulfillJson(route, {
-      user: {
-        id: 1,
-        email: "p0-browser@example.invalid",
-        merchantId: MERCHANT_ID,
-        role: "owner",
-        onboardingCompleted: true,
-        gstRegistered: false,
-        tradeGstMode: "inclusive",
-      },
-    }),
-  );
+  await installBusinessSessionFixture(page, {
+    baseUrl: BASE_URL, merchantId: MERCHANT_ID, email: "p0-browser@example.invalid", errors, label: "P0",
+  });
 
   await page.route("**/api/tutorial/state", async (route) => {
     if (tutorialGate) await tutorialGate.promise;
@@ -214,7 +196,7 @@ async function createScenario(browser, contextOptions, mockOptions) {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await installMocks(page, mockOptions);
+  await installMocks(page, mockOptions, pageErrors);
   return { context, page, requests, pageErrors, serviceWorkers };
 }
 
@@ -303,6 +285,7 @@ async function verifyDesktop(browser) {
   const { context, page, requests, pageErrors, serviceWorkers } = scenario;
   try {
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await waitForDesktopCanvas(page);
 
     const metrics = await readFrameMetrics(page);
@@ -436,6 +419,7 @@ async function verifyTablet(browser) {
   const { context, page, requests, pageErrors, serviceWorkers } = scenario;
   try {
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await waitForDesktopCanvas(page);
 
     assert.equal(
@@ -488,6 +472,7 @@ async function verifyPhone(browser) {
   const { context, page, requests, pageErrors, serviceWorkers } = scenario;
   try {
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await page.locator('[aria-label="new sale"]').waitFor({ state: "visible" });
     // Cover the route-preload delay: a wrong device branch would request the
     // first desktop module after one second even if the initial route looked OK.

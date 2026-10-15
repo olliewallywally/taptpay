@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu, X, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { logOut } from "@/lib/log-out";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 interface LayoutProps {
@@ -11,9 +12,8 @@ export function Layout({ children }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [, setLocation] = useLocation();
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    await logOut();
     setLocation("/login");
   };
 

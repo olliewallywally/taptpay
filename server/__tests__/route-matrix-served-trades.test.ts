@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 
 import * as delivery from "../trades-delivery";
@@ -5,8 +6,8 @@ import { resetTestStorage, storage } from "./support/http-harness";
 import {
   as,
   expectServed,
+  familyRows,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -166,7 +167,7 @@ const RECIPES: Record<string, ServedRecipe> = {
           id: MADE_QUOTE, merchantId: ctx.merchantId, clientProfileId: CLIENT, status: "sent",
           subtotalCents: 80_000, gstCents: 0, totalCents: 80_000, depositCents: 20_000, delivered: true,
         });
-        expect(delivery.sendTradeQuote).toHaveBeenCalledWith(MADE_QUOTE, expect.any(String));
+        expect(delivery.sendTradeQuoteForMerchant).toHaveBeenCalledWith(MADE_QUOTE, ctx.merchantId, expect.any(String));
         expect(eventTypes()).toEqual(["quote_sent"]);
       },
     };
@@ -194,7 +195,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     seeded(ctx);
     return {
       req: {
-        method: "post", path: "/api/trades/invoices",
+        method: "post", path: "/api/trades/invoices", headers: {"Idempotency-Key":requestCommandKey()},
         body: { clientProfileId: CLIENT, amountCents: 30_000, deliveryChannel: "email", dueAt: inDays(14).toISOString(), kind: "deposit", quoteId: QUOTE },
       },
       status: 201,
@@ -203,7 +204,8 @@ const RECIPES: Record<string, ServedRecipe> = {
           id: MADE_INVOICE, merchantId: ctx.merchantId, clientProfileId: CLIENT, quoteId: QUOTE, kind: "deposit",
           amountCents: 30_000, status: "pending_dispatch", delivered: true,
         });
-        expect(delivery.resendTradeInvoice).toHaveBeenCalledWith(MADE_INVOICE, expect.any(String));
+        expect(delivery.resendTradeInvoiceForMerchant).toHaveBeenCalledWith(MADE_INVOICE, ctx.merchantId, expect.any(String));
+        expect(delivery.resendTradeInvoice).not.toHaveBeenCalled();
         expect(eventTypes()).toEqual(["invoice_sent"]);
       },
     };
@@ -226,8 +228,10 @@ const RECIPES: Record<string, ServedRecipe> = {
       status: 200,
       check: (res) => {
         expect(res.body).toMatchObject({ id: INVOICE, status: "paid_external", externalPaymentReference: "Cash on site" });
-        // The client is sent the paid invoice.
-        expect(delivery.sendTradePaymentInvoice).toHaveBeenCalledWith(expect.objectContaining({ id: INVOICE }));
+        // The concrete manual-payment event/outbox owns the receiver. The HTTP
+        // route cannot independently repeat its receipt on retry.
+        expect(delivery.sendTradePaymentInvoiceForMerchant).not.toHaveBeenCalled();
+        expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
         expect(eventTypes()).toEqual(["paid_external"]);
       },
     };
@@ -295,8 +299,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/trades\//;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("trades");
 const SERVED = servedPairs(ROWS);
 
 beforeEach(() => {

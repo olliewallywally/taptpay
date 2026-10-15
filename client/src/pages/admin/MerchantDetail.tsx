@@ -12,9 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { adminCsrfHeader } from "@/lib/session";
+import { apiPath, wholeNumber } from "@shared/api-path";
 
-const ADMIN_TOKEN = () => localStorage.getItem('adminAuthToken') || '';
-const ADMIN_HEADERS = () => ({ Authorization: `Bearer ${ADMIN_TOKEN()}` });
+// R1-T4 phase E: the sign-in is the admin's session cookie; this is the page's CSRF token.
+const ADMIN_HEADERS = () => adminCsrfHeader();
 
 interface MerchantDetailProps { merchantId: string; }
 
@@ -32,18 +34,18 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ['/api/admin/merchants', merchantId],
+    queryKey: [apiPath("GET /api/admin/merchants"), merchantId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}`, { headers: ADMIN_HEADERS() });
+      const res = await fetch(apiPath("GET /api/admin/merchants/:id", { id: wholeNumber(merchantId) }), { headers: ADMIN_HEADERS() });
       if (!res.ok) throw new Error('Failed to fetch merchant');
       return res.json();
     },
   });
 
   const { data: transactions = [] } = useQuery<any[]>({
-    queryKey: ['/api/admin/merchants', merchantId, 'transactions'],
+    queryKey: [apiPath("GET /api/admin/merchants"), merchantId, 'transactions'],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/transactions`, { headers: ADMIN_HEADERS() });
+      const res = await fetch(apiPath("GET /api/admin/merchants/:id/transactions", { id: wholeNumber(merchantId) }), { headers: ADMIN_HEADERS() });
       if (!res.ok) return [];
       return res.json();
     },
@@ -91,7 +93,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const verifyMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/verify`, {
+      const res = await fetch(apiPath("POST /api/admin/merchants/:id/verify", { id: wholeNumber(merchantId) }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
       });
@@ -100,8 +102,8 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     },
     onSuccess: () => {
       toast({ title: 'Merchant Verified', description: 'Account verified successfully.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants")] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants"), merchantId] });
       setShowConfirm(false);
     },
     onError: (e: any) => toast({ title: 'Verification Failed', description: e.message, variant: 'destructive' }),
@@ -109,7 +111,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   const resendEmailMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/admin/resend-verification', {
+      const res = await fetch(apiPath("POST /api/admin/resend-verification"), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
         body: JSON.stringify({ email: merchant.email }),
@@ -123,7 +125,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   const saveWindcaveIdMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/windcave-merchant-id`, {
+      const res = await fetch(apiPath("PATCH /api/admin/merchants/:id/windcave-merchant-id", { id: wholeNumber(merchantId) }), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
         body: JSON.stringify({ windcaveMerchantId: windcaveIdValue }),
@@ -133,7 +135,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     },
     onSuccess: () => {
       toast({ title: 'Saved', description: 'Windcave Merchant ID updated.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants"), merchantId] });
       setEditingWindcaveId(false);
     },
     onError: (e: any) => toast({ title: 'Save Failed', description: e.message, variant: 'destructive' }),
@@ -141,7 +143,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   const activateMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/set-active`, {
+      const res = await fetch(apiPath("POST /api/admin/merchants/:id/set-active", { id: wholeNumber(merchantId) }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
       });
@@ -150,15 +152,15 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     },
     onSuccess: () => {
       toast({ title: 'Merchant Activated', description: 'Account is now fully active.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants")] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants"), merchantId] });
     },
     onError: (e: any) => toast({ title: 'Activation Failed', description: e.message, variant: 'destructive' }),
   });
 
   // ── Receipt helpers ────────────────────────────────────────────────────────
   const fetchPdfBlob = async (txId: number) => {
-    const r = await fetch(`/api/transactions/${txId}/receipt-pdf`, { method: 'POST' });
+    const r = await fetch(apiPath("POST /api/transactions/:id/receipt-pdf", { id: txId }), { method: 'POST' });
     if (!r.ok) throw new Error('Failed to generate PDF');
     return r.blob();
   };
@@ -193,7 +195,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
   const statusColor = (s: string) =>
     s === 'verified' || s === 'active' ? 'bg-[#4ade80]/20 text-[#4ade80]' :
     s === 'pending' ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
-    'bg-[#ef4444]/20 text-[#ef4444]';
+    'bg-[#ef4444]/20 text-[#FF8A94]';
 
   // ── Loading / not found ────────────────────────────────────────────────────
   if (isLoading) return (
@@ -205,7 +207,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     <div className="min-h-screen bg-[#1a1b2e] flex items-center justify-center">
       <div className="text-center">
         <p className="text-[#dbdfea]">Merchant not found</p>
-        <button onClick={() => setLocation('/merchants')} className="mt-4 text-[#0055FF] hover:text-[#00E5CC]">Back to Merchants</button>
+        <button onClick={() => setLocation('/merchants')} className="mt-4 text-[#93BAFF] hover:text-[#00E5CC]">Back to Merchants</button>
       </div>
     </div>
   );
@@ -218,13 +220,13 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
       {/* ── Back + header ── */}
       <div>
-        <button onClick={() => setLocation('/merchants')} className="flex items-center gap-2 text-[#dbdfea]/60 hover:text-[#0055FF] transition-colors mb-4 text-sm">
+        <button onClick={() => setLocation('/merchants')} className="flex items-center gap-2 text-[#dbdfea]/60 hover:text-[#93BAFF] transition-colors mb-4 text-sm">
           <ArrowLeft className="size-4" /> Back to Merchants
         </button>
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-[#dbdfea] text-2xl font-semibold">{merchant.businessName}</h1>
-            <p className="text-[#dbdfea]/50 text-sm">{merchant.email} · ID #{merchant.id}</p>
+            <p className="text-[#dbdfea]/70 text-sm">{merchant.email} · ID #{merchant.id}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor(merchant.status)}`}>
             {merchant.status}
@@ -239,7 +241,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
             <AlertTriangle className="size-5 text-[#fbbf24] mt-0.5 shrink-0" />
             <div>
               <h3 className="text-[#dbdfea] text-sm font-medium">Pending Verification</h3>
-              <p className="text-[#dbdfea]/50 text-xs mt-0.5">This merchant has not been verified. Verify them directly or resend the verification email.</p>
+              <p className="text-[#dbdfea]/70 text-xs mt-0.5">This merchant has not been verified. Verify them directly or resend the verification email.</p>
             </div>
           </div>
           {showConfirm ? (
@@ -272,7 +274,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
             <CheckCircle className="size-5 text-[#00E5CC] mt-0.5 shrink-0" />
             <div>
               <h3 className="text-[#dbdfea] text-sm font-medium">Ready to Activate</h3>
-              <p className="text-[#dbdfea]/50 text-xs mt-0.5">This merchant has verified their email and completed signup. Once Windcave onboarding is done, click Activate to make them fully live.</p>
+              <p className="text-[#dbdfea]/70 text-xs mt-0.5">This merchant has verified their email and completed signup. Once Windcave onboarding is done, click Activate to make them fully live.</p>
             </div>
           </div>
           <button
@@ -290,7 +292,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'from-[#0055FF] to-[#00E5CC]', text: 'text-white' },
-          { label: 'Transactions', value: String(transactions.length), icon: Activity, color: 'bg-[#0055FF]/20', text: 'text-[#0055FF]' },
+          { label: 'Transactions', value: String(transactions.length), icon: Activity, color: 'bg-[#0055FF]/20', text: 'text-[#93BAFF]' },
           { label: 'Completed', value: String(completedTx.length), icon: CheckCircle, color: 'bg-[#4ade80]/20', text: 'text-[#4ade80]' },
           { label: 'Avg Transaction', value: `$${avgTransaction.toFixed(2)}`, icon: TrendingUp, color: 'bg-[#00E5CC]/20', text: 'text-[#00E5CC]' },
         ].map(({ label, value, icon: Icon, color, text }) => (
@@ -299,7 +301,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               <Icon className={`size-5 ${color.includes('from') ? 'text-white' : text}`} />
             </div>
             <div className="min-w-0">
-              <p className="text-[#dbdfea]/50 text-xs truncate">{label}</p>
+              <p className="text-[#dbdfea]/70 text-xs whitespace-normal break-words">{label}</p>
               <p className="text-[#dbdfea] text-lg font-semibold leading-tight">{value}</p>
             </div>
           </div>
@@ -326,9 +328,9 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
             { icon: Activity, label: 'Business Type', value: merchant.businessType },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-start gap-3 py-2 border-b border-[#1a1b2e] last:border-0">
-              <Icon className="size-4 text-[#0055FF] mt-0.5 shrink-0" />
+              <Icon className="size-4 text-[#93BAFF] mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-[#dbdfea]/50 text-xs">{label}</p>
+                <p className="text-[#dbdfea]/70 text-xs">{label}</p>
                 <p className="text-[#dbdfea] text-sm truncate">{value || '—'}</p>
               </div>
             </div>
@@ -346,7 +348,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                   <BadgeX className="size-4 text-[#fbbf24] mt-0.5 shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[#dbdfea]/50 text-xs">Email Verified</p>
+                  <p className="text-[#dbdfea]/70 text-xs">Email Verified</p>
                   <p className={`text-sm font-medium ${isEmailVerified ? 'text-[#4ade80]' : 'text-[#fbbf24]'}`}>
                     {isEmailVerified ? 'Verified' : 'Not verified'}
                   </p>
@@ -366,7 +368,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
             {/* Windcave Merchant ID */}
             <div className="bg-[#1a1b2e] rounded-xl p-4 mb-3">
-              <p className="text-[#dbdfea]/50 text-xs mb-2 uppercase tracking-wide">Windcave Merchant ID</p>
+              <p className="text-[#dbdfea]/70 text-xs mb-2 uppercase tracking-wide">Windcave Merchant ID</p>
               {editingWindcaveId ? (
                 <div className="flex gap-2">
                   <input
@@ -375,19 +377,20 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                     placeholder="e.g. TaptPay_Dev"
                     className="flex-1 bg-[#24263a] text-[#dbdfea] text-sm px-3 py-2 rounded-lg border border-[#0055FF]/50 focus:outline-none focus:border-[#0055FF]"
                   />
-                  <button onClick={() => saveWindcaveIdMutation.mutate()} disabled={saveWindcaveIdMutation.isPending} className="bg-[#4ade80] hover:bg-[#22c55e] text-[#1a1b2e] px-3 py-2 rounded-lg">
+                  <button aria-label="Save Windcave merchant ID" onClick={() => saveWindcaveIdMutation.mutate()} disabled={saveWindcaveIdMutation.isPending} className="bg-[#4ade80] hover:bg-[#22c55e] text-[#1a1b2e] px-3 py-2 rounded-lg">
                     <Check className="size-4" />
                   </button>
-                  <button onClick={() => setEditingWindcaveId(false)} className="bg-[#24263a] hover:bg-[#2a2c42] text-[#dbdfea] px-3 py-2 rounded-lg">
+                  <button aria-label="Cancel merchant ID edit" onClick={() => setEditingWindcaveId(false)} className="bg-[#24263a] hover:bg-[#2a2c42] text-[#dbdfea] px-3 py-2 rounded-lg">
                     <X className="size-4" />
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[#dbdfea] text-sm font-mono">{merchant.windcaveMerchantId || <span className="text-[#dbdfea]/30 italic text-xs">Not set — enter after Windcave provides it</span>}</p>
+                  <p className="text-[#dbdfea] text-sm font-mono">{merchant.windcaveMerchantId || <span className="text-[#dbdfea]/70 italic text-xs">Not set — enter after Windcave provides it</span>}</p>
                   <button
+                    aria-label="Edit Windcave merchant ID"
                     onClick={() => { setWindcaveIdValue(merchant.windcaveMerchantId || ''); setEditingWindcaveId(true); }}
-                    className="text-[#0055FF] hover:text-[#00E5CC] transition-colors"
+                    className="text-[#93BAFF] hover:text-[#00E5CC] transition-colors"
                   >
                     <Edit2 className="size-4" />
                   </button>
@@ -399,9 +402,9 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                 2026-09-25 (server/no-board-address.ts); boards and sales have their own. */}
             {/* Windcave integration status — never return the credential itself. */}
             <div className="bg-[#1a1b2e] rounded-xl p-4">
-              <p className="text-[#dbdfea]/50 text-xs mb-1 uppercase tracking-wide">Windcave integration</p>
+              <p className="text-[#dbdfea]/70 text-xs mb-1 uppercase tracking-wide">Windcave integration</p>
               <p className="text-[#dbdfea] text-sm">
-                {merchant.windcaveApiConfigured ? 'Configured' : <span className="text-[#dbdfea]/30 italic text-xs">Not configured</span>}
+                {merchant.windcaveApiConfigured ? 'Configured' : <span className="text-[#dbdfea]/70 italic text-xs">Not configured</span>}
               </p>
             </div>
           </div>
@@ -417,7 +420,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                 { label: 'Refunded Tx', value: String(transactions.filter((t) => t.status === 'refunded').length) },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-[#1a1b2e] rounded-xl p-3 text-center">
-                  <p className="text-[#dbdfea]/50 text-xs">{label}</p>
+                  <p className="text-[#dbdfea]/70 text-xs">{label}</p>
                   <p className="text-[#dbdfea] text-xl font-semibold">{value}</p>
                 </div>
               ))}
@@ -429,7 +432,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
       {/* ── Revenue chart ── */}
       <div className="bg-[#24263a] rounded-xl p-5">
         <h2 className="text-[#dbdfea] text-base font-semibold mb-1">Revenue — Last 30 Days</h2>
-        <p className="text-[#dbdfea]/40 text-xs mb-5">Completed transactions only</p>
+        <p className="text-[#dbdfea]/70 text-xs mb-5">Completed transactions only</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={revenueChart} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
@@ -456,10 +459,10 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div>
             <h2 className="text-[#dbdfea] text-base font-semibold">Transaction History</h2>
-            <p className="text-[#dbdfea]/40 text-xs mt-0.5">{transactions.length} total · {filteredTx.length} shown</p>
+            <p className="text-[#dbdfea]/70 text-xs mt-0.5">{transactions.length} total · {filteredTx.length} shown</p>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[#dbdfea]/40" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[#dbdfea]/70" />
             <input
               value={txSearch}
               onChange={(e) => setTxSearch(e.target.value)}
@@ -470,14 +473,14 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
         </div>
 
         {filteredTx.length === 0 ? (
-          <div className="text-center py-12 text-[#dbdfea]/30 text-sm">No transactions found</div>
+          <div className="text-center py-12 text-[#dbdfea]/70 text-sm">No transactions found</div>
         ) : (
-          <div className="overflow-y-auto max-h-[520px] rounded-xl border border-[#1a1b2e]">
+          <div tabIndex={0} role="region" aria-label="Merchant transactions" className="overflow-y-auto max-h-[520px] rounded-xl border border-[#1a1b2e]">
             <table className="w-full min-w-[600px]">
               <thead className="sticky top-0 bg-[#1a1b2e]">
                 <tr>
-                  {['#ID', 'Amount', 'Item', 'Method', 'Status', 'Date', ''].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-[#dbdfea]/40 text-xs font-normal uppercase tracking-wide">{h}</th>
+                  {['#ID', 'Amount', 'Item', 'Method', 'Status', 'Date', 'Action'].map((h) => (
+                    <th key={h} scope="col" className="text-left px-4 py-3 text-[#dbdfea]/70 text-xs font-normal uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -488,24 +491,24 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                     tx.status === 'completed' ? 'text-[#4ade80]' :
                     tx.status === 'pending' ? 'text-[#fbbf24]' :
                     tx.status === 'refunded' ? 'text-[#a78bfa]' :
-                    'text-[#ef4444]';
+                    'text-[#FF8A94]';
                   return (
                     <tr
                       key={tx.id}
                       onClick={() => setSelectedTx(tx)}
                       className={`border-t border-[#1a1b2e] cursor-pointer hover:bg-[#1a1b2e]/60 transition-colors ${i % 2 === 0 ? '' : 'bg-[#1a1b2e]/20'}`}
                     >
-                      <td className="px-4 py-3 text-[#dbdfea]/40 text-xs font-mono">#{tx.id}</td>
+                      <td className="px-4 py-3 text-[#dbdfea]/70 text-xs font-mono">#{tx.id}</td>
                       <td className="px-4 py-3 text-[#dbdfea] text-sm font-semibold">${amount.toFixed(2)}</td>
                       <td className="px-4 py-3 text-[#dbdfea]/70 text-sm max-w-[160px] truncate">{tx.itemName || '—'}</td>
-                      <td className="px-4 py-3 text-[#dbdfea]/50 text-xs capitalize">{(tx.paymentMethod || 'card').replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-3 text-[#dbdfea]/70 text-xs capitalize">{(tx.paymentMethod || 'card').replace(/_/g, ' ')}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${statusCls}`}>{tx.status}</span>
                       </td>
-                      <td className="px-4 py-3 text-[#dbdfea]/40 text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-[#dbdfea]/70 text-xs whitespace-nowrap">
                         {new Date(tx.createdAt).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="px-4 py-3 text-[#00E5CC]/60 text-xs">View →</td>
+                      <td className="px-4 py-3 text-[#00E5CC]/80 text-xs">View →</td>
                     </tr>
                   );
                 })}
@@ -540,8 +543,8 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                     ['Status', selectedTx.status],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between text-sm">
-                      <span className="text-[#dbdfea]/50">{k}</span>
-                      <span className={k === 'Status' ? (selectedTx.status === 'completed' ? 'text-[#4ade80]' : selectedTx.status === 'pending' ? 'text-[#fbbf24]' : 'text-[#ef4444]') : 'font-mono text-xs'}>{v}</span>
+                      <span className="text-[#dbdfea]/70">{k}</span>
+                      <span className={k === 'Status' ? (selectedTx.status === 'completed' ? 'text-[#4ade80]' : selectedTx.status === 'pending' ? 'text-[#fbbf24]' : 'text-[#FF8A94]') : 'font-mono text-xs'}>{v}</span>
                     </div>
                   ))}
                 </div>

@@ -9,10 +9,12 @@ import {
   DESKTOP_LOGICAL_WIDTH,
 } from "./desktop-theme";
 import "./desktop.css";
+import { browserZoomFactor } from '@/hooks/use-device-class';
 
 interface MeasuredSize {
   width: number;
   height: number;
+  zoom: number;
 }
 
 export interface ScaledCanvasProps {
@@ -34,6 +36,7 @@ export function ScaledCanvas({
   const [available, setAvailable] = useState<MeasuredSize>({
     width: 0,
     height: 0,
+    zoom: 1,
   });
 
   useLayoutEffect(() => {
@@ -42,11 +45,12 @@ export function ScaledCanvas({
 
     const measure = () => {
       const next = {
-        width: stage.clientWidth,
-        height: stage.clientHeight,
+        width: stage.getBoundingClientRect().width,
+        height: stage.getBoundingClientRect().height,
+        zoom: browserZoomFactor(),
       };
       setAvailable((current) =>
-        current.width === next.width && current.height === next.height
+        current.width === next.width && current.height === next.height && current.zoom === next.zoom
           ? current
           : next,
       );
@@ -67,8 +71,9 @@ export function ScaledCanvas({
   const measuredScale =
     available.width > 0 && available.height > 0
       ? Math.min(
-          available.width / logicalWidth,
-          available.height / logicalHeight,
+          available.width * available.zoom / logicalWidth,
+          available.height * available.zoom / logicalHeight,
+          available.zoom > 1 && stageRef.current?.closest('[data-device-class="desktop"]') ? 1000 / logicalWidth : Number.POSITIVE_INFINITY,
           maxScale,
         )
       : 0;
@@ -81,7 +86,8 @@ export function ScaledCanvas({
     : "tapt-desktop-scale-stage";
 
   return (
-    <div ref={stageRef} className={stageClassName}>
+    <div ref={stageRef} className={stageClassName} data-browser-zoomed={available.zoom > 1 ? 'true' : undefined}
+      role={available.zoom > 1 ? 'region' : undefined} aria-label={available.zoom > 1 ? 'Merchant app' : undefined} tabIndex={available.zoom > 1 ? 0 : undefined}>
       <div
         className="tapt-desktop-scale-box"
         style={{

@@ -1,3 +1,7 @@
+> Review correction (2026-09-29): the introducing commit in the cleaned GitHub history
+> is `53f5a8b9ca689b8b92dc951d6a69e86dd13dd51e`. The `387d189d` references below
+> belong to the historical review record and are not resolvable in that history.
+
 # R1-T8 — the hook-order crash (2026-09-21)
 
 Date: 2026-09-21 UTC. Branch: `remediation/r1-continuation-20260907`. Base: `c6667985`.

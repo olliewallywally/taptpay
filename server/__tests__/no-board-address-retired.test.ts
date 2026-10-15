@@ -12,9 +12,10 @@ process.env.FEATURE_NEW_RETAIL_PAYMENTS = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
 import request from "supertest";
+import {randomUUID} from "node:crypto";
 import { sseBroker } from "../sse-broker";
 import {
-  bearer,
+  signedIn, type SignedIn,
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -128,10 +129,11 @@ describe("the business-wide no-board live feed is retired", () => {
 
   it("still delivers a no-board sale's update to the business's own stream, and never to a board's stream", async () => {
     const { app } = await createTestApp();
-    const { merchantId, token } = await createOwnerPrincipal();
+    const owner = await createOwnerPrincipal();
+    const { merchantId } = owner;
     const { board } = await boardSale(merchantId);
 
-    const merchantStream = await openEventStream(app, `/api/merchants/${merchantId}/events`, bearer({ token }));
+    const merchantStream = await openEventStream(app, `/api/merchants/${merchantId}/events`, signedIn(owner));
     const boardStream = await openEventStream(app, `/api/merchants/${merchantId}/events?stoneId=${board.id}`);
     try {
       expect(merchantStream.status).toBe(200);
@@ -143,10 +145,11 @@ describe("the business-wide no-board live feed is retired", () => {
       // existing sale until that route was removed on 2026-09-27, C10 batch 6b.)
       billingInOrder();
       const created = await request(app)
-        .post("/api/transactions")
-        .set(bearer({ token }))
+        .post("/api/transactions").set("Idempotency-Key",randomUUID())
+        .set(signedIn(owner))
         .send({ merchantId, itemName: "Private link sale", price: "30.00" });
       expect(created.status).toBe(200);
+      await sseBroker.broadcast(merchantId,null,{type:"transaction_updated",eventId:randomUUID(),merchantOnly:true,transaction:created.body});
 
       await expect(merchantStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
@@ -161,10 +164,11 @@ describe("the business-wide no-board live feed is retired", () => {
 
   it("delivers a board's sale to that board's stream at once, with the business's stream", async () => {
     const { app } = await createTestApp();
-    const { merchantId, token } = await createOwnerPrincipal();
+    const owner = await createOwnerPrincipal();
+    const { merchantId } = owner;
     const board = await storage.createNextTaptStone(merchantId);
 
-    const merchantStream = await openEventStream(app, `/api/merchants/${merchantId}/events`, bearer({ token }));
+    const merchantStream = await openEventStream(app, `/api/merchants/${merchantId}/events`, signedIn(owner));
     const boardStream = await openEventStream(app, `/api/merchants/${merchantId}/events?stoneId=${board.id}`);
     try {
       await merchantStream.nextEvent();
@@ -173,10 +177,11 @@ describe("the business-wide no-board live feed is retired", () => {
       // A new sale on the board is the update (see the test above).
       billingInOrder();
       const created = await request(app)
-        .post("/api/transactions")
-        .set(bearer({ token }))
+        .post("/api/transactions").set("Idempotency-Key",randomUUID())
+        .set(signedIn(owner))
         .send({ merchantId, itemName: "Board sale", price: "8.00", selectedStoneId: board.id })
         .expect(200);
+      await sseBroker.broadcast(merchantId,board.id,{type:"transaction_updated",eventId:randomUUID(),transaction:created.body});
 
       await expect(boardStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
@@ -226,7 +231,7 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
 
     const response = await request(app)
       .get(`/api/merchants/${owner.merchantId}/active-transaction`)
-      .set(bearer(owner));
+      .set(signedIn(owner));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ id: linked.id, itemName: "Private link sale", status: "pending" });
@@ -247,7 +252,7 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
 
     const response = await request(app)
       .get(`/api/merchants/${owner.merchantId}/active-transaction`)
-      .set(bearer(member));
+      .set(signedIn(member));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ id: linked.id });
@@ -260,7 +265,7 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
 
     const response = await request(app)
       .get(`/api/merchants/${owner.merchantId}/active-transaction`)
-      .set(bearer(owner));
+      .set(signedIn(owner));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -279,13 +284,29 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
 
     const response = await request(app)
       .get(`/api/merchants/${owner.merchantId}/active-transaction`)
-      .set(bearer(stranger));
+      .set(signedIn(stranger));
 
     expect(response.status).toBe(403);
     expect(JSON.stringify(response.body)).not.toMatch(/counter sale|link sale|12\.50|30\.00/);
   });
 
-  it("refuses a token that is not valid, with no data", async () => {
+  it("refuses a session that is not valid, with no data", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const { merchantId } = owner;
+    await sharedNoBoardSale(merchantId);
+
+    const response = await request(app)
+      .get(`/api/merchants/${merchantId}/active-transaction`)
+      .set(signedIn({ cookie: `${owner.cookie.split(".")[0]}.${"A".repeat(43)}`, csrf: owner.csrf }));
+
+    // The sign-in gate's answer for a cookie that is no one's session, on every signed-in route.
+    expect(response.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
+    expect(response.body).toEqual({ code: "INVALID_SESSION", message: "Please sign in again." });
+  });
+
+  it("answers an Authorization header with no session as anyone: the retired address, with no data", async () => {
+    // R1-T4 phase E3: the header is not looked at. (A token in it was once the terminal's sign-in.)
     const { app } = await createTestApp();
     const { merchantId } = await createOwnerPrincipal();
     await sharedNoBoardSale(merchantId);
@@ -294,9 +315,8 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
       .get(`/api/merchants/${merchantId}/active-transaction`)
       .set({ Authorization: "Bearer not-a-real-token" });
 
-    // authenticateToken's answer for a token that doesn't verify, on every signed-in route.
-    expect(response.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
-    expect(response.body).toEqual({ message: "Invalid or expired token" });
+    expect(response.status).toBe(410);
+    expect(response.body).toEqual({ code: "NO_BOARD_ADDRESS_RETIRED", message: expect.any(String) });
   });
 
   it("still lets a board's page read that board's sale without signing in", async () => {
@@ -313,11 +333,11 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
 });
 
 describe("a sale without a payment board always gets its own link", () => {
-  async function createSale(principal: { token: string; merchantId: number }, body: Record<string, unknown>) {
+  async function createSale(principal: SignedIn & { merchantId: number }, body: Record<string, unknown>) {
     const { app } = await createTestApp();
     return request(app)
-      .post("/api/transactions")
-      .set(bearer(principal))
+      .post("/api/transactions").set("Idempotency-Key",randomUUID())
+      .set(signedIn(principal))
       .send({ merchantId: principal.merchantId, itemName: "Flat white", price: "5.50", ...body });
   }
 

@@ -36,7 +36,6 @@ let unsubscribeStatus: number;
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
-  localStorage.setItem("authToken", "this.device.token");
   businessWideFlag = false;
   unsubscribeStatus = 200;
   mockNativePush.checkPermissions.mockResolvedValue({ receive: "granted" });

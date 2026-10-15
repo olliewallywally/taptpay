@@ -135,7 +135,19 @@ jobs:
           # 2026-09-26 (C10): 0030 added 1 table (invoice_split_sessions), 7
           # columns, 5 constraints, 2 foreign keys and 3 indexes and removed
           # nothing.
-          RECORDED: docs/evidence/remediation-v2-2/r1/C10-invoice-split-sessions-empty-fingerprint-2026-09-26.json
+          # 2026-09-30 (R1-T4 phase E): 0031 added 1 table (auth_sessions), 18
+          # columns, 6 constraints (4 checks, its key, 1 foreign key) and 3
+          # indexes and removed nothing.
+          # 2026-10-04 (R1-T7 S6a): 0032 added 1 table (uploaded_file_scans), 5
+          # columns, 4 constraints (2 checks, its key, 1 foreign key) and 1 index
+          # and removed nothing.
+          # 2026-10-04 (R1-T5b): 0033 added 1 table (apple_identities), 9
+          # columns, 3 constraints (1 check, its key, 1 foreign key), 3 indexes
+          # and 1 sequence and removed nothing.
+          # 2026-10-14: integrated R2/R3 migrations 0034–0047; complete
+          # owned scratch/restored schemas match. The pre-expansion snapshot
+          # independently reproduces the previous 0033 baseline above.
+          RECORDED: docs/evidence/remediation-v2-2/r3/R3-integrated-through-0047-fingerprint-2026-10-14.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

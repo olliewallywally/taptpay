@@ -40,20 +40,44 @@ describe("Phase 2 Drizzle schema", () => {
     expect(attemptConfig.indexes.map(({ config }) => config.name).sort()).toEqual([
       "payment_attempts_live_transaction_share_uq",
       "payment_attempts_processor_session_id_uq",
+      "payment_attempts_processor_transaction_id_uq",
+      "payment_attempts_processor_x_id_uq",
+      "payment_attempts_provider_transaction_id_uq",
       "payment_attempts_return_state_hash_uq",
       "payment_attempts_transaction_idx",
       "payment_attempts_transaction_share_key_uq",
     ]);
     expect(attemptConfig.checks.map(({ name }) => name).sort()).toEqual([
+      "payment_attempts_account_fingerprint_check",
+      "payment_attempts_expected_amount_check",
+      "payment_attempts_expected_currency_check",
+      "payment_attempts_expected_pair_check",
+      "payment_attempts_expected_reference_check",
       "payment_attempts_lease_expiry_check",
       "payment_attempts_outcome_check",
+      "payment_attempts_provider_environment_check",
       "payment_attempts_receipt_share_check",
+      "payment_attempts_reconciliation_code_check",
       "payment_attempts_return_state_expiry_check",
       "payment_attempts_return_state_hash_shape_check",
       "payment_attempts_return_state_pair_check",
+      "payment_attempts_send_started_check",
       "payment_attempts_share_index_check",
       "payment_attempts_state_check",
     ]);
+    // R2-T4 (migration 0034): expected provider values, all nullable for attempts
+    // claimed before it; the provider transaction ID is unique where present.
+    for (const [name, dataType] of [
+      ["expected_amount_cents", "number"],
+      ["expected_currency", "string"],
+      ["expected_merchant_reference", "string"],
+      ["provider_environment", "string"],
+      ["provider_transaction_id", "string"],
+      ["last_reconciliation_code", "string"],
+      ["last_reconciled_at", "date"],
+    ] as const) {
+      expect(attemptConfig.columns.find((column) => column.name === name)).toMatchObject({ notNull: false, dataType });
+    }
 
     expect(splitConfig.columns.find(({ name }) => name === "transaction_id"))
       .toMatchObject({ notNull: true });

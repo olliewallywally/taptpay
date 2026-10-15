@@ -1,12 +1,12 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `2e09b0f75bb1ef0acbbcc0228987d0905fb488ed`
+# R1-T2 route inventory — generated 2026-10-15 @ `82e320ece59b3cfa222f6c9db3a6629b595026cf`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
 docs/evidence/remediation-v2-2/r1/ for the task record.
 
-Total registrations: **184** (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE).
+Total registrations: **194** (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE).
 
-By principal: **public**: 56, **admin**: 17, **merchant-user**: 100, **provider-webhook**: 6, **api-key**: 3, **cron**: 2.
+By principal: **public**: 61, **admin**: 18, **merchant-user**: 104, **provider-webhook**: 6, **api-key**: 3, **cron**: 2.
 
 Unclassified (no known gate marker, no known public-design marker, and no
 curated allowlist entry found near the handler — needs a human read, not
@@ -14,49 +14,54 @@ necessarily a bug): **0**.
 
 ## Review
 
-184 of 184 routes reviewed (server/route-review.ts); 0 pending.
+194 of 194 routes reviewed (server/route-review.ts); 0 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
 
-- **ALL /api/windcave/notification:** pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.
-- **ALL /api/windcave/notification:** Logs the raw query (with the session id), and the query and body when no session id is found, to the server log.
-- **POST /api/v1/transactions:** webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).
-- **POST /api/v1/transactions:** No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).
-- **ALL /api/windcave/rent-notification:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
-- **ALL /api/windcave/trades-notification:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
+- **ALL /api/pay/notification/:state:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **ALL /api/windcave/notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **POST /api/v1/transactions:** Webhook requests are explicitly unavailable before creation; the later API phase must restrict destinations before enabling delivery.
+- **POST /api/v1/transactions:** Distributed rate limits remain with R6; FEATURE_ECOMMERCE_API remains off by default.
+- **ALL /api/billing/card/notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **ALL /api/windcave/rent-notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **ALL /api/windcave/trades-notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 - **POST /api/internal/cron:** Overlapping runs are refused only within one server process (the in-memory cronRunning flag): two instances can run the passes at once. Plan 13.3 (durable cron leases).
 - **GET /api/pay/t/:token/receipt:** share is parsed with Number(), which accepts forms such as 1e0, 0x1 and ' 1' that the plan's strict parser (§8.4) refuses; the same on the receipt, its PDF and its QR.
+- **POST /api/pay/t/:token/session:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/pay/t/:token/hosted-fields-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/pay/t/:token/googlepay-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **GET /api/pay/return/:state:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 - **POST /api/transactions/:id/split:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/split-payments/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/pay:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/hosted-fields-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/hosted-fields-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **POST /api/transactions/:id/hosted-fields-complete:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
-- **POST /api/transactions/:id/googlepay-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/googlepay-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **POST /api/transactions/:id/googlepay-complete:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
+- **POST /api/transactions/:id/pay:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **POST /api/transactions/:id/pay:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/transactions/:id/hosted-fields-complete:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **POST /api/transactions/:id/hosted-fields-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/transactions/:id/googlepay-complete:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **POST /api/transactions/:id/googlepay-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 - **GET /api/transactions/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it. With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board, and, since the by-number business read was retired (2026-09-26), each selling business's receipt details, which moved here.
 - **POST /api/transactions/:id/receipt-pdf:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/transactions/:id/receipt-qr:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **GET /api/windcave/callback:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **GET /api/windcave/callback:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
-- **POST /api/checkout/:token/split:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
-- **POST /api/checkout/:token/session:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
-- **POST /api/checkout/:token/session:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
-- **POST /api/checkout/:token/googlepay-complete:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
-- **GET /api/checkout/callback:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
+- **GET /api/windcave/callback:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/split:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/session:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/hosted-fields-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/googlepay-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **GET /api/checkout/callback:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 - **GET /api/trades/quotes/token/:token:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
 - **POST /api/trades/quotes/token/:token/respond:** Two acceptances at once can both pass the status check, and each issues and sends an invoice (a read then a write; R3 / C20).
 - **POST /api/trades/quotes/token/:token/respond:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
-- **GET /api/auth/google/callback:** Until TRUST_PROXY_HOPS is set there is no limit: every request carrying a self-made cookie and state makes the server call Google's token endpoint, which refuses the made-up code. Phase B's live check switches the limit on.
+- **GET /api/auth/google/callback:** Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/google, itself unlimited) can make the server call Google's token endpoint once with a made-up code, which Google refuses. Phase B's live check switches the limit on.
+- **POST /api/auth/apple/callback:** Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/apple, itself unlimited) can make the server call Apple's token endpoint once with a made-up code, which Apple refuses. Phase B's live check switches the limit on. (A connect's start needs the owner's password, counted per login.)
+- **POST /api/auth/apple/callback:** No screen leads here yet: the login page's Apple button and the Settings row are R1-T5d. Built and tested against a stand-in Apple; going live needs the owner's Services ID, key and team ID and a real iPhone (owner decision 2026-09-29).
+- **POST /api/auth/apple/callback:** Sign-in and a connect share one starting cookie name, so starting one replaces a pending other in the same browser: the replaced one's return is then refused as expired (on the login page for a sign-in's cookie, in Settings for a connect's). Safe, and the person starts again.
 - **POST /api/admin/auth/login:** While ADMIN_PASSWORD_HASH is unset (today, everywhere), the admin's email is answered 500 'Admin login unavailable' at once and every other email 401 after a full password check: the answer and its timing show which address is the admin's, against the owner's 2026-09-23 rule for sign-in. It ends when the owner sets the hash (npm run admin:password).
 - **POST /api/auth/forgot-password:** A storage or email fault is answered as a success: requestPasswordReset returns false and the route ignores it, so the visitor is told a link was sent when none was. Partly deliberate: only a login's request writes and sends, so an error answered there would show which addresses have logins. A failed lookup, which fails alike for every address, could be answered 500 without that.
 - **GET /api/auth/validate-reset-token/:token:** The reset page (client/src/pages/reset-password.tsx) shows 'Expired Reset Link' for a failed check as well as for an expired link, and offers only a new link: now that the server answers a fault with 500, the page still has to tell the two apart. R1-T9's rule, but this public page was not on its screen list: put to the owner 2026-09-26.
 - **POST /api/auth/confirm-email:** The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for).
 - **POST /api/merchants/signup:** The only limit on new applications is checkRateLimit, 100 a minute per visitor address in this process only. Until TRUST_PROXY_HOPS is set, visitors may all count as the proxy's address, and the same count serves GET /api/merchants/:id/active-transaction (which each open board page asks every 3 seconds) and POST /api/transactions/:id/pay: five open board pages can use it up, refusing sign-ups and board payments, and a run of sign-ups can refuse board customers. Each new address costs a bcrypt hash, a merchant row and an email.
 - **GET /.well-known/apple-developer-merchantid-domain-association:** Were the file ever missing, sendFile's error would reach the global handler, which passes a 4xx error's own message on: a 404 naming the server's absolute path (shown with express's sendFile and the same pass-through, 2026-09-26). The file is in the repository, so only a broken deploy shows it; the pass-through itself belongs to the logs and redaction phase.
-- **GET /api/merchants/:id/active-transaction:** A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).
 - **GET /api/merchants/:id/active-transaction:** Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).
 - **GET /api/merchants/:id/events:** Nothing limits how many streams anyone holds open: each keeps a connection and a subscriber in this process's memory, so one script can hold thousands on any board's public stream (R1-T4 phase B's address limits, once TRUST_PROXY_HOPS is set).
 - **GET /api/nfc/capabilities:** Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).
@@ -65,7 +70,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **PATCH /api/admin/merchants/:id/windcave-merchant-id:** The provider merchant id is stored as sent, with no check of its type or form: a number, an object or a stray space is saved as it came, and only the provider notices. A strict schema (a trimmed string of the provider's form, or null) is plan §8.4's rule.
 - **POST /api/admin/merchants/:id/activate:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Kept by the owner's decision (2026-09-26) as support's path until an emailed set-password link replaces it (the account-security work).
 - **GET /api/admin/analytics:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
-- **GET /api/admin/analytics:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).
+- **GET /api/admin/analytics:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too). Since 2026-10-01 the totals say how many were left out (businessesNotLoaded), and the home page shows it; the per-business rows of the merchants list still show zeros.
 - **GET /api/admin/revenue-over-time:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 - **GET /api/admin/payment-method-breakdown:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 - **GET /api/admin/ga4-detailed:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
@@ -75,7 +80,6 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/subscription/cancel:** reason is read raw: a number, an object or an array is a 500 (reason.trim is not a function) where P2.2 says 400 (§8.4).
 - **PATCH /api/tutorial/pages/:pageKey:** The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.
 - **POST /api/tutorial/restart:** The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.
-- **POST /api/push/unsubscribe:** A database fault while listing the business's devices reads as none (getPushSubscriptionsByMerchant answers [] on any error), so the answer is 403 'Not authorized to unsubscribe this endpoint', not 500 (R1-T9's rule).
 - **GET /api/push/status:** A database fault reading the switches reads as the defaults (getPushNotificationPreferences answers them on any error), so the page shows the default switches instead of that it could not check (R1-T9's rule).
 - **GET /api/push/preferences:** A database fault reading the switches reads as the defaults (getPushNotificationPreferences answers them on any error), so the page shows the default switches instead of that it could not check (R1-T9's rule).
 - **POST /api/merchants/:id/onboarding:** Every submission emails the admin again, with no limit (minor).
@@ -85,13 +89,14 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/merchants/:id/tapt-stones:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 - **PUT /api/merchants/:merchantId/tapt-stones/:stoneId:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 - **DELETE /api/merchants/:merchantId/tapt-stones/:stoneId:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
-- **POST /api/transactions:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
-- **POST /api/transactions/cash-sale:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **POST /api/transactions:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
+- **POST /api/transactions/cash-sale:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
 - **POST /api/transactions/tap-to-pay:** A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).
-- **POST /api/transactions/tap-to-pay:** merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).
+- **POST /api/transactions/tap-to-pay:** Strict input and stored-price validation are in place. It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).
 - **POST /api/transactions/tap-to-pay:** No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).
-- **POST /api/transactions/:id/cancel:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
-- **POST /api/transactions/:transactionId/refunds:** A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).
+- **POST /api/transactions/tap-to-pay:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
+- **POST /api/transactions/:id/cancel:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
+- **POST /api/transactions/:transactionId/refunds:** Until R4-T1 (2026-10-12) a provider refusal answered with the provider's error text, and an ambiguous failure released the reservation (a second refund possible); both fixed.
 - **POST /api/transactions/:transactionId/refunds:** Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).
 - **GET /api/merchants/:id/export/pdf:** startDate and endDate are read raw: a malformed one reaches the storage query as an invalid date (a 500, not the 400 P2.2 asks for; §8.4). The live page sends neither.
 - **GET /api/invoice-documents/:name:** No screen calls it yet: the property terminal shows an attached document by name only. It serves gap 13's option C (owner decision 2026-09-14): a business reading its own documents, and the admin's audited reading.
@@ -107,206 +112,260 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/property/invoices/:id/mark-paid-external:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 - **PUT /api/property/reminder-settings:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 - **PUT /api/trades/reminder-settings:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
-- **POST /api/trades/clients/:id/archive:** The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.
 - **POST /api/trades/quotes:** An archived client can still be quoted here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
 - **POST /api/trades/quotes:** Each quote to someone not saved as a client makes another hidden prospect, and nothing removes them.
 - **POST /api/trades/invoices:** An archived client can still be invoiced here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
 - **POST /api/trades/invoices:** A deposit's amount is the one typed, not checked against the deposit its quote worked out.
-- **POST /api/trades/invoices/:id/send-balance:** Two sends at the same moment can each find no balance and each make one, billing the client twice: the one-balance check is a read, then a write (R3).
+- **POST /api/trades/invoices/:id/send-balance:** A customer's acceptance of the quote makes its deposit or full invoice without the client's lock (the public lane), so one landing beside a balance send is not counted in that balance (R3).
 - **POST /api/trades/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
 - **POST /api/trades/invoices/:id/mark-paid-external:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 - **POST /api/trades/invoices/:id/void:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
 - **POST /api/trades/invoices/:id/void:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
 - **POST /api/trades/invoices/:id/void:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
+## The role and tenant matrix (R1-T3)
+
+For each route, who it serves and what every other caller it names is answered, derived from the
+route's review and its gate (server/route-matrix.ts) and shown in the Routes table's last two columns.
+Every row is driven at runtime: the gates' refusals (route-matrix.test.ts, route-matrix-own-gates),
+a teammate's and another business's (route-matrix-roles, route-matrix-records), and every caller a
+route serves (route-matrix-served-*.test.ts, each with the success status and what the success did).
+route-matrix-inventory.test.ts fails when this table and the matrix disagree.
+
+The callers:
+
+- `signed-out`: no credential at all; on a public route, anyone
+- `invalid-session`: a session cookie that is no one's: a real session's id with a secret that is not its own
+- `disabled-login`: a teammate whose login the owner disabled, holding a session begun before
+- `suspended-business`: the owner of a business that is no longer verified or active
+- `owner`: the business's owner
+- `member`: a teammate of the business
+- `other-owner`: the owner of another business
+- `platform-admin`: the validated platform admin (no business of its own)
+- `link-as-sign-in`: a payment link's token presented as a sign-in (as the session cookie, and as Authorization: Bearer)
+- `old-token`: the owner's account token of the kind the app held before sessions (Authorization: Bearer, correctly signed, unexpired)
+- `old-admin-token`: the platform admin's account token of that kind
+- `no-secret`: the scheduler's routes without x-cron-secret
+- `wrong-secret`: the scheduler's routes with a secret that is not the scheduler's
+- `no-key`: the ecommerce API without a key
+- `unknown-key`: the ecommerce API with a key nobody was issued
+- `key-without-permission`: the ecommerce API with a live key that lacks the route's permission
+- `unknown-link`: a link route asked with a token, state or code that is no one's
+- `unknown-board`: a board's public route asked with a board that is not the business's, or does not exist
+- `removed-board`: a board's public route asked with a board the business has removed
+- `sale-with-its-own-link`: a numbered route asked for a sale that has its own payment link
+- `wrong-webhook-key`: the WhatsApp webhook with a key that is not the provider's
+- `unknown-reference`: a provider's call naming a session, return state or message that is no one's
+- `link-holder`: the holder of the route's own link: its token, return state, handoff code or invite
+- `provider`: the payment or messaging provider's servers, naming their own reference
+- `scheduler`: the scheduler, with its secret
+- `api-key`: the ecommerce API with a live key that has the route's permission
+
+A refusal's status (P2.2): 401 authentication missing, invalid, expired or disabled; 403 signed in
+without the role or the tenant; 404 another business's record, or a link that is no one's, answered as
+a missing one. A few routes answer by design with 200 (a provider's call is acknowledged whatever it
+names; the reset-link check says `{ valid: false }`), 302 (a browser's return is sent home) or 400 (the
+pages that send a one-time token in the body: kept by the owner's decision, 2026-09-29). A retired
+address's success is its notice (410), which it gives everyone.
+
 ## Routes
 
-| Method | Path | Line | Principal | Markers |
-|---|---|---:|---|---|
-| GET | `/robots.txt` | 457 | public | — |
-| GET | `/nfc/:merchantId/stone/:stoneId` | 476 | public | generatePaymentUrl( |
-| GET | `/nfc/:merchantId` | 490 | public | — |
-| GET | `/.well-known/apple-developer-merchantid-domain-association` | 497 | public | — |
-| GET | `/sitemap.xml` | 512 | public | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin |
-| GET | `/api/auth/google` | 600 | public | — |
-| GET | `/api/auth/google/callback` | 621 | public | — |
-| POST | `/api/auth/google/session` | 770 | public-bearer | — |
-| POST | `/api/auth/sign-out-everywhere` | 793 | merchant | authenticateToken |
-| POST | `/api/auth/login` | 838 | public | — |
-| POST | `/api/auth/forgot-password` | 895 | public | requestPasswordReset( |
-| POST | `/api/auth/reset-password` | 935 | public-bearer | resetPassword( |
-| GET | `/api/auth/validate-reset-token/:token` | 975 | public-bearer | validateResetToken( |
-| GET | `/api/admin/request-origin` | 994 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/auth/login` | 1014 | public | — |
-| GET | `/api/auth/me` | 1102 | merchant | authenticateToken |
-| GET | `/api/tutorial/state` | 1143 | merchant | authenticateToken, req.user?.role === "admin" |
-| PATCH | `/api/tutorial/pages/:pageKey` | 1173 | merchant | authenticateToken, req.user?.role === "admin" |
-| POST | `/api/tutorial/restart` | 1210 | merchant | authenticateToken, req.user?.role === "admin" |
-| POST | `/api/merchants/:id/onboarding` | 1231 | merchant | authenticateToken, checkAccountOwnership |
-| GET | `/api/admin/auth/me` | 1323 | platform-admin | authenticateAdmin |
-| GET | `/api/merchants/:id/qr` | 1336 | public | — |
-| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1343 | public | — |
-| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1396 | public | publicBoardBrandDto( |
-| GET | `/api/merchants/:id/profile` | 1418 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner |
-| GET | `/api/pay/t/:token` | 1440 | public-bearer | resolvePaymentToken( |
-| GET | `/api/pay/t/:token/qr` | 1467 | public-bearer | resolvePaymentToken( |
-| POST | `/api/pay/t/:token/split` | 1495 | public-bearer | resolvePaymentToken(, loadTokenReceipt( |
-| GET | `/api/pay/t/:token/receipt` | 1592 | public-bearer | loadTokenReceipt( |
-| POST | `/api/pay/t/:token/receipt-pdf` | 1605 | public-bearer | loadTokenReceipt( |
-| GET | `/api/pay/t/:token/receipt-qr` | 1635 | public-bearer | loadTokenReceipt( |
-| POST | `/api/pay/t/:token/session` | 1711 | public-bearer | resolvePaymentToken(, prepareTokenCompletion( |
-| POST | `/api/pay/t/:token/hosted-fields-complete` | 2011 | public-bearer | prepareTokenCompletion( |
-| POST | `/api/pay/t/:token/googlepay-complete` | 2063 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( |
-| GET | `/api/pay/return/:state` | 2194 | public-bearer | paymentAttempts.resolveReturnState( |
-| ALL | `/api/pay/notification/:state` | 2228 | provider | — |
-| GET | `/api/merchants/:id/active-transaction` | 2245 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
-| POST | `/api/transactions` | 2362 | merchant | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/cash-sale` | 2443 | merchant | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/tap-to-pay` | 2507 | merchant | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/:id/split` | 2649 | public | isTokenAddressedTransaction(, publicTransactionDto( |
-| GET | `/api/split-payments/:id` | 2703 | public | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/cancel` | 2722 | merchant | authenticateToken, checkMerchantOwnership |
-| GET | `/api/nfc/capabilities` | 2782 | public | — |
-| POST | `/api/transactions/:id/pay` | 2796 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/env` | 3048 | public | — |
-| POST | `/api/transactions/:id/hosted-fields-complete` | 3062 | public | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/googlepay-complete` | 3100 | public | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id` | 3173 | public | isTokenAddressedTransaction(, publicTransactionDto( |
-| POST | `/api/transactions/:id/receipt-pdf` | 3196 | public | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id/receipt-qr` | 3257 | public | isTokenAddressedTransaction( |
-| GET | `/api/merchants/:id/export/pdf` | 3311 | merchant | authenticateToken, checkMerchantOwnership |
-| POST | `/api/admin/merchants/:id/verify` | 3351 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/set-active` | 3402 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/merchants/:id/transactions` | 3425 | platform-admin | authenticateAdmin |
-| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3438 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/activate` | 3454 | platform-admin | authenticateAdmin, storage.verifyMerchant( |
-| PUT | `/api/merchants/:id/details` | 3512 | merchant | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/change-password` | 3538 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" |
-| PUT | `/api/merchants/:id/theme` | 3628 | merchant | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/daily-goal` | 3656 | merchant | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id` | 3689 | merchant | authenticateToken, checkAccountOwnership |
-| POST | `/api/merchants/:id/logo` | 3763 | merchant | authenticateToken, checkAccountOwnership |
-| DELETE | `/api/merchants/:id/logo` | 3818 | merchant | authenticateToken, checkAccountOwnership |
-| GET | `/api/merchants/:id/transactions` | 3861 | merchant | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/tapt-stones` | 3878 | merchant | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:id/tapt-stones` | 3894 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
-| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3945 | merchant | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3984 | merchant | authenticateToken, checkMerchantOwnership |
-| ALL | `/api/windcave/notification` | 4024 | provider | — |
-| GET | `/api/windcave/callback` | 4146 | public | isTokenAddressedTransaction( |
-| GET | `/api/admin/analytics` | 4344 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/revenue-over-time` | 4417 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/payment-method-breakdown` | 4453 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/ga4-detailed` | 4490 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/ga4-metrics` | 4555 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/merchants` | 4642 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/merchants/:id` | 4652 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/resend-verification` | 4675 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/email-status` | 4735 | platform-admin | authenticateAdmin |
-| POST | `/api/auth/confirm-email` | 4772 | public-bearer | getMerchantByToken( |
-| POST | `/api/auth/resend-confirmation` | 4899 | public | — |
-| POST | `/api/info-pack-leads` | 4929 | public | — |
-| POST | `/api/merchants/signup` | 4982 | public | — |
-| GET | `/api/merchants/:id/events` | 5093 | merchant / public | authenticateToken, checkMerchantOwnership |
-| GET | `/api/push/capabilities` | 5169 | public | — |
-| GET | `/api/push/vapid-key` | 5193 | public | — |
-| POST | `/api/push/subscribe` | 5203 | merchant | authenticateToken |
-| POST | `/api/push/unsubscribe` | 5245 | merchant | authenticateToken |
-| POST | `/api/push/native-subscribe` | 5272 | merchant | authenticateToken |
-| POST | `/api/push/native-unsubscribe` | 5306 | merchant | authenticateToken |
-| GET | `/api/push/status` | 5341 | merchant | authenticateToken |
-| GET | `/api/push/preferences` | 5366 | merchant | authenticateToken |
-| PUT | `/api/push/preferences` | 5381 | merchant | authenticateToken |
-| POST | `/api/transactions/:transactionId/refunds` | 5413 | merchant | authenticateToken, isAccountOwner |
-| GET | `/api/transactions/:transactionId/refunds` | 5553 | merchant | authenticateToken |
-| GET | `/api/merchants/:merchantId/refunds` | 5585 | merchant | authenticateToken |
-| GET | `/api/merchants/:merchantId/stock-items` | 5618 | merchant | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:merchantId/stock-items` | 5637 | merchant | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5665 | merchant | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 5702 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership |
-| POST | `/api/v1/transactions` | 5770 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
-| GET | `/api/v1/transactions/:id` | 5882 | api-key | authenticateApiKey, requireEcommerceApi |
-| GET | `/api/subscription` | 5970 | merchant | authenticateToken, isAccountOwner |
-| PUT | `/api/subscription/plan` | 5993 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/subscription/cancel` | 6056 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/subscription/resume` | 6099 | merchant | authenticateToken, isAccountOwner |
-| GET | `/api/team` | 6130 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/team/invite` | 6151 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/team/:userId/resend` | 6212 | merchant | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId/invite` | 6294 | merchant | authenticateToken, isAccountOwner |
-| PUT | `/api/team/:userId/status` | 6314 | merchant | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId` | 6362 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/team/accept-invite` | 6400 | public-bearer | getUserByInviteToken( |
-| GET | `/api/subscription/billing-history` | 6436 | merchant | authenticateToken, isAccountOwner |
-| GET | `/api/billing/card` | 6466 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/session` | 6495 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/confirm` | 6541 | merchant | authenticateToken, isAccountOwner |
-| ALL | `/api/billing/card/notification` | 6632 | provider | billingCardCallback |
-| GET | `/api/billing/card/callback` | 6642 | public | billingCardCallback |
-| POST | `/api/billing/card/callback` | 6643 | public | billingCardCallback |
-| DELETE | `/api/billing/card` | 6646 | merchant | authenticateToken, isAccountOwner |
-| POST | `/api/board-builder/submit` | 6671 | merchant | authenticateToken |
-| GET | `/uploads/:folder/:name` | 6736 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/property/tenants` | 7001 | merchant | authenticateToken |
-| POST | `/api/property/tenants` | 7012 | merchant | authenticateToken |
-| GET | `/api/property/tenants/:id` | 7029 | merchant | authenticateToken |
-| PUT | `/api/property/tenants/:id` | 7041 | merchant | authenticateToken |
-| POST | `/api/property/tenants/:id/archive` | 7058 | merchant | authenticateToken |
-| POST | `/api/property/tenants/:id/unarchive` | 7072 | merchant | authenticateToken |
-| GET | `/api/property/tenants/:id/events` | 7086 | merchant | authenticateToken |
-| GET | `/api/property/schedules` | 7103 | merchant | authenticateToken |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7114 | merchant | authenticateToken |
-| PUT | `/api/property/schedules/:id` | 7142 | merchant | authenticateToken |
-| DELETE | `/api/property/schedules/:id` | 7170 | merchant | authenticateToken |
-| GET | `/api/property/invoices` | 7186 | merchant | authenticateToken |
-| POST | `/api/property/invoices/document` | 7217 | merchant | authenticateToken |
-| GET | `/api/invoice-documents/:name` | 7263 | merchant / platform-admin | authenticateToken |
-| POST | `/api/property/invoices` | 7292 | merchant | authenticateToken |
-| POST | `/api/property/invoices/:id/resend` | 7334 | merchant | authenticateToken |
-| POST | `/api/property/invoices/:id/void` | 7353 | merchant | authenticateToken |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7368 | merchant | authenticateToken |
-| GET | `/api/checkout/resolve/:token` | 7391 | public-bearer | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/document/:token` | 7477 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/split` | 7501 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 7532 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 7610 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 7646 | public-bearer | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 7704 | public-bearer | getCheckoutInvoiceByToken( |
-| ALL | `/api/windcave/rent-notification` | 7731 | provider | — |
-| ALL | `/api/windcave/trades-notification` | 7753 | provider | — |
-| POST | `/api/webhooks/whatsapp` | 7778 | provider | req.headers["apikey"] |
-| GET | `/api/property/reminder-settings` | 7828 | merchant | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 7838 | merchant | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 7858 | merchant | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 7868 | merchant | authenticateToken |
-| GET | `/api/trades/gst-settings` | 7881 | merchant | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 7897 | merchant | authenticateToken, isAccountOwner |
-| GET | `/api/trades/clients` | 7917 | merchant | authenticateToken |
-| POST | `/api/trades/clients` | 7925 | merchant | authenticateToken |
-| GET | `/api/trades/clients/:id` | 7937 | merchant | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 7948 | merchant | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 7961 | merchant | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 7980 | merchant | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 7993 | merchant | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 8005 | merchant | authenticateToken |
-| GET | `/api/trades/quotes` | 8017 | merchant | authenticateToken |
-| POST | `/api/trades/quotes` | 8026 | merchant | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8123 | merchant | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8138 | public-bearer | getQuoteByToken( |
-| GET | `/api/trades/quotes/token/:token` | 8153 | public-bearer | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8198 | public-bearer | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8247 | merchant | authenticateToken |
-| POST | `/api/trades/invoices` | 8259 | merchant | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8317 | merchant | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8358 | merchant | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8381 | merchant | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8400 | merchant | authenticateToken |
-| GET | `/api/trades/schedules` | 8417 | merchant | authenticateToken |
-| POST | `/api/trades/schedules` | 8424 | merchant | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8449 | merchant | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8472 | merchant | authenticateToken |
-| GET | `/api/internal/cron/status` | 8488 | cron | authorizeCronRequest |
-| POST | `/api/internal/cron` | 8498 | cron | authorizeCronRequest |
+| Method | Path | Line | Principal | Markers | Served | Refused (P2.2) |
+|---|---|---:|---|---|---|---|
+| GET | `/robots.txt` | 453 | public | — | `signed-out` | — |
+| GET | `/nfc/:merchantId/stone/:stoneId` | 472 | public | generatePaymentUrl( | `signed-out` | — |
+| GET | `/nfc/:merchantId` | 486 | public | — | `signed-out` | — |
+| GET | `/.well-known/apple-developer-merchantid-domain-association` | 493 | public | — | `signed-out` | — |
+| GET | `/sitemap.xml` | 508 | public | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin | `signed-out` | — |
+| GET | `/api/auth/google` | 596 | public | — | `signed-out` | — |
+| GET | `/api/auth/google/callback` | 617 | public | — | `signed-out` | — |
+| POST | `/api/auth/google/session` | 772 | public-bearer | — | `link-holder` | 401: `unknown-link` |
+| GET | `/api/auth/apple` | 811 | public | — | `signed-out` | — |
+| GET | `/api/auth/apple/available` | 824 | public | — | `signed-out` | — |
+| POST | `/api/auth/apple/callback` | 829 | public | — | `signed-out` | — |
+| POST | `/api/auth/apple/session` | 938 | public-bearer | — | `link-holder` | 401: `unknown-link` |
+| GET | `/api/auth/apple/connection` | 971 | merchant | authenticateToken | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/auth/apple/connect` | 986 | merchant | authenticateToken | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/auth/apple/disconnect` | 1013 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/auth/sign-out-everywhere` | 1153 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/auth/logout` | 1180 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/auth/login` | 1221 | public | — | `signed-out` | — |
+| POST | `/api/auth/forgot-password` | 1283 | public | requestPasswordReset( | `signed-out` | — |
+| POST | `/api/auth/reset-password` | 1323 | public-bearer | resetPassword( | `link-holder` | 400: `unknown-link` |
+| GET | `/api/auth/validate-reset-token/:token` | 1365 | public-bearer | validateResetToken( | `link-holder` | 200: `unknown-link` |
+| GET | `/api/admin/request-origin` | 1384 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/auth/login` | 1404 | public | — | `signed-out` | — |
+| GET | `/api/auth/me` | 1523 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/auth/session` | 1537 | public | — | `signed-out` | — |
+| GET | `/api/tutorial/state` | 1556 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PATCH | `/api/tutorial/pages/:pageKey` | 1586 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/tutorial/restart` | 1623 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/merchants/:id/onboarding` | 1644 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| GET | `/api/admin/auth/me` | 1736 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/auth/logout` | 1751 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/merchants/:id/qr` | 1767 | public | — | `signed-out` | — |
+| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1774 | public | — | `signed-out` | 404: `unknown-board` |
+| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1827 | public | publicBoardBrandDto( | `signed-out` | 404: `unknown-board`, `removed-board` |
+| GET | `/api/merchants/:id/profile` | 1849 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| GET | `/api/pay/t/:token` | 1871 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/qr` | 1898 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/split` | 1926 | public-bearer | resolvePaymentToken(, loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/receipt` | 2019 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/receipt-pdf` | 2032 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/receipt-qr` | 2062 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/session` | 2088 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/hosted-fields-complete` | 2090 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/googlepay-complete` | 2092 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/return/:state` | 2097 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| ALL | `/api/pay/notification/:state` | 2099 | provider | — | `provider` | 200: `unknown-reference` |
+| GET | `/api/merchants/:id/active-transaction` | 2102 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
+| POST | `/api/transactions` | 2217 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/transactions/cash-sale` | 2293 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/transactions/tap-to-pay` | 2350 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/transactions/:id/split` | 2486 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/split-payments/:id` | 2534 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/cancel` | 2553 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 404: `other-owner` |
+| GET | `/api/nfc/capabilities` | 2617 | public | — | `signed-out` | — |
+| POST | `/api/transactions/:id/pay` | 2631 | public | — | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/windcave/env` | 2637 | public | — | `signed-out` | — |
+| POST | `/api/transactions/:id/hosted-fields-complete` | 2651 | public | — | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/googlepay-complete` | 2654 | public | — | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/transactions/:id` | 2657 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/receipt-pdf` | 2680 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/transactions/:id/receipt-qr` | 2741 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/merchants/:id/export/pdf` | 2795 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/admin/merchants/:id/verify` | 2835 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/merchants/:id/set-active` | 2886 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/merchants/:id/transactions` | 2909 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 2922 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/merchants/:id/activate` | 2938 | platform-admin | authenticateAdmin, storage.verifyMerchant( | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| PUT | `/api/merchants/:id/details` | 2996 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id/change-password` | 3022 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner`, `platform-admin` |
+| PUT | `/api/merchants/:id/theme` | 3117 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id/daily-goal` | 3145 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id` | 3176 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| POST | `/api/merchants/:id/logo` | 3250 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| DELETE | `/api/merchants/:id/logo` | 3305 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| GET | `/api/merchants/:id/transactions` | 3348 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| GET | `/api/merchants/:id/tapt-stones` | 3365 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/merchants/:id/tapt-stones` | 3381 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3432 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3471 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| ALL | `/api/windcave/notification` | 3510 | provider | — | `provider` | 200: `unknown-reference` |
+| GET | `/api/windcave/callback` | 3513 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| GET | `/api/admin/analytics` | 3519 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/revenue-over-time` | 3600 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/payment-method-breakdown` | 3636 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/ga4-detailed` | 3673 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/ga4-metrics` | 3738 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/merchants` | 3825 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/merchants/:id` | 3835 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/resend-verification` | 3858 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/email-status` | 3918 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/auth/confirm-email` | 3955 | public-bearer | getMerchantByToken( | `link-holder` | 400: `unknown-link` |
+| POST | `/api/auth/resend-confirmation` | 4082 | public | — | `signed-out` | — |
+| POST | `/api/info-pack-leads` | 4112 | public | — | `signed-out` | — |
+| POST | `/api/merchants/signup` | 4165 | public | — | `signed-out` | — |
+| GET | `/api/merchants/:id/events` | 4276 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
+| GET | `/api/push/capabilities` | 4362 | public | — | `signed-out` | — |
+| GET | `/api/push/vapid-key` | 4386 | public | — | `signed-out` | — |
+| POST | `/api/push/subscribe` | 4396 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/push/unsubscribe` | 4442 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/push/native-subscribe` | 4469 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/push/native-unsubscribe` | 4507 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/push/status` | 4540 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/push/preferences` | 4565 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/push/preferences` | 4580 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/transactions/:transactionId/refunds` | 4612 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| GET | `/api/transactions/:transactionId/refunds` | 4766 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/merchants/:merchantId/refunds` | 4798 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| GET | `/api/merchants/:merchantId/stock-items` | 4831 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/merchants/:merchantId/stock-items` | 4850 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 4875 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 4912 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/v1/transactions` | 4980 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
+| GET | `/api/v1/transactions/:id` | 5084 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
+| GET | `/api/subscription` | 5170 | merchant | authenticateToken, isAccountOwner | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/subscription/plan` | 5193 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/subscription/cancel` | 5259 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/subscription/resume` | 5305 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/team` | 5339 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/team/invite` | 5360 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/team/:userId/resend` | 5421 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/team/:userId/invite` | 5503 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| PUT | `/api/team/:userId/status` | 5523 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/team/:userId` | 5574 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| POST | `/api/team/accept-invite` | 5615 | public-bearer | getUserByInviteToken( | `link-holder` | 400: `unknown-link` |
+| GET | `/api/subscription/billing-history` | 5651 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/billing/card` | 5681 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/billing/card/session` | 5710 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/billing/card/confirm` | 5726 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| ALL | `/api/billing/card/notification` | 5749 | provider | billingCardCallback | `provider` | 200: `unknown-reference` |
+| GET | `/api/billing/card/callback` | 5761 | public-bearer | billingCardCallback | `link-holder` | 404: `unknown-link` |
+| POST | `/api/billing/card/callback` | 5762 | public-bearer | billingCardCallback | `link-holder` | 404: `unknown-link` |
+| DELETE | `/api/billing/card` | 5765 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/board-builder/submit` | 5793 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/uploads/:folder/:name` | 5858 | public | getCheckoutInvoiceByToken( | `signed-out` | — |
+| GET | `/api/property/tenants` | 5982 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/property/tenants` | 5993 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/property/tenants/:id` | 6010 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/property/tenants/:id` | 6022 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/tenants/:id/archive` | 6040 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/tenants/:id/unarchive` | 6054 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/tenants/:id/events` | 6068 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/schedules` | 6085 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/property/tenants/:tenantId/schedules` | 6096 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/property/schedules/:id` | 6118 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/property/schedules/:id` | 6140 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/invoices` | 6156 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/property/invoices/document` | 6187 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/invoice-documents/:name` | 6250 | merchant / platform-admin | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 404: `other-owner` |
+| POST | `/api/property/invoices` | 6280 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/resend` | 6312 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/void` | 6334 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 6354 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/checkout/resolve/:token` | 6382 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/document/:token` | 6468 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/split` | 6492 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/session` | 6502 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 6505 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/googlepay-complete` | 6508 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/callback` | 6513 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| ALL | `/api/windcave/rent-notification` | 6516 | provider | — | `provider` | 200: `unknown-reference` |
+| ALL | `/api/windcave/trades-notification` | 6519 | provider | — | `provider` | 200: `unknown-reference` |
+| POST | `/api/webhooks/whatsapp` | 6524 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
+| GET | `/api/property/reminder-settings` | 6574 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/property/reminder-settings` | 6584 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/reminder-settings` | 6620 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/trades/reminder-settings` | 6630 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/gst-settings` | 6643 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/trades/gst-settings` | 6659 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/trades/clients` | 6679 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/clients` | 6687 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/clients/:id` | 6699 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/clients/:id` | 6710 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/archive` | 6725 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/unarchive` | 6738 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/promote` | 6753 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/clients/:id/events` | 6768 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes` | 6780 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/quotes` | 6789 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/:id/pdf` | 6883 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/token/:token/pdf` | 6901 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/quotes/token/:token` | 6922 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/trades/quotes/token/:token/respond` | 6963 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/invoices` | 6984 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/invoices` | 6996 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/send-balance` | 7065 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 7100 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/complete` | 7127 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/void` | 7147 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/schedules` | 7170 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/schedules` | 7177 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/schedules/:id` | 7206 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/trades/schedules/:id` | 7230 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/internal/cron/status` | 7247 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/internal/cron` | 7257 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
 
 ## Per-route facts
 
@@ -427,16 +486,16 @@ Reviewed policy:
 Reviewed policy:
 
 - **Who:** public. **Tenant (credentials):** the login Google's verified email names: the owner of an existing verified or active merchant (linked to one Google id, never re-linked), or a new verified merchant when the address has neither a merchant nor a login. Refused: an email Google has not verified, an address whose login belongs to another merchant or is not its owner (the existingLogin comparisons), a pending or suspended merchant, a merchant linked to another Google id
-- **Input:** query read raw: code (sent to Google with this browser's PKCE verifier), state (must equal the state cookie's, compared in constant time by verifyGoogleSignInState; both halves must be 43 base64url characters) and error (only its presence is used)
+- **Input:** query read raw: code (sent to Google with this browser's PKCE verifier), state (must equal the state cookie's, compared in constant time by verifyGoogleSignInState; the cookie's state and verifier must each be 43 base64url characters, under this server's signature with a start time no more than ten minutes old) and error (only its presence is used)
 - **Capability gate:** Google sign-in configured (config.oauth.googleClientId and googleClientSecret, server/config.ts): without them the browser goes back to /login with an error
-- **Idempotency:** the state cookie is cleared on every call; a new Google user gets one merchant (two first sign-ins at once: the second fails on the unique email and is asked to try again); an existing merchant is linked to the Google id once; each success stores a new one-time handoff code
+- **Idempotency:** the state cookie is cleared on every call, and each start is taken up once (googleStateBucket, a row of auth_throttle taken before Google is asked and never given back: a second callback with the same cookie and state, a simultaneous one included, goes back to /login with the expired message); a new Google user gets one merchant (two first sign-ins at once: the second fails on the unique email and is asked to try again); an existing merchant is linked to the Google id once; each success stores a new one-time handoff code
 - **Side effects:** asks Google to exchange the code (oauth2.googleapis.com/token, with the client secret and the PKCE verifier) and for the profile (googleapis.com/oauth2/v2/userinfo); for a new Google user, creates a verified merchant (createMerchantWithPassword) and its owner login (createUser, server/auth.ts, which keeps an existing password)
 - **Success:** 302 to /login?google=complete, with the one-time handoff code in a second HttpOnly cookie (SameSite=Strict, 60 seconds): never a token in an address. Every refusal is a 302 to /login?error=<a fixed message>
 - **Error disclosure:** fixed
-- **Authenticity:** Google's authorization code, exchanged with the PKCE verifier from this browser's state cookie, and Google's word that the email is verified. The returned state must equal the cookie's, which stops login CSRF and makes a stolen code useless. The server keeps no record of the pair, so a script can present one of its own making; that gets it only Google's refusal of a made-up code
-- **Replay:** Google accepts a code once; a replayed cookie and state make the server ask Google again, which refuses the spent code
+- **Authenticity:** Google's authorization code, exchanged with the PKCE verifier from this browser's state cookie, and Google's word that the email is verified. The returned state must equal the cookie's, which stops login CSRF and makes a stolen code useless. The cookie carries its start time under the server's signature (a key of its own, derived from JWT_SECRET), so a script cannot present a pair of its own making, and a kept cookie is refused after ten minutes whatever the browser does with it (external review 2026-09-29)
+- **Replay:** each start is taken up once, before Google is asked (googleStateBucket): a replayed cookie and state are refused without asking Google again; Google also accepts a code once
 - **Rate:** tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Google is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back
-- **Finding:** Until TRUST_PROXY_HOPS is set there is no limit: every request carrying a self-made cookie and state makes the server call Google's token endpoint, which refuses the made-up code. Phase B's live check switches the limit on.
+- **Finding:** Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/google, itself unlimited) can make the server call Google's token endpoint once with a made-up code, which Google refuses. Phase B's live check switches the limit on.
 
 ### POST `/api/auth/google/session`
 
@@ -450,11 +509,146 @@ Reviewed policy:
 - **Who:** public-bearer. **Tenant (token):** the one-time handoff code in this browser's cookie selects the one login the callback signed in: only its SHA-256 is looked up, and storage.consumeAuthHandoffCode spends it in one statement (unknown, spent, or older than 60 seconds: 401 GOOGLE_SIGN_IN_EXPIRED)
 - **Input:** only the handoff cookie, refused unless it is 43 base64url characters (handoffCodeHash); the body is not read
 - **Idempotency:** one-time: the first redemption spends the code (of two at once, exactly one succeeds); the cookie is cleared on every call
-- **Success:** { token, merchantId, newUser }: the account token in the body only, Cache-Control no-store. 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (issueTokenForUserId, server/auth.ts)
+- **Success:** { merchantId, newUser, csrfToken }: no account credential in the body, Cache-Control no-store; starts a session and sets its cookie (R1-T4 phase E). 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (loginForUserId, server/auth.ts)
 - **Error disclosure:** fixed
 - **Authenticity:** the one-time code the callback set in this browser's cookie. SameSite=Strict, so another site cannot make the browser redeem it
 - **Replay:** refused: the code is spent on first use
 - **Rate:** none — a 32-byte code that lives 60 seconds cannot be guessed
+
+### GET `/api/auth/apple`
+
+- statuses: `302`
+- helpers: `appleSignInError`
+
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** no merchant data: starts a Sign in with Apple for whoever asks; Apple then says who they are
+- **Input:** nothing is read from the request; redirect_uri comes from getBaseUrl(req): the configured public origin, or in development the request's own Host
+- **Capability gate:** Sign in with Apple configured (all four of config.apple, server/config.ts) and an https public origin: without either the browser goes back to /login with an error and no cookie is set
+- **Idempotency:** each call starts a new sign-in: a fresh state and nonce replace this browser's cookie; nothing is stored
+- **Success:** 302 to Apple's authorize page with the Services ID, redirect_uri, response_mode=form_post, the name and email scope, state and nonce; sets the HttpOnly state cookie (SameSite=None and Secure, the only kind that comes back on Apple's cross-site post; 10 minutes, __Host-); Cache-Control no-store
+- **Error disclosure:** fixed
+- **Authenticity:** anyone: this only starts a sign-in, which Apple authenticates and the callback checks
+- **Replay:** harmless: a new call replaces this browser's pending sign-in
+- **Rate:** none — it stores nothing and calls no one
+
+### GET `/api/auth/apple/available`
+
+- statuses: `200`
+- helpers: `appleOffered`
+
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own settings
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { available }: whether Sign in with Apple can run on this server (all four Apple settings and an https public origin), never cached. The login page shows its Apple button only on true (R1-T5d). The same for every caller, signed in or not; nothing of the settings themselves
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
+
+### POST `/api/auth/apple/callback`
+
+- authChecks: `appleStateMatches`, `compares user.role === 'owner'`, `compares user.userId === start.userId`, `liveBusinessSessionLogin`, `readAppleConnectStart`, `verifyAppleIdentityToken`, `verifyAppleSignInState`
+- storageMethods: `connectAppleIdentity`, `createAuthHandoffCode`, `createMerchantWithAppleIdentity`, `getAppleIdentity`, `getMerchantByEmail`, `getUserByEmail`, `recordPendingAppleIdentity`, `settleAuthThrottle`, `takeAuthThrottleSlot`
+- sideEffects: `audit log: logSecurityEvent`, `outbound http: fetch`
+- statuses: `303`
+- rateLimits: `tooManyAttempts`
+- helpers: `appleSignInError`, `appleTransport`, `back`, `done`, `finishAppleConnect`, `stillTheOwner`
+
+Reviewed policy:
+
+- **Who:** public — the starting cookie is a sign-in's, or there is none. **Tenant (credentials):** the login Apple's verified identity token names by its stable subject (issuer, Services ID and subject together): the login that identity was made with. An identity seen for the first time whose verified email no business or login uses makes a new verified business, its owner login and the linked identity in one transaction (createMerchantWithAppleIdentity). An identity is NEVER joined to an existing business or login by its email: it is recorded as pending (recordPendingAppleIdentity), signs nobody in, and the person is told to sign in and connect Apple from Settings. Refused: an email Apple has not verified, and a first sign-in whose token carries no email
+- **Who:** public — the starting cookie is a connect's (readAppleConnectStart: six parts in the shapes this server writes, under a signature key used for nothing else; R1-T5c). **Tenant (credentials):** the login and the session the starting cookie names under the server's signature, and nothing in Apple's post: that cookie is set only by POST /api/auth/apple/connect, for a signed-in owner who proved the current password. The session must still stand and still be that owner's (liveBusinessSessionLogin: not ended, not run out, its login active with the session's version, its business verified or active; then the same login id and the owner role), checked before Apple is asked and again before the write, which re-reads the login under its row lock and takes nothing but an active owner's (connectAppleIdentity). Apple's verified token says which identity; an identity never seen, or pending, becomes that login's whatever email it holds. Never moved: an identity that is another login's (taken), and a login that has a different one (has-another). No business, login or session is made
+- **Input:** Apple's form post, read raw: code (sent to Apple's token endpoint), state (must equal the state in this browser's cookie, compared in constant time by verifyAppleSignInState; the cookie's state and nonce must each be 43 base64url characters, under this server's signature with a start time no more than ten minutes old), error (only its presence is used) and user (Apple's unsigned first-time details: a display name of at most 100 characters is read from it and nothing else, never its email). A connect's return reads code, state (appleStateMatches: whole, in this server's shape, in constant time, against its own cookie's) and error's presence; user is not read
+- **Capability gate:** Sign in with Apple configured (config.apple, server/config.ts): without it the browser goes back to /login with an error, before anything in the post is read (a connect's return goes to /settings?apple=unavailable)
+- **Idempotency:** the state cookie is cleared on every call, and each start is taken up once (appleStateBucket, a row of auth_throttle taken before Apple is asked and never given back: a second return with the same cookie and state, a simultaneous one included, goes back to /login with the expired message); a new Apple identity gets one business (two first sign-ins at once: the second finds the address or the identity taken, nothing half-made is left, and trying again signs in). A connect's start is taken up once the same way (a second return answers expired); connecting the identity a login already has changes nothing, and of two connects at once for one login, or of one identity by two logins, one wins (the login's row lock and the table's two unique rules)
+- **Side effects:** asks Apple to exchange the code (appleid.apple.com/auth/token, with a five-minute client secret signed by the team's key) and, when it does not hold them, for Apple's published keys (appleid.apple.com/auth/keys, cached, refetched for an unknown key id at most once a minute); for a new Apple identity, creates a verified business, its owner login, its subscription and the identity together; for one whose email already has a login, records the identity as pending; for a connect, links the identity to the owner's login and writes APPLE_CONNECTED to the security log (logSecurityEvent) by login id, with no Apple subject, token or email
+- **Success:** 303 to /login?apple=complete, with the one-time handoff code in a second HttpOnly cookie (SameSite=Strict, 60 seconds): never a token, a code or anything of Apple's in an address. Every refusal is a 303 to /login?error=<a fixed message>. A connect's return is always a 303 to /settings?apple=<one fixed word: connected, cancelled, expired, taken, has-another, unavailable, failed or try-later>, with no handoff code and no session cookie (the owner has a session)
+- **Error disclosure:** fixed
+- **Authenticity:** Apple's authorization code, exchanged at Apple's token endpoint, and the identity token that comes back: RS256 under a key Apple publishes, Apple as issuer, the Services ID as the only audience, unexpired, and carrying the nonce this browser's starting cookie holds (server/apple-sign-in.ts). The returned state must equal the cookie's, which stops login CSRF; the cookie carries its start time under the server's signature (a key of its own, derived from JWT_SECRET). The post itself is admitted only from Apple's exact origin (server/cross-site.ts). A connect is believed on three things together: its starting cookie's signature under the connect key (a sign-in's cookie is never a connect's, nor the reverse), the session it names still standing for the owner it names, and Apple's token for the nonce that cookie holds
+- **Replay:** each start is taken up once, before Apple is asked (appleStateBucket): a replayed cookie and state are refused without asking Apple again; Apple also accepts a code once
+- **Rate:** tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Apple is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back. A connect's return is counted in the same bucket (over it: /settings?apple=try-later) and gives its count back when it connects
+- **Finding:** Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/apple, itself unlimited) can make the server call Apple's token endpoint once with a made-up code, which Apple refuses. Phase B's live check switches the limit on. (A connect's start needs the owner's password, counted per login.)
+- **Finding:** No screen leads here yet: the login page's Apple button and the Settings row are R1-T5d. Built and tested against a stand-in Apple; going live needs the owner's Services ID, key and team ID and a real iPhone (owner decision 2026-09-29).
+- **Finding:** Sign-in and a connect share one starting cookie name, so starting one replaces a pending other in the same browser: the replaced one's return is then refused as expired (on the login page for a sign-in's cookie, in Settings for a connect's). Safe, and the person starts again.
+
+### POST `/api/auth/apple/session`
+
+- authChecks: `storage.consumeAuthHandoffCode`
+- storageMethods: `consumeAuthHandoffCode`
+- statuses: `200`, `401`, `403`, `500`
+- helpers: `expired`
+
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the one-time handoff code in this browser's cookie selects the one login the callback signed in: only its SHA-256 is looked up, and storage.consumeAuthHandoffCode spends it in one statement (unknown, spent, or older than 60 seconds: 401 APPLE_SIGN_IN_EXPIRED)
+- **Input:** only the handoff cookie, refused unless it is 43 base64url characters (handoffCodeHash); the body is not read
+- **Idempotency:** one-time: the first redemption spends the code (of two at once, exactly one succeeds); the cookie is cleared on every call
+- **Success:** { merchantId, newUser, csrfToken }: no account credential in the body, Cache-Control no-store; starts a session and sets its cookie. 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (loginForUserId, server/auth.ts)
+- **Error disclosure:** fixed
+- **Authenticity:** the one-time code the callback set in this browser's cookie. SameSite=Strict, so another site cannot make the browser redeem it
+- **Replay:** refused: the code is spent on first use
+- **Rate:** none — a 32-byte code that lives 60 seconds cannot be guessed
+
+### GET `/api/auth/apple/connection`
+
+- middleware: `authenticateToken`
+- authChecks: `compares user.role !== 'owner'`, `isAccountOwner`
+- storageMethods: `getAppleIdentityForLogin`
+- statuses: `200`, `401`, `403`, `500`, `503`
+- dtos: `appleConnectionDto`
+- helpers: `appleOffered`, `ownerLoginOf`
+
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own login, by its users-row id, and no business's data: nothing in the request names a login or a business. Only an owner's login behind a business session (ownerLoginOf: isAccountOwner, then the role must be the owner's own and the session a business one): a teammate, and the platform admin (which isAccountOwner alone would let through, and which has no login row), are refused 403 'Only the account owner can do this.'
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** appleConnectionDto: { available, connected, email, isPrivateEmail, connectedAt }, never cached: whether Apple signs this login in, the address Apple gave (possibly a relay address) and since when; never Apple's subject, issuer or client id. available says whether a connect can start here (Apple configured, an https origin); a connection made earlier is still shown when it cannot
+- **Error disclosure:** fixed
+
+### POST `/api/auth/apple/connect`
+
+- middleware: `authenticateToken`
+- body: `schema: currentPasswordBody`
+- authChecks: `compares user.role !== 'owner'`, `isAccountOwner`
+- storageMethods: `getAppleIdentityForLogin`, `getUserById`, `settleAuthThrottle`, `takeAuthThrottleSlot`
+- sideEffects: `audit log: logSecurityEvent`
+- statuses: `200`, `400`, `401`, `403`, `404`, `409`, `429`, `500`, `503`
+- rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
+- helpers: `ownerLoginOf`, `provesCurrentPassword`, `refuseTooManyAttempts`
+
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own login, by its users-row id, and no business's data: nothing in the request names a login or a business. Only an owner's login behind a business session (ownerLoginOf: isAccountOwner, then the role must be the owner's own and the session a business one): a teammate, and the platform admin (which isAccountOwner alone would let through, and which has no login row), are refused 403 'Only the account owner can do this.'
+- **Input:** body: currentPasswordBody (currentPassword, a string that is not empty; anything else is 400 'Current password is required', with no issue list); redirect_uri comes from getBaseUrl(req): the configured public origin, or in development the request's own Host
+- **Capability gate:** Sign in with Apple configured (all four of config.apple, server/config.ts) and an https public origin (the starting cookie must be SameSite=None and Secure to come back on Apple's post): without either, 503 APPLE_NOT_AVAILABLE, answered before the caller's role is looked at (the plan's order) and before any password is checked
+- **Idempotency:** a login that already has an Apple identity is refused first (409 APPLE_ALREADY_CONNECTED, before the password is checked, so it costs no attempt). Otherwise the current password is checked, counted per login in changing the password's own bucket (passwordChangeBucket: five wrong between the two routes and disconnecting, then 429 TOO_MANY_ATTEMPTS with Retry-After; the right password clears the count), and each call that proves it starts a new connect: a fresh state and nonce replace this browser's starting cookie. Nothing is stored and Apple is asked nothing
+- **Side effects:** logs a slowed password check (logSecurityEvent: PASSWORD_CHECK_SLOWED, by login id)
+- **Success:** { url }, never cached: Apple's authorize address for the page to go to (the Services ID, redirect_uri, response_mode=form_post, the name and email scope, state and nonce). Sets the HttpOnly starting cookie (SameSite=None and Secure; 10 minutes, __Host-), which carries the state, the nonce, the start time, this login's id and this session's id under the server's signature, with a key used for nothing else. No session is begun
+- **Error disclosure:** fixed
+
+### POST `/api/auth/apple/disconnect`
+
+- middleware: `authenticateToken`
+- body: `schema: currentPasswordBody`
+- authChecks: `compares user.role !== 'owner'`, `isAccountOwner`
+- storageMethods: `disconnectAppleIdentity`, `getUserById`, `settleAuthThrottle`, `takeAuthThrottleSlot`
+- sideEffects: `audit log: logSecurityEvent`
+- statuses: `200`, `400`, `401`, `403`, `404`, `429`, `500`, `503`
+- rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
+- helpers: `ownerLoginOf`, `provesCurrentPassword`, `refuseTooManyAttempts`
+
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own login, by its users-row id, and no business's data: nothing in the request names a login or a business. Only an owner's login behind a business session (ownerLoginOf: isAccountOwner, then the role must be the owner's own and the session a business one): a teammate, and the platform admin (which isAccountOwner alone would let through, and which has no login row), are refused 403 'Only the account owner can do this.'
+- **Input:** body: currentPasswordBody (currentPassword, a string that is not empty; anything else is 400 'Current password is required', with no issue list)
+- **Idempotency:** checks the current password, counted in the same bucket as changing it and connecting (429 TOO_MANY_ATTEMPTS), then deletes this login's Apple identity row (disconnectAppleIdentity, by the session's login id alone): nothing about that Apple account is kept, and it can be connected again. With nothing connected the answer is the same and nothing is removed. A login made by Apple has no password anyone knows, so it cannot remove its only way in
+- **Side effects:** writes APPLE_DISCONNECTED to the security log (logSecurityEvent) by login id, with whether a row was removed and no Apple subject or email; logs a slowed password check (PASSWORD_CHECK_SLOWED). It ends no session: those Apple began stay until they end or the owner signs out everywhere
+- **Success:** { connected: false }, never cached
+- **Error disclosure:** fixed
 
 ### POST `/api/auth/sign-out-everywhere`
 
@@ -468,9 +662,25 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own login: every session of it ends, this one included; the platform admin is refused (403 'Only a TaptPay login can do this.')
 - **Input:** nothing
-- **Idempotency:** advances the login's session version (advanceUserSessionVersion), spending every token issued before it, this one included: the same token again is 401 SESSION_ENDED
-- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended)
-- **Success:** 204, no body, not cached
+- **Idempotency:** advances the login's session version (advanceUserSessionVersion), ending every session begun before it, this one included: the same cookie again is 401 SESSION_ENDED
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended); records each session as ended (sign_out_everywhere; SESSION_REVOKED in the security log)
+- **Success:** 204, no body, not cached; this device's session cookie cleared
+- **Error disclosure:** fixed
+
+### POST `/api/auth/logout`
+
+- middleware: `authenticateToken`
+- authChecks: `compares req.user?.role === 'admin'`
+- sideEffects: `live update: sseBroker.disconnectSession`
+- statuses: `204`, `401`, `403`, `500`, `503`
+
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session that signed the request in, and no other: a session cookie's session is ended. The platform admin is refused (403 'Only a TaptPay login can do this.'): the admin area has its own Log Out
+- **Input:** nothing
+- **Idempotency:** ends this session (revokeAuthSession, recorded as logout); the same cookie again is refused 401 by the sign-in gate, so the Log Out cannot repeat
+- **Side effects:** closes this session's live streams only (sseBroker.disconnectSession); SESSION_REVOKED in the security log
+- **Success:** 204, no body, not cached; the session cookie cleared
 - **Error disclosure:** fixed
 
 ### POST `/api/auth/login`
@@ -488,12 +698,12 @@ Reviewed policy:
 
 - **Who:** public. **Tenant (credentials):** the login the email names, when its password matches (authenticateUser: the password is checked at full cost for every email, one with no login included; then the login must be active, its merchant verified or active, and a member within the seat limit). Every refusal is the same 401
 - **Input:** body: loginSchema (400 with its issues)
-- **Idempotency:** each success issues another one-hour token and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address
+- **Idempotency:** each success starts another session (R1-T4 phase E: a row in auth_sessions keeping only its secret's digest) and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address
 - **Side effects:** security audit log entries (logSecurityEvent: LOGIN_SUCCESS, FAILED_LOGIN, LOGIN_SLOWED, LOGIN_ERROR), with the email and address
-- **Success:** { token, user: { id, email, merchantId, role } }; sets the known-device cookie
+- **Success:** { csrfToken, user: { id, email, merchantId, role } }, not cached; sets the session cookie (HttpOnly, Secure, SameSite=Lax, __Host-, 7 days) and the known-device cookie
 - **Error disclosure:** input-issues
 - **Authenticity:** the email and its password
-- **Replay:** a replayed success issues another token; a replayed failure counts again
+- **Replay:** a replayed success starts another session; a replayed failure counts again
 - **Rate:** takeAuthThrottleSlot before the password is checked: per email (a device that has signed in with it is counted on its own), 5 free, then waits from 30 s doubling to 15 minutes, never a lockout; per visitor address (50 free) once TRUST_PROXY_HOPS is set (R1-T4 phase B). Counted in the database, so across server instances
 
 ### POST `/api/auth/forgot-password`
@@ -533,7 +743,7 @@ Reviewed policy:
 - **Who:** public-bearer. **Tenant (token):** the reset token (32 random bytes, hex) selects the one login it was sent to: only its SHA-256 is looked up; it must be live (one hour), the login active and an owner or member (resetPassword, server/auth.ts); storage.resetUserPasswordByToken spends it in the statement that sets the password
 - **Input:** body: resetPasswordSchema: the token and a new password meeting the one password rule, with its confirmation (400 with the first issue and the issues)
 - **Idempotency:** one-time: the token is spent with the new password in one statement, and a second use is 400. A storage fault is 500 and changes nothing, so the same link can be tried again (until 2026-09-26 a fault was answered 400 'Invalid or expired reset token')
-- **Side effects:** ends every session of the login (its session version, advanced in the same statement), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs
+- **Side effects:** ends every session of the login (its session version, advanced in the same statement; each session also recorded as ended, password_reset, SESSION_REVOKED), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs
 - **Success:** { message }; marks this browser as a known device for the login
 - **Error disclosure:** input-issues
 - **Authenticity:** holding the emailed reset link: its token is the credential for that one login's reset
@@ -590,12 +800,12 @@ Reviewed policy:
 
 - **Who:** public. **Tenant (credentials):** the platform admin: the configured admin email (compared without regard to case) and ADMIN_PASSWORD_HASH; any other email is refused after the same work (checkPasswordEvenly with the admin hash's budget)
 - **Input:** body: loginSchema (400 with its issues)
-- **Idempotency:** each success issues another one-hour admin token; each failure counts against the email (or this device) and the visitor's address
+- **Idempotency:** each success starts another admin session (R1-T4 phase E); each failure counts against the email (or this device) and the visitor's address
 - **Side effects:** security audit log entries (logSecurityEvent: ADMIN_LOGIN_SUCCESS, ADMIN_FAILED_LOGIN, ADMIN_LOGIN_SLOWED, ADMIN_LOGIN_ERROR)
-- **Success:** { token, user: { id: 1, email, merchantId: 0, role: 'admin' } }: a one-hour token under the dedicated admin principal; sets the admin known-device cookie
+- **Success:** { csrfToken, user: { id: 1, email, merchantId: 0, role: 'admin' } }, not cached; sets the admin session cookie (its own name, 12 hours) and the admin known-device cookie
 - **Error disclosure:** input-issues
 - **Authenticity:** the admin email and its password
-- **Replay:** a replayed success issues another token; a replayed failure counts again
+- **Replay:** a replayed success starts another session; a replayed failure counts again
 - **Rate:** takeAuthThrottleSlot before the password is checked: per email (a device that has signed in with it is counted on its own), 5 free, then waits from 30 s doubling to 15 minutes, never a lockout; per visitor address (50 free) once TRUST_PROXY_HOPS is set (R1-T4 phase B). Counted in the database, so across server instances; the admin's buckets are its own
 - **Finding:** While ADMIN_PASSWORD_HASH is unset (today, everywhere), the admin's email is answered 500 'Admin login unavailable' at once and every other email 401 after a full password check: the answer and its timing show which address is the admin's, against the owner's 2026-09-23 rule for sign-in. It ends when the owner sets the hash (npm run admin:password).
 
@@ -603,8 +813,10 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - storageMethods: `getMerchant`, `getOrCreateSubscription`
-- statuses: `200`, `401`, `500`, `503`
+- statuses: `200`, `401`, `403`, `500`, `503`
+- dtos: `signedInUserDto`
 - entitlementGates: `billingCardIsReady`
+- helpers: `signedInUserDto`
 
 Reviewed policy:
 
@@ -612,8 +824,28 @@ Reviewed policy:
 - **Input:** nothing
 - **Entitlement gate:** none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate
 - **Idempotency:** read-only, apart from getOrCreateSubscription, which makes the business's subscription row if it has none
-- **Success:** { user: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }: every client's start-up check
+- **Success:** { user: signedInUserDto: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }, with csrfToken, not cached: a signed-in check; the public start-up check is GET /api/auth/session
 - **Error disclosure:** fixed
+
+### GET `/api/auth/session`
+
+- storageMethods: `getMerchant`, `getOrCreateSubscription`
+- statuses: `200`, `500`
+- dtos: `signedInUserDto`
+- entitlementGates: `billingCardIsReady`
+- helpers: `signedInUserDto`
+
+Reviewed policy:
+
+- **Who:** public. **Tenant (session):** the caller's own business session cookie, and nothing else: readBusinessSession finds its session by the cookie's id, checks its secret, that it has not ended, that its login is active with the session's version and that its business is verified or active; the admin's cookie and any Authorization header are not read. Anyone without such a session gets { signedIn: false }
+- **Input:** only the session cookie, refused unless it is `<22 base64url>.<43 base64url>` (parseSessionCookie); nothing else is read
+- **Entitlement gate:** none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate
+- **Idempotency:** read-only for the signed-out; for a session, recorded as a use (at most once a minute), and the daily swap offered or taken up, as on any signed-in request; apart from getOrCreateSubscription, which makes the business's subscription row if it has none
+- **Success:** { signedIn: false }, or { signedIn: true, user: signedInUserDto, csrfToken }, never cached: the app's start-up check on a session cookie (R1-T4 phase E). A cookie that is not a live session is cleared
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: it answers only about the caller's own cookie, which is HttpOnly, so no script can present another's; without a valid one it says only { signedIn: false }
+- **Replay:** harmless: the cookie's holder reads their own session again
+- **Rate:** none — it reveals nothing about anyone but the caller, and each read of a session is one indexed row
 
 ### GET `/api/tutorial/state`
 
@@ -671,7 +903,7 @@ Reviewed policy:
 - params: `id: strictPositiveIntegerParam`
 - body: `schema: merchantOnboardingSchema`
 - authChecks: `checkAccountOwnership`, `checkMerchantOwnership`, `isAccountOwner`
-- storageMethods: `getMerchant`, `updateMerchant`
+- storageMethods: `getMerchant`, `updateMerchantSettings`
 - sideEffects: `email: sendEmail`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `validation.error.issues`
@@ -681,7 +913,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
 - **Input:** id: strictPositiveIntegerParam; body: merchantOnboardingSchema, strict, sign-up's rules (a director of 1 to 100 characters; NZBN and GST at most 20; a description of at most 500; a website address or nothing; one of the turnover ranges or nothing); 400 with the first issue and the issues, before anything is read, kept or sent
-- **Idempotency:** stores the six details and marks onboarding complete (updateMerchant; all six since 2026-09-27, when three had only been emailed); again stores them again and emails the admin again
+- **Idempotency:** stores the six details and marks onboarding complete (updateMerchantSettings, onboarding: storage sets the flag and writes those six columns only; all six since 2026-09-27, when three had only been emailed); again stores them again and emails the admin again
 - **Side effects:** emails the details to the platform's admin address (sendEmail; every value HTML-escaped, the subject's line breaks removed)
 - **Success:** { message }
 - **Error disclosure:** input-issues
@@ -701,7 +933,24 @@ Reviewed policy:
 - **Input:** nothing
 - **Idempotency:** read-only
 - **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** { user: { id, email, merchantId: 0, role: 'admin' } }: the admin app's session check
+- **Success:** { user: { id, email, merchantId: 0, role: 'admin' }, csrfToken }, not cached: the admin app's session check; with an admin session cookie, the page's CSRF token (R1-T4 phase E)
+- **Error disclosure:** fixed
+
+### POST `/api/admin/auth/logout`
+
+- middleware: `authenticateAdmin`
+- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
+- sideEffects: `audit log: logSecurityEvent`, `live update: sseBroker.disconnectSession`
+- statuses: `204`, `401`, `403`, `500`, `503`
+- helpers: `authenticateAdmin`
+
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** the admin session that signed the request in, and no other: it is ended
+- **Input:** nothing
+- **Idempotency:** ends this admin session (revokeAuthSession, recorded as logout); the same cookie again is refused 401 by the sign-in gate
+- **Side effects:** closes this session's live streams (sseBroker.disconnectSession); SESSION_REVOKED in the security log; an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** 204, no body, not cached; the admin session cookie cleared
 - **Error disclosure:** fixed
 
 ### GET `/api/merchants/:id/qr`
@@ -822,19 +1071,18 @@ Reviewed policy:
 - body: `schema: z.object({ totalSplits: z.number().int().min(2).max(10), }).strict()`
 - authChecks: `resolvePaymentToken`
 - storageMethods: `createBillSplit`, `getMerchant`
-- sideEffects: `live update: sseBroker.broadcast`
 - statuses: `200`, `400`, `404`, `409`, `429`, `500`
 - dtos: `tokenPaymentDto`
 - errorTextInResponse: `error.message`
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- helpers: `broadcastToStone`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
+- helpers: `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
 Reviewed policy:
 
 - **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
 - **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict)
 - **Idempotency:** only while the sale is pending and the business allowed splitting; storage.createBillSplit sets it up atomically and a sale already split is refused (BillSplitConflictError, 409)
-- **Side effects:** a live update to the business's screens (broadcastToStone)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** tokenPaymentDto of the split sale; no split-payment id is returned
 - **Error disclosure:** domain-errors
 - **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
@@ -908,130 +1156,125 @@ Reviewed policy:
 
 ### POST `/api/pay/t/:token/session`
 
-- params: `token: raw`
-- body: `schema: tokenSessionRequestSchema`
-- authChecks: `resolvePaymentToken`
-- storageMethods: `getMerchant`, `getNextPendingSplit`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: createWindcaveSession`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `404`, `409`, `410`, `429`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claim`, `claimFinalization`
-- helpers: `broadcastToStone`, `cacheTokenAttemptSession`, `persistTokenOutcome`, `reconcileExpiredTokenAttempt`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `schema: sessionSchema`
+- authChecks: `compares input.merchantId!==sale.merchantId`, `resolvePaymentToken`
+- storageMethods: `getMerchant`, `getSplitPaymentsByTransaction`, `getTaptStoneForMerchant`, `getTransaction`
+- sideEffects: `provider through durable attempt coordinator: checkout.open`
+- statuses: `200`, `202`, `400`, `403`, `404`, `409`, `410`, `429`, `503`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `find`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:session`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
-- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: tokenSessionRequestSchema, strict (idempotencyKey: a UUID; amount: optional, and must equal what is owed)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE) and PAYMENT_RETURN_STATE_SECRET (503 PAYMENT_RETURN_STATE_UNAVAILABLE)
-- **Idempotency:** per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process
-- **Side effects:** creates a payment session with the provider (createWindcaveSession); an expired attempt is first reconciled by querying the provider, which can settle it (live update and push to the business)
-- **Success:** the provider session id, its hosted-page and submit URLs, attemptState and shareIndex; or, for a settled attempt, its outcome
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** actual R2 session client through the durable coordinator; no communication from this route
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
-- **Replay:** the same idempotency key returns the same attempt and session; a new key while one is active is refused
-- **Rate:** requirePaymentTokenRateLimit (the session family: 20 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/pay/t/:token/hosted-fields-complete`
 
-- params: `token: raw`
-- body: `schema: tokenCompletionBaseSchema.extend({ paymentMethod: z.enum(["card", "apple_pay"]).optional().default("card"), }).strict()`
-- authChecks: `prepareTokenCompletion`, `resolvePaymentToken`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `404`, `409`, `429`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `persistTokenOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)
-- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), paymentMethod card or apple_pay; strict
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured: the outcome waits)
-- **Idempotency:** paymentAttempts.claimFinalization: one finaliser per attempt; a settled attempt returns its outcome
-- **Side effects:** queries the provider for the session's outcome; on settlement a live update and a push to the business
-- **Success:** { approved, outcome, receiptShare } (tokenAttemptOutcome)
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else, together with the attempt's idempotency key and provider session id
-- **Replay:** returns the settled outcome; the outcome always comes from the provider, never from the request
-- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/pay/t/:token/googlepay-complete`
 
-- params: `token: raw`
-- body: `schema: tokenCompletionBaseSchema.extend({ googlePayToken: z.record(z.unknown()).optional(), }).strict()`
-- authChecks: `prepareTokenCompletion`, `resolvePaymentToken`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `404`, `409`, `429`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `assertWindcaveUrl`, `broadcastToStone`, `persistTokenOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)
-- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), and googlePayToken, an object passed to the provider as it is; strict
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured: the outcome waits)
-- **Idempotency:** paymentAttempts.claimFinalization: only the first finaliser submits the wallet token; a replay only queries the session, so it cannot charge twice
-- **Side effects:** the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); otherwise queries the session; on settlement a live update and a push to the business
-- **Success:** { approved, outcome, receiptShare } (tokenAttemptOutcome)
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else, together with the attempt's idempotency key and provider session id
-- **Replay:** never resubmits the wallet token; returns the settled outcome
-- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/pay/return/:state`
 
-- params: `state: raw`
-- query: `result: raw`, `source: raw`
-- authChecks: `paymentAttempts.resolveReturnState`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `303`, `404`, `410`, `429`, `500`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `persistTokenOutcome`, `reconcileTokenReturnState`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `state: raw`
+- query: `result: checked`, `source: raw`
+- authChecks: `attempts.resolveReturnState`
+- storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`
+- statuses: `200`, `202`, `303`, `404`, `410`, `429`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:returnState`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the return state (HMAC-derived from one payment attempt) selects that attempt (paymentAttempts.resolveReturnState); an unknown state is 404
-- **Input:** state: an opaque return state, resolved by its hash; source: only 'hpp' is acted on; result: only 'cancelled' changes anything (a provider-declined outcome is labelled cancelled)
-- **Capability gate:** isWindcaveConfigured() (unconfigured, the attempt stays pending)
-- **Idempotency:** the provider's browser return reconciles through paymentAttempts.claimFinalization, once per attempt; a plain read is read-only
-- **Side effects:** on the provider's browser return: queries the provider and settles the attempt (live update and push to the business)
-- **Success:** a browser return is always 303 to /pay/return/<state>; a plain read returns only { outcome, receiptShare }
+- **Who:** public-bearer. **Tenant (token):** hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required.
+- **Input:** state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** narrow local outcome/receipt share or safe redirect; pending remains processing
 - **Error disclosure:** fixed
-- **Authenticity:** holding the attempt's return state, the credential for that one attempt
-- **Replay:** harmless: settlement is claimed once, and reads are read-only
-- **Rate:** requirePaymentTokenRateLimit (the resolve family: 120 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### ALL `/api/pay/notification/:state`
 
-- params: `state: raw`
-- query: `result: raw`
-- body: `fields: result`
-- authChecks: `paymentAttempts.resolveReturnState`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `429`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `persistTokenOutcome`, `reconcileTokenReturnState`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
+- statuses: `200`, `400`, `405`, `413`, `415`, `429`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (token):** the return state (HMAC-derived, one per payment attempt) selects one attempt through paymentAttempts.resolveReturnState; an unknown state does nothing
-- **Input:** state: an opaque return state, only resolved by its hash; result (query or body): read only to label a provider-declined outcome as cancelled rather than declined
-- **Capability gate:** isWindcaveConfigured(): with no provider configured the attempt stays pending
-- **Idempotency:** paymentAttempts.claimFinalization claims the attempt before the provider is queried; a terminal or conflicting attempt is left alone, so repeated or concurrent notifications settle it once
-- **Side effects:** queries the provider for the attempt's session; on settlement, a live update and a push to the business (persistTokenOutcome, broadcastToStone)
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed: the call only prompts a re-read, and the outcome comes from querying the provider, never from the request
-- **Replay:** harmless: a settled attempt is terminal and the claim is atomic
-- **Rate:** requirePaymentTokenRateLimit (the completion family, per visitor address)
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### GET `/api/merchants/:id/active-transaction`
 
@@ -1039,23 +1282,22 @@ Reviewed policy:
 - query: `stoneId: strictPositiveIntegerQueryParam`
 - authChecks: `authenticateToken`, `checkMerchantOwnership`, `compares stone.merchantId !== merchantId`, `compares transaction.merchantId !== merchantId`
 - storageMethods: `getActiveTransactionByMerchant`, `getTaptStone`
-- statuses: `200`, `400`, `401`, `403`, `410`, `429`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `404`, `410`, `429`, `500`, `503`
 - dtos: `ownerTransactionDto`, `publicTransactionDto`
 - rateLimits: `checkRateLimit`
 - helpers: `checkRateLimit`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin) — an Authorization header is sent. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; its newest open sale on any board, or on the board asked for, including a sale with its own link
-- **Who:** public — no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; a board that is not the business's, or does not exist, is 403
+- **Who:** merchant (owner, member, platform admin) — a session cookie with no stoneId (R1-T4 phase E3); an Authorization header is ignored. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; its newest open sale on any board, including a sale with its own link
+- **Who:** public — a stoneId, regardless of cookies or Authorization headers: a board's page reads its board as any customer does (with neither a sign-in nor a stoneId: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403), and so is a board the business has removed (owner decision 2026-09-29: its page no longer shows the sale left open on it); absent or mismatched transactions return null
 - **Input:** id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)
 - **Idempotency:** read-only
 - **Success:** the open sale or null, not cached: to the business, ownerTransactionDto; to the board's page, publicTransactionDto; each with the board's page and QR addresses for a board sale
 - **Error disclosure:** fixed
 - **Authenticity:** none: a board's page is public by design (owner 2026-09-25: with a board, its own page and stream are unchanged); the business and board numbers are both sequential, so anyone can follow any board's open sale, its item and price, by counting
 - **Replay:** read-only
-- **Rate:** the board's page: checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B), which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none
-- **Finding:** A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).
+- **Rate:** the board's page: checkRateLimit (100 a minute per normalized IPv4 address or IPv6 /64, counted in this server process only; until TRUST_PROXY_HOPS is set visitors behind a proxy share its address — R1-T4 phase B), which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none
 - **Finding:** Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).
 
 ### POST `/api/transactions`
@@ -1063,57 +1305,55 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - body: `schema: retailTransactionCreateRequestSchema`
 - authChecks: `checkMerchantOwnership`, `compares stone.merchantId !== validation.data.merchantId`
-- storageMethods: `getOrCreateSubscription`, `getTaptStone`
-- sideEffects: `live update: sseBroker.broadcast`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `401`, `402`, `403`, `500`, `503`
+- storageMethods: `createTransactionForMerchant`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`
+- statuses: `200`, `400`, `401`, `402`, `403`, `409`, `500`, `503`
 - dtos: `ownerTransactionDto`
 - errorTextInResponse: `validation.error.errors`
 - capabilityGates: `config.features.newRetailPayments`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `broadcastToStone`, `requireBillingCard`
+- helpers: `commandActor`, `requireBillingCard`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; a board must be one of its active boards (400 otherwise)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; createTransactionForMerchant uses explicit tenant scope and holds the active owned board's row lock through insert (400 on unavailable/raced board)
 - **Input:** body: retailTransactionCreateRequestSchema, strict (the business, an item name of 1 to 200 characters, a price like 5.00, splitting, the board, the link type; 400 with the issues)
 - **Capability gate:** a sale without a board has its own link, which needs per-payment links on (config.features.newRetailPayments: 503 otherwise)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
 - **Idempotency:** none: each call makes another pending sale, with a new private link (only its hash kept; a token clash is 503) or its board's shared address
-- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification to the business (sendPushToMerchant)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/payment-creation-command.ts; no route-local financial publication.
 - **Success:** ownerTransactionDto with the sale's page and QR addresses; the private link's token appears only in this answer
 - **Error disclosure:** input-issues
-- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
 
 ### POST `/api/transactions/cash-sale`
 
 - middleware: `authenticateToken`
 - body: `schema: cashSaleRequestSchema`
 - authChecks: `checkMerchantOwnership`, `compares stone.merchantId !== merchantId`
-- storageMethods: `createTransaction`, `getOrCreateSubscription`, `getTaptStone`
-- sideEffects: `live update: sseBroker.broadcast`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `401`, `402`, `403`, `500`, `503`
+- storageMethods: `getCashSaleByKeyForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`, `recordCashSaleForMerchant`
+- statuses: `200`, `400`, `401`, `402`, `403`, `409`, `500`, `503`
 - dtos: `ownerTransactionDto`
 - errorTextInResponse: `validation.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `broadcastToStone`, `requireBillingCard`
+- helpers: `requireBillingCard`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; a board must be one of its active boards (getTaptStone: 400 otherwise, since 2026-09-27)
-- **Input:** body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues; since 2026-09-27, when parseInt and parseFloat let '1abc' and 'Infinity' through)
-- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** none: each call records another completed cash sale
-- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getCashSaleByKeyForMerchant and recordCashSaleForMerchant scope the UUID to that business; getTaptStoneForMerchant scopes the read and recordCashSaleForMerchant locks and rechecks an active owned board through insert (400 on unavailable/raced board)
+- **Input:** body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues). Idempotency-Key header must be a UUID (400 IDEMPOTENCY_KEY_REQUIRED otherwise)
+- **Entitlement gate:** paid access for new records (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise); an authenticated matching committed retry returns its audited record with no new action
+- **Idempotency:** merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication. Generic constructors cannot mint cash keys
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** { transaction: ownerTransactionDto }
 - **Error disclosure:** input-issues
-- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
 
 ### POST `/api/transactions/tap-to-pay`
 
 - middleware: `authenticateToken`
-- body: `fields: amount, merchantId, transactionId, windcaveToken`
+- body: `schema: tapToPayRequestSchema`
 - authChecks: `checkMerchantOwnership`, `compares pendingTransaction.merchantId !== mid`
-- storageMethods: `createTransaction`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransaction`, `updateTransactionPaymentMethod`, `updateTransactionStatus`
+- storageMethods: `createTransactionForMerchant`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransactionForMerchant`, `updateTransactionPaymentMethodForMerchant`, `updateTransactionStatusForMerchant`
 - sideEffects: `live update: sseBroker.broadcast`, `provider: createAttendedSession`, `provider: submitTapToPayToken`, `push: sendPushToMerchant`
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `502`, `503`
 - errorTextInResponse: `paymentResult.error`, `sessionResult.error`
@@ -1123,8 +1363,8 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; a sale named by transactionId must be the business's (404 otherwise) and pending (409)
-- **Input:** body read without a schema: merchantId and transactionId with parseInt, amount with parseFloat (400 if not above zero), windcaveToken required once the provider is configured
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getTransactionForMerchant scopes the named sale (404 otherwise); pending state is 409; create/status/method writes require explicit tenant scope and a refused outcome write returns reconciliation-required 503 without stale-row success. Native capability remains off
+- **Input:** strict tapToPayRequestSchema: positive safe-integer merchantId and optional transactionId; amount is a JSON number or decimal string from 0.01 to 99999999.99 with at most two decimals, canonicalized to a two-decimal string; optional nonblank string windcaveToken, required once the provider is configured. The stored charge amount is validated by the same money schema before any provider call
 - **Capability gate:** Tap to Pay must be on (config.features.tapToPay: 503 TAP_TO_PAY_DISABLED otherwise), and the provider configured (isWindcaveConfigured: 503 otherwise)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
 - **Idempotency:** charges the named pending sale's stored price, or the business's newest pending sale, or, with none, a new sale for the amount sent; a sale no longer pending is 409. Nothing stops the same request finishing a different pending sale or making a new one when repeated
@@ -1132,8 +1372,9 @@ Reviewed policy:
 - **Success:** { approved, transactionId }
 - **Error disclosure:** provider-text
 - **Finding:** A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).
-- **Finding:** merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).
+- **Finding:** Strict input and stored-price validation are in place. It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).
 - **Finding:** No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
 
 ### POST `/api/transactions/:id/split`
 
@@ -1141,18 +1382,16 @@ Reviewed policy:
 - body: `schema: z.object({ totalSplits: z.number().int().min(2).max(10), }).strict()`
 - authChecks: `isTokenAddressedTransaction`
 - storageMethods: `createBillSplit`, `getTransaction`
-- sideEffects: `live update: sseBroker.broadcast`
 - statuses: `200`, `400`, `404`, `409`, `500`
 - dtos: `publicTransactionDto`
 - errorTextInResponse: `error.message`
-- helpers: `broadcastToStone`
 
 Reviewed policy:
 
 - **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
 - **Input:** id: strictPositiveIntegerParam; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict, since 2026-09-26)
 - **Idempotency:** only a pending sale the business allowed to split (409 otherwise, since 2026-09-26); storage.createBillSplit sets it up atomically, returns an exact retry unchanged, and refuses a different split (BillSplitConflictError, 409)
-- **Side effects:** a live update to the business's screens (broadcastToStone)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** publicTransactionDto of the split sale, with its board's page and QR addresses
 - **Error disclosure:** domain-errors
 - **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
@@ -1184,22 +1423,21 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictPositiveIntegerParam`
-- authChecks: `checkMerchantOwnership`
-- storageMethods: `getTransaction`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`
-- statuses: `200`, `400`, `401`, `404`, `500`, `503`
+- authChecks: `checkMerchantOwnership`, `compares req.user?.role === "admin"`
+- storageMethods: `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant`
+- statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `ownerTransactionDto`
-- helpers: `broadcastToStone`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (resource):** the sale read by id (getTransaction) must be the session's business's, by checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist)
+- **Who:** merchant (owner, member, platform admin). **Tenant (resource):** getTransactionForMerchant scopes a merchant session's read; the validated platform admin alone may resolve the sale globally. cancelTransactionForMerchant locks and rechecks the sale's business and pending/processing state at the write; another business's is answered as a missing one (404), by checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
 - **Input:** id: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** cancels a pending or processing sale; any other state is 400 (so again is 400)
-- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)
+- **Idempotency:** cancels a pending or processing sale under the parent row lock, then separately rechecks recorded attempts and split shares with a fresh statement snapshot. Live/expired or possibly accepted attempts, legacy sessions and captured/processing shares hold cancellation (409 PAYMENT_ACTIVE); any other aggregate state is 400 (so again is 400). Only a persisted cancellation broadcasts. Durable cancellation command/audit/outbox remains R3 work; legacy provider sends before attachment still require initiation convergence
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** ownerTransactionDto with the board's addresses for a board sale
 - **Error disclosure:** fixed
-- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
 
 ### GET `/api/nfc/capabilities`
 
@@ -1221,30 +1459,30 @@ Reviewed policy:
 
 ### POST `/api/transactions/:id/pay`
 
-- params: `id: strictPositiveIntegerParam`
-- body: `schema: paymentRequestSchema`
-- authChecks: `compares stone.merchantId !== transaction.merchantId`, `compares transaction.merchantId !== requestMerchantId`, `isTokenAddressedTransaction`
-- storageMethods: `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionStatus`, `updateTransactionWindcaveSession`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: createWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `403`, `404`, `409`, `429`, `500`, `503`
-- errorTextInResponse: `validation.error.errors`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `checkRateLimit`
-- helpers: `broadcastToStone`, `checkRateLimit`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `schema: sessionSchema`
+- authChecks: `compares input.merchantId!==sale.merchantId`, `resolvePaymentToken`
+- storageMethods: `getMerchant`, `getSplitPaymentsByTransaction`, `getTaptStoneForMerchant`, `getTransaction`
+- sideEffects: `provider through durable attempt coordinator: checkout.open`
+- statuses: `200`, `202`, `400`, `403`, `404`, `409`, `410`, `429`, `503`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `find`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:session`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
-- **Input:** id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: never charged — what is owed (the next share, or the whole price) is; an amount given must equal it to the cent, or 400 before any provider session (owner decision 2026-09-26)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)
-- **Idempotency:** a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one
-- **Side effects:** creates a payment session with the provider (createWindcaveSession); when the provider reports the session already complete, settles the sale (live update and push)
-- **Success:** the provider session id and its hosted-page and submit URLs (kept server-side too, and never taken back from a client)
-- **Error disclosure:** input-issues
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
-- **Replay:** each call opens another provider session for the same sale
-- **Rate:** checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **Who:** public. **Tenant (number):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** actual R2 session client through the durable coordinator; no communication from this route
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
+- **Error disclosure:** fixed
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/windcave/env`
 
@@ -1263,57 +1501,59 @@ Reviewed policy:
 
 ### POST `/api/transactions/:id/hosted-fields-complete`
 
-- params: `id: strictPositiveIntegerParam`
-- body: `fields: paymentMethod, sessionId`
-- authChecks: `isTokenAddressedTransaction`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `403`, `404`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`, `finaliseHostedPayment`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404); the session id sent must be the one bound to the sale (403 otherwise)
-- **Input:** id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and paymentMethod (only apple_pay is kept, anything else is card)
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured)
-- **Idempotency:** none: every call queries the provider and settles again (gap 11, finding)
-- **Side effects:** queries the provider for the bound session; settles the sale or its next share, counts it on the business, and sends a live update and a push
-- **Success:** { approved, redirectPath } to the receipt or the declined page
+- **Who:** public. **Tenant (number):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting, with the provider session id bound to it
-- **Replay:** settles again; after a share, the same session can complete the next one (gap 11)
-- **Rate:** none — no limit
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **Finding:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/transactions/:id/googlepay-complete`
 
-- params: `id: strictPositiveIntegerParam`
-- body: `fields: googlePayToken, sessionId`
-- authChecks: `isTokenAddressedTransaction`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `403`, `404`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `assertWindcaveUrl`, `broadcastToStone`, `finaliseHostedPayment`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404); the session id sent must be the one bound to the sale (403 otherwise)
-- **Input:** id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and googlePayToken (an object passed to the provider)
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured)
-- **Idempotency:** none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one, otherwise the session is queried, and the result is settled again on every call (gap 11)
-- **Side effects:** submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it) or queries the session; settles the sale or its next share, counts it, and sends a live update and a push
-- **Success:** { approved, redirectPath } to the receipt or the declined page
+- **Who:** public. **Tenant (number):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting, with the provider session id bound to it
-- **Replay:** settles again; after a share, the same session can complete the next one (gap 11)
-- **Rate:** none — no limit
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **Finding:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/transactions/:id`
 
@@ -1531,9 +1771,9 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path must be the session's, a precondition only: the caller's own login is what changes; the platform admin, which that check lets through, is then refused (403 'Only a TaptPay login can do this.', since 2026-09-27)
 - **Input:** id: strictPositiveIntegerParam; body: changePasswordSchema (the current password, and a new one held to the one password rule; 400 with the first issue and the issues)
-- **Idempotency:** checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword); again with the old password is 400
-- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED)
-- **Success:** { message, token }: a fresh token for this device, not cached
+- **Idempotency:** checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword; each session recorded as ended, password_change) and starts a new one for this device; again with the old password is 400
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED) and the ended sessions (SESSION_REVOKED)
+- **Success:** { message, csrfToken }: a new session cookie for this device, no body account credential, not cached
 - **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:id/theme`
@@ -1561,7 +1801,7 @@ Reviewed policy:
 - params: `id: strictPositiveIntegerParam`
 - body: `schema: updateDailyGoalSchema`
 - authChecks: `checkAccountOwnership`, `checkMerchantOwnership`, `isAccountOwner`
-- storageMethods: `updateMerchant`
+- storageMethods: `updateMerchantSettings`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
@@ -1570,7 +1810,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
 - **Input:** id: strictPositiveIntegerParam; body: updateDailyGoalSchema (400 with the issues)
-- **Idempotency:** sets the daily goal (updateMerchant); the same again changes nothing
+- **Idempotency:** sets the daily goal (updateMerchantSettings, daily-goal: that column only); the same again changes nothing
 - **Success:** ownerMerchantDto of the business afterwards
 - **Error disclosure:** input-issues
 
@@ -1580,7 +1820,7 @@ Reviewed policy:
 - params: `id: strictPositiveIntegerParam`
 - body: `schema: updateSchema`
 - authChecks: `checkAccountOwnership`, `checkMerchantOwnership`, `isAccountOwner`
-- storageMethods: `updateMerchant`
+- storageMethods: `updateMerchantSettings`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `parseResult.error.errors`
@@ -1589,7 +1829,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
 - **Input:** id: strictPositiveIntegerParam; body: a strict schema of nine optional fields (business name, director, address, NZBN, phone, GST number, contact email as an email, contact phone, business address); 400 with the issues, and when none is given
-- **Idempotency:** sets the fields given (updateMerchant); the same values again change nothing
+- **Idempotency:** sets the fields given (updateMerchantSettings, profile: the nine named columns only); the same values again change nothing
 - **Success:** ownerMerchantDto of the business afterwards
 - **Error disclosure:** input-issues
 - **Finding:** Its text fields have no length limit, and the NZBN and GST number are not checked for form (§8.4); only the settings screen bounds them.
@@ -1670,7 +1910,7 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictPositiveIntegerParam`
 - authChecks: `checkMerchantOwnership`
-- storageMethods: `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrls`
+- storageMethods: `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrlsForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `error.message`
 
@@ -1688,15 +1928,15 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `merchantId: strictPositiveIntegerParam`, `stoneId: strictPositiveIntegerParam`
 - body: `fields: name`
-- authChecks: `checkMerchantOwnership`, `compares existingStone.merchantId !== merchantId`
-- storageMethods: `getTaptStone`, `updateTaptStone`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `getTaptStoneForMerchant`, `updateTaptStoneForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getTaptStoneForMerchant and updateTaptStoneForMerchant constrain the read and write by board id and authorized merchantId (404 for a missing or foreign board)
 - **Input:** merchantId and stoneId: strictPositiveIntegerParam; body read without a schema: name, a non-blank string of at most 60 characters once trimmed (400 otherwise; the cap since 2026-09-27)
-- **Idempotency:** renames the board; the same name again changes nothing. A deleted (inactive) board is still found and renamed
+- **Idempotency:** renames the board; the same name again refreshes updatedAt. A deleted (inactive) board is still found and renamed
 - **Success:** the board, a whole board row (number, name, page and QR addresses, whether active, when made and changed)
 - **Error disclosure:** fixed
 - **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
@@ -1705,69 +1945,60 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `merchantId: strictPositiveIntegerParam`, `stoneId: strictPositiveIntegerParam`
-- authChecks: `checkMerchantOwnership`, `compares existingStone.merchantId !== merchantId`
-- storageMethods: `deleteTaptStone`, `getTaptStone`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `deleteTaptStoneForMerchant`, `getTaptStoneForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getTaptStoneForMerchant and deleteTaptStoneForMerchant constrain the read and write by board id and authorized merchantId (404 for a missing or foreign board)
 - **Input:** merchantId and stoneId: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** marks the board inactive (deleteTaptStone), so its page and printed QR stop working; again answers 200 and changes nothing
+- **Idempotency:** marks the board inactive (deleteTaptStoneForMerchant), so its page and printed QR stop working; again answers 200 and refreshes updatedAt
 - **Success:** { message }
 - **Error disclosure:** fixed
 - **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 
 ### ALL `/api/windcave/notification`
 
-- middleware: `express.urlencoded(…)`, `express.json(…)`
-- query: `sessionId: raw`, `sessionid: raw`
-- body: `fields: sessionId, sessionid`, `whole body: console.warn`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`
+- statuses: `200`, `400`, `405`, `413`, `415`, `429`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one sale created with it (storage.getTransactionByWindcaveSessionId); an unknown id does nothing
-- **Input:** sessionId / sessionid (query or body): an opaque provider session id, used only to find the sale and to query the provider; the rest of the body is ignored
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored before any write
-- **Idempotency:** only a sale whose session is still pending is processed, but pending → processing is a read then a write, not a claim (finding)
-- **Side effects:** queries the provider; settles the sale or its next split share, counts the sale on the business, and sends the business a live update and a push
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
-- **Replay:** a settled session is skipped (no longer pending); two simultaneous duplicates can both pass the read
-- **Rate:** none — anyone can make the server query the provider about a pending session whose id they hold; the ids are unguessable provider session ids
-- **Finding:** pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.
-- **Finding:** Logs the raw query (with the session id), and the query and body when no session id is found, to the server log.
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### GET `/api/windcave/callback`
 
-- query: `result: raw`, `sessionId: raw`, `sessionid: raw`, `transactionId: raw`
-- authChecks: `isTokenAddressedTransaction`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `302`, `400`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`
+- params: `id: checked`
+- query: `state: raw`, `transactionId: strictPositiveIntegerParam`
+- authChecks: `attempts.resolveReturnState`
+- storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`
+- statuses: `303`, `400`, `404`, `409`, `410`, `429`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `outcome`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:numericReturn`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel is believed only with the bound session id
-- **Input:** transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session before a cancel is believed; result: only 'cancelled' is acted on; any 'sim' key rejects the request (400)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending
-- **Idempotency:** an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)
-- **Side effects:** queries the provider for the bound session and settles the sale or its next share (count, live update, push); a matching cancel fails the sale (live update, push)
-- **Success:** 302 to the receipt, or to the result page (declined, cancelled or pending), or home
+- **Who:** public-bearer. **Tenant (token):** hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required.
+- **Input:** state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** narrow local outcome/receipt share or safe redirect; pending remains processing
 - **Error disclosure:** fixed
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting; the outcome always comes from querying the provider, and a cancel needs the bound session id
-- **Replay:** a settled sale only redirects; simultaneous calls can both settle (R3 / C20)
-- **Rate:** none — anyone can prompt a provider query for a pending numbered sale
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/admin/analytics`
 
@@ -1784,10 +2015,10 @@ Reviewed policy:
 - **Input:** nothing
 - **Idempotency:** read-only
 - **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** platform totals (businesses, active ones, sales, revenue, monthly recurring revenue, paying subscriptions) and, per business, its id, name, business name, sales count and revenue, status and last sale
+- **Success:** platform totals (businesses, active ones, sales, completed and still-waiting sales, revenue, how many businesses' figures could not be read, monthly recurring revenue, paying subscriptions) and, per business, its id, name, business name, sales count and revenue, status and last sale
 - **Error disclosure:** fixed
 - **Finding:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
-- **Finding:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).
+- **Finding:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too). Since 2026-10-01 the totals say how many were left out (businessesNotLoaded), and the home page shows it; the per-business rows of the merchants list still show zeros.
 
 ### GET `/api/admin/revenue-over-time`
 
@@ -2029,7 +2260,7 @@ Reviewed policy:
 - **Error disclosure:** input-issues
 - **Authenticity:** none needed: nothing made here can be used until the link sent to the address is used with the password chosen here
 - **Replay:** for an address in use, a replay sends a note, within its limit; it creates nothing
-- **Rate:** checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B); that count is shared with the board page's feed and the numbered pay route
+- **Rate:** checkRateLimit (100 a minute per normalized IPv4 address or IPv6 /64, counted in this server process only; until TRUST_PROXY_HOPS is set visitors behind a proxy share its address — R1-T4 phase B); that count is shared with the board page's feed and the numbered pay route
 - **Finding:** The only limit on new applications is checkRateLimit, 100 a minute per visitor address in this process only. Until TRUST_PROXY_HOPS is set, visitors may all count as the proxy's address, and the same count serves GET /api/merchants/:id/active-transaction (which each open board page asks every 3 seconds) and POST /api/transactions/:id/pay: five open board pages can use it up, refusing sign-ups and board payments, and a run of sign-ups can refuse board customers. Each new address costs a bcrypt hash, a merchant row and an email.
 
 ### GET `/api/merchants/:id/events`
@@ -2043,11 +2274,11 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin) — an Authorization header is sent. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business, labelled admin on its stream; every live event of the business
-- **Who:** public — no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; the board must also be active, and anything else is 404 (sse-broker.ts sends a board's stream only its own board's events)
-- **Input:** id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam (400 otherwise); a token in the query is refused (400: credentials go in the Authorization header)
+- **Who:** merchant (owner, member, platform admin) — a session cookie with no stoneId (R1-T4 phase E3); an Authorization header is ignored. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business, labelled admin on its stream; every live event of the business, for as long as the sign-in stands (it is read again before each event and every five seconds: isStreamSessionActive, server/auth.ts)
+- **Who:** public — a stoneId, regardless of cookies or Authorization headers: a board's page keeps its board stream (with neither a sign-in nor a stoneId: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; the board must also be active, and anything else is 404 (sse-broker.ts sends a board's stream only its own board's events)
+- **Input:** id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam (400 otherwise); a token in the query is refused (400: no credential travels in an address)
 - **Idempotency:** each request opens another stream; closing it unsubscribes
-- **Side effects:** subscribes the connection to the business's live updates (sseBroker.subscribe): the business's own view (its sales and refunds) or the board's (publicTransactionDto of that board's sales)
+- **Side effects:** subscribes the connection to the business's live updates (sseBroker.subscribe): the business's own view (its sales and refunds) or the board's (publicTransactionDto of that board's sales). A signed-in stream's sign-in is read again from shared storage before each event and every five seconds while idle (external review 2026-09-29): a session ended or run out, a login no longer let through, on this instance or another, or a check that fails, closes the stream with nothing written. A session cookie's stream is checked by its session id (no secret is presented again, nothing is written, and the check is not a use of the session)
 - **Success:** text/event-stream, not cached: a 'connected' event, then the audience's events
 - **Error disclosure:** fixed
 - **Authenticity:** none: a board's page is public by design (owner 2026-09-25: with a board, its own page and stream are unchanged); the business and board numbers are both sequential, so anyone can follow any board's open sale, its item and price, by counting
@@ -2098,7 +2329,7 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); the subscription is recorded against the business and this login, and a device already registered moves to them and takes this login's switches (createPushSubscription, by its endpoint; each login its own (owner decision 2026-09-26))
 - **Input:** body read without a schema: subscription, whose endpoint, keys.p256dh and keys.auth must be present (400 otherwise); the endpoint must be a browser push service's (isPushServiceEndpoint, server/push-endpoint.ts: https on port 443, no user or password, a host of Google's, Mozilla's, Apple's or Microsoft's push service; 400 otherwise, owner decision 2026-09-26); the keys are not checked for form
 - **Capability gate:** the server's push keys must be set (config.push in server/config.ts: 503 otherwise)
-- **Idempotency:** registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing
+- **Idempotency:** registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing. The login's sessions must not have been ended while the request was on its way: its session version is checked again under the login's row lock, in the transaction that writes (external review 2026-09-29: 401 SESSION_ENDED, nothing registered)
 - **Success:** { success: true, preferences: pushNotificationPreferencesDto }
 - **Error disclosure:** fixed
 
@@ -2106,17 +2337,16 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `fields: endpoint`
-- storageMethods: `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant`
+- storageMethods: `deactivatePushSubscriptionForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); the endpoint must be one of its active subscriptions (getPushSubscriptionsByMerchant: 403 otherwise), and any login of the business may stop any of its devices
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); the endpoint must be one of its active subscriptions (the stop itself names the business, the address and the active state, deactivatePushSubscriptionForMerchant: 403 when nothing was stopped), and any login of the business may stop any of its devices
 - **Input:** body read without a schema: endpoint, required, compared as sent
-- **Idempotency:** stops the device (deactivatePushSubscriptionByEndpoint; since 2026-09-26 a database fault is a 500, not a success); again is 403, as it is no longer active
+- **Idempotency:** stops the device in one statement (deactivatePushSubscriptionForMerchant; a database fault is a 500: since R1-T7 S5b there is no separate read of the business's devices to swallow one); again is 403, as it is no longer active
 - **Success:** { success: true }
 - **Error disclosure:** fixed
-- **Finding:** A database fault while listing the business's devices reads as none (getPushSubscriptionsByMerchant answers [] on any error), so the answer is 403 'Not authorized to unsubscribe this endpoint', not 500 (R1-T9's rule).
 
 ### POST `/api/push/native-subscribe`
 
@@ -2130,7 +2360,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); the iPhone is recorded against the business and this login, and takes this login's switches (createPushSubscription, by its endpoint; each login its own (owner decision 2026-09-26))
 - **Input:** body read without a schema: deviceToken, a string of at least 8 characters once trimmed (400 otherwise), stored as the endpoint apns://<token>
-- **Idempotency:** registers the iPhone, or re-registers it by its endpoint; the same body again changes nothing
+- **Idempotency:** registers the iPhone, or re-registers it by its endpoint; the same body again changes nothing. The login's sessions must not have been ended while the request was on its way: its session version is checked again under the login's row lock, in the transaction that writes (external review 2026-09-29: 401 SESSION_ENDED, nothing registered)
 - **Success:** { success: true, preferences: pushNotificationPreferencesDto }
 - **Error disclosure:** fixed
 
@@ -2138,12 +2368,12 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `fields: deviceToken`
-- storageMethods: `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant`
+- storageMethods: `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); with a deviceToken, that iPhone, which must be one of its active subscriptions (403 otherwise); without one, this login's iPhones and the business's unattributed ones (deactivateNativePushSubscriptionsForLogin)
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); with a deviceToken, that iPhone, which must be one of its active subscriptions (the stop itself names the business, the address and the active state, deactivatePushSubscriptionForMerchant: 403 when nothing was stopped); without one, this login's iPhones and the business's unattributed ones (deactivateNativePushSubscriptionsForLogin)
 - **Input:** body read without a schema: deviceToken, optional; when present a string of at least 8 characters once trimmed (400 otherwise)
 - **Idempotency:** stops the iPhone or iPhones (since 2026-09-26 a database fault stopping one iPhone is a 500, not a success); again with the token is 403, without it changes nothing
 - **Success:** { success: true }
@@ -2203,23 +2433,23 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `transactionId: strictPositiveIntegerParam`
 - authChecks: `compares transaction.merchantId !== merchantId`, `isAccountOwner`
-- storageMethods: `createRefund`, `getTransaction`, `releaseRefundAmount`, `reserveRefundAmount`, `updateRefundStatus`
+- storageMethods: `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant`
 - sideEffects: `live update: sseBroker.broadcast`, `provider: createWindcaveRefund`, `push: sendPushToMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `502`, `503`
-- errorTextInResponse: `refundResult.error`, `validation.error.errors`
+- errorTextInResponse: `validation.error.errors`
 - capabilityGates: `config.features.refundInitiation`, `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
 Reviewed policy:
 
-- **Who:** merchant (owner). **Tenant (resource):** the sale read by id (getTransaction) must be the session's business's: another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)
+- **Who:** merchant (owner). **Tenant (resource):** getTransactionForMerchant and all four refund writes require the session's business; creation/status also lock and recheck the parent. Another business's sale is 404; the platform admin without a business is 403. Persistence refusal after reservation/provider returns 503 REFUND_RECONCILIATION_REQUIRED without success events. R4 durable operations remain gated
 - **Input:** transactionId: strictPositiveIntegerParam; body: createRefundSchema (an amount like 5.00, a reason of 1 to 500 characters, a method; 400 with the issues; the amount's form since 2026-09-27)
 - **Capability gate:** refunds must be on (config.features.refundInitiation: 503 otherwise), and the provider configured with the sale's provider transaction (isWindcaveConfigured: 503 otherwise)
-- **Idempotency:** reserves the amount against what is left to refund (reserveRefundAmount: 409 when it exceeds it or another refund is in progress), records the refund, asks the provider, and gives the amount back if the provider refuses
-- **Side effects:** refunds at the provider (createWindcaveRefund); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)
+- **Idempotency:** reserves against the remaining balance with tenant/status/cap predicates (409 on refusal), creates the scoped refund, calls the provider under a per-request X-ID (R4-T1; R4-T3 persists it), and releases only the same tenant's balance, only when the provider definitely did not refund (declined, refused, never sent: 502 with a fixed message); an unknown, pending, malformed or mismatched reply keeps the reservation (503 REFUND_RECONCILIATION_REQUIRED, R4-T1). Persistence refusal after reservation/provider requires reconciliation (503), with no success event. Not yet durable/idempotent; remains disabled pending R4
+- **Side effects:** refunds at the provider (createWindcaveRefund, verified as exactly this refund, R4-T1); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)
 - **Success:** { success, message, refund: the whole refund row, transaction: the whole sale row }
-- **Error disclosure:** input-issues, provider-text
-- **Finding:** A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).
+- **Error disclosure:** input-issues
+- **Finding:** Until R4-T1 (2026-10-12) a provider refusal answered with the provider's error text, and an ambiguous failure released the reservation (a second refund possible); both fixed.
 - **Finding:** Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).
 
 ### GET `/api/transactions/:transactionId/refunds`
@@ -2227,12 +2457,12 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `transactionId: strictPositiveIntegerParam`
 - authChecks: `compares transaction.merchantId !== merchantId`
-- storageMethods: `getRefundsByTransaction`, `getTransaction`
+- storageMethods: `getRefundsForTransactionForMerchant`, `getTransactionForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the sale read by id (getTransaction) must be the session's business's: another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)
+- **Who:** merchant (owner, member). **Tenant (resource):** getTransactionForMerchant scopes the lookup to the session's business; getRefundsForTransactionForMerchant checks both the refund and its current parent's business in one SQL query; another business's sale is answered as a missing one (404); the platform admin, with no business, is refused (403 'Merchant access required')
 - **Input:** transactionId: strictPositiveIntegerParam (400 otherwise)
 - **Idempotency:** read-only
 - **Success:** the sale's whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)
@@ -2276,7 +2506,7 @@ Reviewed policy:
 - params: `merchantId: strictPositiveIntegerParam`
 - body: `schema: createStockItemSchema`
 - authChecks: `checkMerchantOwnership`
-- storageMethods: `createStockItem`
+- storageMethods: `createStockItemForMerchant`
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
@@ -2284,7 +2514,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
 - **Input:** merchantId: strictPositiveIntegerParam; body: createStockItemSchema (a name of 1 to 100 characters, a description of at most 500, a cost like 1.50, an emoji, variations; 400 with the issues)
-- **Idempotency:** none: each call adds another item
+- **Idempotency:** none: each call adds another item (createStockItemForMerchant: the path's business is the create's own argument, and storage takes the five stock fields only)
 - **Success:** 201, the new item, a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)
 - **Error disclosure:** input-issues
 
@@ -2293,16 +2523,16 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `itemId: strictPositiveIntegerParam`, `merchantId: strictPositiveIntegerParam`
 - body: `schema: updateStockItemSchema`
-- authChecks: `checkMerchantOwnership`, `compares existingItem.merchantId !== merchantId`
-- storageMethods: `getStockItem`, `updateStockItem`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `getStockItemForMerchant`, `updateStockItemForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getStockItemForMerchant and updateStockItemForMerchant constrain the read and write by item id and authorized merchantId (404 for a missing or foreign item); only editable stock fields are persisted
 - **Input:** merchantId and itemId: strictPositiveIntegerParam; body: updateStockItemSchema (as for a new item; 400 with the issues)
-- **Idempotency:** sets the item's fields (updateStockItem); the same again changes nothing
+- **Idempotency:** sets the item's editable fields (updateStockItemForMerchant); the same again refreshes updatedAt
 - **Success:** the item, a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)
 - **Error disclosure:** input-issues
 
@@ -2310,15 +2540,15 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `itemId: strictPositiveIntegerParam`, `merchantId: strictPositiveIntegerParam`
-- authChecks: `checkMerchantOwnership`, `compares existingItem.merchantId !== merchantId`
-- storageMethods: `deleteStockItem`, `getStockItem`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `deleteStockItemForMerchant`, `getStockItemForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getStockItemForMerchant and deleteStockItemForMerchant constrain the read and write by item id and authorized merchantId (404 for a missing or foreign item)
 - **Input:** merchantId and itemId: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** deletes the item (deleteStockItem); again is 404
+- **Idempotency:** marks the item inactive (deleteStockItemForMerchant); again answers 200 and refreshes updatedAt; a missing or foreign item is 404
 - **Success:** { message }
 - **Error disclosure:** fixed
 
@@ -2326,9 +2556,8 @@ Reviewed policy:
 
 - middleware: `requireEcommerceApi`, `authenticateApiKey`
 - body: `schema: apiV1CreateTransactionSchema`
-- storageMethods: `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed`
-- statuses: `200`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
-- dtos: `publicTransactionDto`
+- storageMethods: `createTransactionForMerchant`, `getApiKeyByKey`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed`
+- statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `validation.error.errors`
 - capabilityGates: `config.features.ecommerceApi`, `config.features.newRetailPayments`, `requireEcommerceApi`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
@@ -2336,33 +2565,33 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** api-key. **Tenant (key):** the sale is created for the API key's own merchant (req.apiKey.merchantId); no merchant id is read from the request
+- **Who:** api-key. **Tenant (key):** createTransactionForMerchant receives the API key's own merchant as explicit scope; no merchant id is read from the request
 - **Input:** the key's create_transactions permission is checked first (403), then the body: apiV1CreateTransactionSchema (amount, currency, item_name, and webhook_url as a URL of at most 2048 characters)
 - **Capability gate:** requireEcommerceApi (FEATURE_ECOMMERCE_API, off by default: 404) and config.features.newRetailPayments (503 while per-payment links are off)
 - **Entitlement gate:** requireBillingCard: 402 BILLING_CARD_REQUIRED without a paid plan
-- **Idempotency:** none: every call creates another sale and another payment link (no idempotency key)
-- **Side effects:** creates a per-payment sale (createRetailTransaction, server/retail-transaction-service.ts), writes an API log row, and records a webhook delivery row that nothing sends
+- **Idempotency:** required Idempotency-Key UUID; merchant/key unique concrete creation receipt and canonical request fingerprint; replay returns the same aggregate and deterministic hashed retail credential
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/retail-transaction-service.ts; no route-local financial publication.
 - **Success:** fields listed one by one: id, amount, currency, item_name, status, payment_url, qr_code_url (the payment link's raw token, given once), created_at; publicTransactionDto is only the stored webhook payload
 - **Error disclosure:** input-issues
 - **Authenticity:** a Bearer API key found with storage.getApiKeyByKey and active; create_transactions permission
-- **Replay:** a replayed request creates another sale
+- **Replay:** same UUID/fingerprint reuses the original bill; changed immutable details conflict
 - **Rate:** none — no per-key or per-address limit
-- **Finding:** webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).
-- **Finding:** No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).
+- **Finding:** Webhook requests are explicitly unavailable before creation; the later API phase must restrict destinations before enabling delivery.
+- **Finding:** Distributed rate limits remain with R6; FEATURE_ECOMMERCE_API remains off by default.
 
 ### GET `/api/v1/transactions/:id`
 
 - middleware: `requireEcommerceApi`, `authenticateApiKey`
 - params: `id: raw | strictPositiveIntegerParam`
 - authChecks: `compares transaction.merchantId !== req.apiKey.merchantId`
-- storageMethods: `getApiKeyByKey`, `getTransaction`, `logApiRequest`, `updateApiKeyLastUsed`
+- storageMethods: `getApiKeyByKey`, `getTransactionForMerchant`, `logApiRequest`, `updateApiKeyLastUsed`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`
 - capabilityGates: `config.features.ecommerceApi`, `requireEcommerceApi`
 - helpers: `authenticateApiKey`, `requireEcommerceApi`
 
 Reviewed policy:
 
-- **Who:** api-key. **Tenant (resource):** storage.getTransaction(id), then the sale's merchant must equal the key's merchant; another merchant's sale answers the same 404 as a missing one
+- **Who:** api-key. **Tenant (resource):** storage.getTransactionForMerchant(id, key.merchantId) scopes the read itself; another merchant's sale answers the same 404 as a missing one
 - **Input:** id: strictPositiveIntegerParam (400 otherwise); the raw id is only echoed into the error log row
 - **Capability gate:** requireEcommerceApi (FEATURE_ECOMMERCE_API, off by default: 404)
 - **Idempotency:** read-only (it writes an API log row)
@@ -2393,18 +2622,17 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - body: `fields: planId`
 - authChecks: `isAccountOwner`
-- storageMethods: `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription`
-- sideEffects: `provider: chargeStoredCard`
+- storageMethods: `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription`, `getSubscription`
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
 - dtos: `subscriptionDto`
-- helpers: `executeStoredCardCharge`
+- helpers: `commandActor`, `executeStoredCardCharge`
 
 Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body read without a schema but for planId: planIdSchema, one of the plans (400 'Unknown plan' otherwise); nothing else is read
 - **Idempotency:** the current plan again changes nothing; an upgrade applies at once after charging the stored card (no card 402, declined 422, unconfirmed 502); a downgrade waits for the period's end, and one that would strand logins is 409; each runs under the subscription's billing claim (409 while another billing step holds it)
-- **Side effects:** an upgrade charges the stored card, with an idempotency key (executeStoredCardCharge, then chargeStoredCard)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-billing.ts; no route-local financial publication.
 - **Success:** { subscription: subscriptionDto, applied: 'immediate' | 'period-end', message }
 - **Error disclosure:** fixed
 
@@ -2416,6 +2644,7 @@ Reviewed policy:
 - storageMethods: `cancelSubscription`, `countSeatsInUse`, `getOrCreateSubscription`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
+- helpers: `commandActor`
 
 Reviewed policy:
 
@@ -2431,8 +2660,9 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
 - storageMethods: `countSeatsInUse`, `resumeSubscription`
-- statuses: `200`, `401`, `403`, `409`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
+- helpers: `commandActor`
 
 Reviewed policy:
 
@@ -2483,8 +2713,8 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `userId: strictPositiveIntegerParam`
-- authChecks: `compares previous.merchantId !== merchantId`, `isAccountOwner`
-- storageMethods: `getMerchant`, `getUserById`, `revokeTeamInvite`, `rotateTeamInvite`
+- authChecks: `isAccountOwner`
+- storageMethods: `getMerchant`, `getTeamMemberForMerchant`, `revokeTeamInvite`, `rotateTeamInvite`
 - sideEffects: `email: sendTeamInviteEmail`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `429`, `500`, `502`, `503`
 - dtos: `teamMemberDto`
@@ -2493,7 +2723,7 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** merchant (owner). **Tenant (resource):** the invited login read by id (getUserById) must be the session's business's, still invited, with a live token (404 otherwise, the same for another business's); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner). **Tenant (resource):** the invited login is read through the session's business (getTeamMemberForMerchant) and must be still invited, with a live token (404 otherwise, the same for another business's); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** userId: strictPositiveIntegerParam (400 otherwise); no body
 - **Idempotency:** each call replaces the invite's token, only if it is unchanged since it was read (rotateTeamInvite: 409 otherwise), and sends the new link; the old link stops working. At most 5 per 10 minutes per business and login (checkResendRateLimit, in this server process only: 429)
 - **Side effects:** emails the new invite link (sendTeamInviteEmail); if it cannot be sent, the previous invite is put back, or failing that taken back (502)
@@ -2532,7 +2762,7 @@ Reviewed policy:
 - **Who:** merchant (owner). **Tenant (resource):** setTeamMemberStatus changes the login only if it is the session's business's (404 otherwise, the same for another business's) and not the owner (403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** userId: strictPositiveIntegerParam; body read without a schema: status, which must be 'active' or 'disabled' (400 otherwise)
 - **Idempotency:** sets the login active or disabled; the same state again is 409; turning one back on counts the plan's seats under a lock (409 when all are in use). A disabled login's tokens are refused from its next request (authenticateToken reads the login)
-- **Side effects:** on disabling: ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)
+- **Side effects:** on disabling: records each of the login's sessions as ended (login_disabled, SESSION_REVOKED; the status check already refuses them), ends its live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)
 - **Success:** { member: teamMemberDto }
 - **Error disclosure:** fixed
 
@@ -2540,17 +2770,17 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `userId: strictPositiveIntegerParam`
-- authChecks: `compares member.merchantId !== merchantId`, `compares member.role === "owner"`, `isAccountOwner`
-- storageMethods: `deactivatePushSubscriptionsForLogin`, `getUserById`, `removeTeamMember`
+- authChecks: `compares member.role === "owner"`, `isAccountOwner`
+- storageMethods: `deactivatePushSubscriptionsForLogin`, `getTeamMemberForMerchant`, `removeTeamMember`
 - sideEffects: `live update: sseBroker.disconnectUser`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner). **Tenant (resource):** the login read by id (getUserById) must be the session's business's and not its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner). **Tenant (resource):** the login is read through the session's business (getTeamMemberForMerchant) and must not be its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** userId: strictPositiveIntegerParam (400 otherwise)
 - **Idempotency:** deletes the login (removeTeamMember); again is 404
-- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)
+- **Side effects:** records each of the login's sessions as ended (login_removed, SESSION_REVOKED) before the login goes, taking its sessions with it (0031's cascade); ends its live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)
 - **Success:** { message: 'Login removed' }
 - **Error disclosure:** fixed
 
@@ -2612,98 +2842,104 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
-- storageMethods: `bindSubscriptionCardSession`, `getMerchant`, `getOrCreateSubscription`
-- sideEffects: `provider: createCardStorageSession`
-- statuses: `200`, `401`, `403`, `404`, `500`, `502`, `503`
-- capabilityGates: `isWindcaveConfigured`
+- storageMethods: `getMerchant`, `getOrCreateSubscription`
+- statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `503`
+- helpers: `commandActor`
 
 Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** nothing is read
-- **Capability gate:** the provider must be configured (isWindcaveConfigured: 503 otherwise)
+- **Capability gate:** Configured durable card provider and enabled initiation checked in server/durable-subscription-card.ts.
 - **Idempotency:** each call opens another hosted card page at the provider and binds its session to the subscription (bindSubscriptionCardSession), replacing any earlier one
-- **Side effects:** opens a hosted card-storage session at the provider (createCardStorageSession), with the business's contact email
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-card.ts; no route-local financial publication.
 - **Success:** { sessionId, redirectUrl }: the provider's page; the session id reads back only this one result
 - **Error disclosure:** fixed
 
 ### POST `/api/billing/card/confirm`
 
 - middleware: `authenticateToken`
-- body: `fields: sessionId`
+- body: `schema: z.object({sessionId:z.string().refine(value=>/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(value))}).strict()`
 - authChecks: `isAccountOwner`
-- storageMethods: `completeSubscriptionCardSetup`, `countSeatsInUse`, `getSubscription`
-- sideEffects: `provider: chargeStoredCard`, `provider: queryStoredCardSession`
-- statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
+- storageMethods: `countSeatsInUse`, `getSubscription`
+- statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `422`, `503`
 - dtos: `subscriptionDto`
-- helpers: `executeStoredCardCharge`
+- entitlementGates: `billingCardIsReady`
 
 Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); the card session must be the one bound to its subscription (subscriptionCardSessionState: 403 otherwise, the same for another business's)
 - **Input:** body read without a schema: sessionId, a trimmed string matching /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/ (400 otherwise)
+- **Entitlement gate:** billingCardIsReady checks readiness of the pending confirmation projection; it grants no browser-authorized charge or independent entitlement.
 - **Idempotency:** a session already settled answers from the stored result with no provider call; otherwise the provider is asked (202 while pending); an approved card is stored and, when the subscription needs paying, charged under the billing claim with an idempotency key (completeSubscriptionCardSetup: 409 busy, 422 declined, 502 unconfirmed)
-- **Side effects:** reads the card session back from the provider (queryStoredCardSession) and may charge the stored card (executeStoredCardCharge, then chargeStoredCard)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-card.ts; no route-local financial publication.
 - **Success:** { success, ready, charged, card: { last4, brand, expiry }, subscription: subscriptionDto }; 202 { pending: true }
 - **Error disclosure:** fixed
 
 ### ALL `/api/billing/card/notification`
 
-- statuses: `200`
+- statuses: `200`, `400`, `405`, `413`, `415`, `429`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (none):** reads nothing and writes nothing
-- **Input:** nothing is read
-- **Idempotency:** does nothing
-- **Success:** 200 "OK"
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed: the call does nothing. A stored card is saved only when the signed-in owner's browser confirms it (POST /api/billing/card/confirm), which re-reads the session from the provider
-- **Replay:** harmless
-- **Rate:** none — there is nothing to limit
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### GET `/api/billing/card/callback`
 
-- query: `result: raw`
-- body: `fields: result`
-- statuses: `302`
-- helpers: `billingCardCallback`, `safeBillingCardCallbackResult`
+- query: `state: raw`
+- authChecks: `subscriptionPayments.card.resolveReturnState`
+- statuses: `303`, `404`, `409`, `503`
+- helpers: `billingCardCallback`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (none):** reads nothing; sends the browser back to billing settings
-- **Input:** result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect
-- **Idempotency:** does nothing
-- **Success:** 302 to /settings?section=billing&card=<one of the four results>
+- **Who:** public-bearer. **Tenant (token):** Expiring hashed return state identifies exactly one stored subscription card attempt; browser result and supplied merchant/session are not authority.
+- **Input:** state: one scalar query value resolved by subscriptionPayments.card.resolveReturnState in server/durable-subscription-card.ts. Result/body fields are hints only.
+- **Capability gate:** Configured subscription runtime; unavailable or legacy state returns reconciliation-required in server/subscription-payment-runtime.ts.
+- **Idempotency:** Same stored card intent and shared inbox; no independent browser finalizer.
+- **Side effects:** Scoped card confirmation through server/durable-subscription-card.ts; retained billing intent through server/durable-subscription-billing.ts.
+- **Success:** 303 to /settings?section=billing&card=pending; no credentials or unverified approved outcome.
 - **Error disclosure:** fixed
-- **Authenticity:** anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card
-- **Replay:** harmless
-- **Rate:** none — there is nothing to limit
+- **Authenticity:** Valid stored hashed state with absolute expiry; zero-value and billing outcomes are queried and verified server-side.
+- **Replay:** Same stored command; terminal results reused without another purchase.
+- **Rate:** none — no new initiation occurs; distributed abuse controls remain with R6.
 
 ### POST `/api/billing/card/callback`
 
-- query: `result: raw`
-- body: `fields: result`
-- statuses: `302`
-- helpers: `billingCardCallback`, `safeBillingCardCallbackResult`
+- query: `state: raw`
+- authChecks: `subscriptionPayments.card.resolveReturnState`
+- statuses: `303`, `404`, `409`, `503`
+- helpers: `billingCardCallback`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (none):** reads nothing; sends the browser back to billing settings
-- **Input:** result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect
-- **Idempotency:** does nothing
-- **Success:** 302 to /settings?section=billing&card=<one of the four results>
+- **Who:** public-bearer. **Tenant (token):** Expiring hashed return state identifies exactly one stored subscription card attempt; browser result and supplied merchant/session are not authority.
+- **Input:** state: one scalar query value resolved by subscriptionPayments.card.resolveReturnState in server/durable-subscription-card.ts. Result/body fields are hints only.
+- **Capability gate:** Configured subscription runtime; unavailable or legacy state returns reconciliation-required in server/subscription-payment-runtime.ts.
+- **Idempotency:** Same stored card intent and shared inbox; no independent browser finalizer.
+- **Side effects:** Scoped card confirmation through server/durable-subscription-card.ts; retained billing intent through server/durable-subscription-billing.ts.
+- **Success:** 303 to /settings?section=billing&card=pending; no credentials or unverified approved outcome.
 - **Error disclosure:** fixed
-- **Authenticity:** anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card
-- **Replay:** harmless
-- **Rate:** none — there is nothing to limit
+- **Authenticity:** Valid stored hashed state with absolute expiry; zero-value and billing outcomes are queried and verified server-side.
+- **Replay:** Same stored command; terminal results reused without another purchase.
+- **Rate:** none — no new initiation occurs; distributed abuse controls remain with R6.
 
 ### DELETE `/api/billing/card`
 
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
 - storageMethods: `removeSubscriptionCard`
-- statuses: `200`, `401`, `403`, `409`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
+- helpers: `commandActor`
 
 Reviewed policy:
 
@@ -2717,8 +2953,7 @@ Reviewed policy:
 
 - middleware: `authenticateToken`, `express.json(…)`
 - body: `schema: boardPrintRequestSchema`
-- authChecks: `compares stone.merchantId !== merchantId`
-- storageMethods: `getMerchant`, `getTaptStone`, `settleAuthThrottle`, `takeAuthThrottleSlot`
+- storageMethods: `getMerchant`, `getTaptStoneForMerchant`, `settleAuthThrottle`, `takeAuthThrottleSlot`
 - sideEffects: `email: sendBoardBuilderEmail`
 - statuses: `200`, `400`, `401`, `403`, `404`, `429`, `500`, `502`, `503`
 - errorTextInResponse: `validation.error.issues`
@@ -2727,7 +2962,7 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (session):** the session's own business, from its record (owner decision 2026-09-26): the body names no business, and its board (stoneId) must be one of that business's active boards (404 otherwise, the same for a missing one); the platform admin, with no business, is refused (403)
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business, from its record (owner decision 2026-09-26): the body names no business, and its board (stoneId) is read through that business (getTaptStoneForMerchant) and must be active (404 otherwise, the same for a missing one, a removed one and another business's); the platform admin, with no business, is refused (403)
 - **Input:** body: boardPrintRequestSchema, strict (400 with the first issue and the issues): a base64 PDF of at most 2 MB that must start %PDF- (decodeBoardPrintPdf), the board's number, one of the two layouts, the sender's name and email. Parsed only after authenticateToken, up to 3 MB (BOARD_PRINT_JSON_LIMIT; 413 above it); the pipeline's 100 KB parser skips this route (server/app.ts)
 - **Idempotency:** none: every accepted request sends another email, within the limit
 - **Side effects:** emails the PDF as an attachment, with the business's and board's names from their records, to the fixed print inbox (sendBoardBuilderEmail, built by server/board-print.ts); a failed send gives its count back
@@ -2772,7 +3007,7 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: createTenantProfileSchema`
-- storageMethods: `createTenantProfile`, `logTransactionEvent`
+- storageMethods: `createTenantProfileForMerchant`
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
@@ -2780,7 +3015,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: createTenantProfileSchema (a first and last name of 1 to 80 characters, the property address of 1 to 200, an optional email of at most 200 and phone of at most 40, co-tenants of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's; 400 with the issues)
-- **Idempotency:** none: each call adds another tenant (no check for the same person)
+- **Idempotency:** none: each call adds another tenant (no check for the same person); the tenant and its Tenant_Created history line commit together (createTenantProfileForMerchant), so a failed history write makes no tenant
 - **Success:** 201 with the tenant, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
 - **Error disclosure:** input-issues
 
@@ -2789,12 +3024,12 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - authChecks: `compares tenant.merchantId !== merchantId`
-- storageMethods: `getTenantProfile`
+- storageMethods: `getTenantProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
 - **Idempotency:** read-only
 - **Success:** the tenant, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
@@ -2806,15 +3041,15 @@ Reviewed policy:
 - params: `id: strictUuidParam`
 - body: `schema: updateTenantProfileSchema`
 - authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getTenantProfile`, `updateTenantProfile`
+- storageMethods: `getTenantProfileForMerchant`, `updateTenantProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateTenantProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or co-tenants is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped; 400 with the issues)
-- **Idempotency:** sets the given fields and clears the emptied ones (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed
+- **Idempotency:** sets the given fields and clears the emptied ones (updateTenantProfileForMerchant), an archived tenant's too; the same again changes nothing but the time changed
 - **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
 - **Error disclosure:** input-issues
 
@@ -2823,14 +3058,14 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `archiveTenantProfile`, `getTenantProfile`, `logTransactionEvent`
+- storageMethods: `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** archives the tenant and cancels every automation of theirs not already cancelled (archiveTenantProfile); invoices already sent stay payable. Again archives again, with a new time, and logs again
+- **Idempotency:** archives the tenant and cancels only same-merchant automations not already cancelled in one SQL transaction (archiveTenantProfileForMerchant); a refused parent changes no child and logs no event; its Tenant_Archived history line commits in the same transaction; invoices already sent stay payable. Again archives again, with a new time, and logs again
 - **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
 - **Error disclosure:** fixed
 
@@ -2839,14 +3074,14 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getTenantProfile`, `logTransactionEvent`, `unarchiveTenantProfile`
+- storageMethods: `getTenantProfileForMerchant`, `unarchiveTenantProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** restores the tenant (unarchiveTenantProfile); automations cancelled by the archive stay cancelled. Again changes nothing but the time, and logs again
+- **Idempotency:** restores the tenant and writes its Tenant_Restored history line in one transaction (unarchiveTenantProfileForMerchant); automations cancelled by the archive stay cancelled. Again changes nothing but the time, and logs again
 - **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
 - **Error disclosure:** fixed
 
@@ -2856,12 +3091,12 @@ Reviewed policy:
 - params: `id: strictUuidParam`
 - query: `limit: strictBoundedIntegerQueryParam`
 - authChecks: `compares tenant.merchantId !== merchantId`
-- storageMethods: `getTenantProfile`, `getTransactionEventsByTenant`
+- storageMethods: `getTenantProfileForMerchant`, `getTransactionEventsByTenantForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); history checks event merchant AND current parent merchant in one query; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); limit: strictBoundedIntegerQueryParam (50 by default, at most 200; 400 otherwise)
 - **Idempotency:** read-only
 - **Success:** the tenant's history, newest first: whole event rows (what happened, the invoice or automation, and what it carried: amounts, channels, a charge's type and description, an external payment reference, the tenant's names and address when added)
@@ -2886,7 +3121,7 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `tenantId: strictUuidParam`
 - authChecks: `compares tenant.merchantId !== merchantId`
-- storageMethods: `createActiveSchedule`, `getActiveSchedulesByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `terminateActiveSchedule`
+- storageMethods: `createActiveScheduleForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant`
 - statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
@@ -2894,10 +3129,10 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and must not be archived (409, since 2026-09-27); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and must not be archived (409, since 2026-09-27), checked again under the parent lock; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** tenantId: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: createActiveScheduleSchema (an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the issues)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** each call adds an automation, first run on its start date, and cancels the tenant's other automations not already cancelled (owner decision 2026-09-27: the new one replaces the old; each recorded with the time and an event). Two made at the same moment could each cancel the other
+- **Idempotency:** createActiveScheduleForMerchant locks the owned parent, cancels only same-merchant live automations, inserts the replacement with its first run on its start date, and records both histories in one transaction (owner decision 2026-09-27). Concurrent calls serialize; one live automation remains. Any persistence failure rolls back replacement and history
 - **Success:** 201 with the automation, a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
 - **Error disclosure:** input-issues
 - **Finding:** The end date is stored but the rent cron never reads it (runGeneratePass; trades honours its own), and an end before the start is taken. No screen sends one.
@@ -2909,15 +3144,15 @@ Reviewed policy:
 - params: `id: strictUuidParam`
 - body: `schema: updateActiveScheduleSchema`
 - authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getActiveSchedule`, `logTransactionEvent`, `updateActiveSchedule`
+- storageMethods: `getActiveScheduleForMerchant`, `updateActiveScheduleForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the automation read by id (getActiveSchedule) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and not cancelled (409, since 2026-09-27: a cancelled one stays cancelled); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the automation read by id (getActiveScheduleForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks, and not cancelled (409, since 2026-09-27: a cancelled one stays cancelled); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateActiveScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the issues)
-- **Idempotency:** sets the given fields (updateActiveSchedule). Resuming a paused automation moves its next date to the first date on its cycle after now (nextRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Pausing or resuming logs an event, again too
+- **Idempotency:** updateActiveScheduleForMerchant projects the given editable fields and rechecks parent/child ownership, parent archive and child cancellation under locks. Resume computes the first cycle after now from the locked row (nextRunDateAfter; owner decision 2026-09-27). Pause/resume history commits with the update, again too; failures roll back both
 - **Success:** the automation afterwards, a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
 - **Error disclosure:** input-issues
 
@@ -2926,14 +3161,14 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getActiveSchedule`, `logTransactionEvent`, `terminateActiveSchedule`
+- storageMethods: `getActiveScheduleForMerchant`, `terminateActiveScheduleForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the automation read by id (getActiveSchedule) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the automation read by id (getActiveScheduleForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** cancels the automation and records when (terminateActiveSchedule); a cancelled one is cancelled again, with a new time, and logged again
+- **Idempotency:** terminateActiveScheduleForMerchant cancels the owned automation and commits its history in the same transaction; a refused or moved parent/child changes nothing. A cancelled one is cancelled again, with a new time, and logged again
 - **Success:** the automation afterwards, a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
 - **Error disclosure:** fixed
 
@@ -2941,12 +3176,12 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - query: `status: raw`, `tenantProfileId: strictUuidParam`
-- storageMethods: `getInvoiceRentRequestsByMerchant`, `getTenantProfile`
+- storageMethods: `getInvoiceRentRequestsByMerchant`, `getTenantProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); getInvoiceRentRequestsByMerchant requires both invoice and current parent ownership, including archived profiles; name/address enrichment uses getTenantProfileForMerchant
 - **Input:** tenantProfileId: strictUuidParam when given (400 'Invalid tenantProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only, compared as text with each invoice's status (one that no invoice has matches nothing)
 - **Idempotency:** read-only
 - **Success:** the business's invoices (or one tenant's, or those of one status), a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id) each, with the tenant's name and property address and what is still owed (owingCents, sharesLeft), newest first, all at once (no paging)
@@ -2956,15 +3191,16 @@ Reviewed policy:
 
 - middleware: `authenticateToken`, `receiveUpload(…)`
 - body: `file`
-- storageMethods: `saveUploadedFile`
+- storageMethods: `saveScannedUploadedFile`
+- sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
-- helpers: `saveUploadedFile`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** the file 'document': a PDF, PNG, JPEG, WebP or HEIC by its MIME type (400 with the filter's message otherwise), whose first bytes must match that type for all but HEIC (400), up to 20 MB (413 above it), read into memory; the type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts). Its own name is returned as sent
-- **Idempotency:** none: each upload stores another document under a new random name (invoice-<time>-<16 hex characters>), stamped with the business (saveUploadedFile)
+- **Idempotency:** none: each upload stores another document under a new random name (invoice-<time>-<16 hex characters>), stamped with the business and written with its clean scan verdict in one transaction (saveScannedUploadedFile)
+- **Side effects:** the document is scanned before anything is stored (getMalwareScanner; owner decision 2026-09-29: ClamAV): a blocked one is 400 'This file was blocked because it may be harmful.' with a security log line (INVOICE_DOCUMENT_BLOCKED_BY_SCAN: the business, the scanner and the signature's name, never the bytes); no scanner configured, one that cannot be reached, or an answer that is no verdict is 503 'Document scanning is temporarily unavailable. Please try again.'; nothing is stored in either case. The type and size refusals come first, so nothing is scanned that would be refused anyway
 - **Success:** { documentUrl: an opaque reference the invoice create checks against the business, documentName: the file's own name }
 - **Error disclosure:** fixed
 - **Finding:** The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business.
@@ -2974,15 +3210,15 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `name: raw`
 - authChecks: `isValidatedPlatformAdmin`
-- storageMethods: `getUploadedFile`, `getUploadedFileForMerchant`, `recordInvoiceDocumentAdminRead`
+- storageMethods: `getCleanUploadedFile`, `getCleanUploadedFileForMerchant`, `recordInvoiceDocumentAdminRead`
 - sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `401`, `404`, `500`, `503`
+- statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `sendPrivateDocument`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member) — a signed-in business. **Tenant (resource):** only the business's own upload (getUploadedFileForMerchant): another business's, one no business could be attributed to, a malformed name and a missing one all give the same 404
-- **Who:** platform-admin — the validated platform admin (isValidatedPlatformAdmin). **Tenant (any-merchant):** any invoice document by its generated name (owner decision S1, 2026-09-19), each read recorded before any bytes leave (recordInvoiceDocumentAdminRead: 503 when it cannot be)
+- **Who:** merchant (owner, member) — a signed-in business. **Tenant (resource):** only the business's own upload with a clean scan on record (getCleanUploadedFileForMerchant): another business's, one no business could be attributed to, one never scanned or scanned and blocked, a malformed name and a missing one all give the same 404
+- **Who:** platform-admin — the validated platform admin (isValidatedPlatformAdmin). **Tenant (any-merchant):** any invoice document with a clean scan on record, by its generated name (getCleanUploadedFile; owner decision S1, 2026-09-19), each read recorded before any bytes leave (recordInvoiceDocumentAdminRead: 503 when it cannot be); one never scanned or scanned and blocked is 404 and records nothing
 - **Input:** name: must be a generated invoice-document name (isInvoiceDocumentName: 404 otherwise), so no other folder or path can be asked for
 - **Idempotency:** read-only, apart from the admin's audit record
 - **Side effects:** an audit log line for each admin read (logSecurityEvent: ADMIN_INVOICE_DOCUMENT_READ)
@@ -2994,22 +3230,21 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: createAdHocInvoiceSchema`
-- authChecks: `compares tenant.merchantId !== merchantId`
-- storageMethods: `createInvoiceRentRequest`, `getInvoiceRentRequest`, `getLiveInvoiceByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `uploadedFileOwnedByMerchant`
-- sideEffects: `email: resendInvoiceEmail`
-- statuses: `200`, `201`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
+- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getCreationCommandForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant`
+- sideEffects: `email: resendInvoiceEmailForMerchant`
+- statuses: `200`, `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
+- helpers: `commandActor`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the tenant named in the body (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant named in the body (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); createOrReuseInvoiceRentRequestForMerchant locks/rechecks that parent and only current owned live children; document ownership is rechecked under a share lock; final response is scoped; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: createAdHocInvoiceSchema, run before anything is read (since 2026-09-27; the tenant was read from the raw body first): the tenant as a UUID, an amount of 1 cent to $1,000,000, a channel, the due date as a date-time, splitting, rent or a charge with its type and a description of at most 200 characters, an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the issues. An attached document must be the business's own upload (requireOwnedInvoiceDocument)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** Rent, when the tenant has a live rent invoice (getLiveInvoiceByTenant): that invoice takes the new amount and is sent again (200, resent: true). Otherwise, and for every charge, a new invoice with a fresh checkout token (201)
-- **Side effects:** sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts), at once; one that fails to send stays pending and the cron retries it
-- **Success:** a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id), with resent, delivered and deliveryReason (a fixed code: not_found, not_payable, billing_card_required, missing_data, send_failed or no_deliverable)
+- **Idempotency:** createOrReuseInvoiceRentRequestForMerchant serializes authenticated creation on the owned profile. Rent reuses the latest live owned invoice if it is rent, changing only its amount (200, resent: true); a latest charge causes new rent. Otherwise, and for every charge, a new invoice with a server-generated checkout token and creation history commits together (201). Existing amount/session R3 semantics are retained
+- **Side effects:** sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmailForMerchant, then deliverInvoice with captured owned contact, server/property-cron.ts); no DB locks over providers; an uncertain send or refused/failed post-send record is reconciliation-required 503, at once; one that fails to send stays pending and the cron retries it
+- **Success:** a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id), with resent, delivered and deliveryReason (a fixed code: not_payable, billing_card_required, missing_data, send_failed or no_deliverable); lost final scope is 404; uncertain post-send results are fixed reconciliation-required 503 without an invoice DTO
 - **Error disclosure:** input-issues
 - **Finding:** Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).
 
@@ -3017,20 +3252,19 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares invoice.merchantId !== merchantId`
-- storageMethods: `getInvoiceRentRequest`, `getOrCreateSubscription`
-- sideEffects: `email: resendInvoiceEmail`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`
+- sideEffects: `email: resendInvoiceEmailForMerchant`
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `502`, `503`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership; resendInvoiceEmailForMerchant reads a joined owned snapshot after awaited prerequisites and records under parent-then-child locks with original parent identity; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** none: each call sends the link again, and a pending or failed invoice becomes dispatched; a paid, externally paid or voided one is 409 'Invoice is not payable' (400 until 2026-09-27, P2.2), and a send that fails is 502 with its reason, a fixed code
-- **Side effects:** sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts)
+- **Idempotency:** none: each call sends the link again; a pending or failed invoice becomes dispatched using its current locked status, with delivery history in the same transaction. A paid, externally paid or voided one is 409 'Invoice is not payable' (400 until 2026-09-27, P2.2); lost pre-send scope is 404; a known send failure is 502 with a fixed reason; uncertainty or post-send record refusal/failure is fixed reconciliation-required 503
+- **Side effects:** sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmailForMerchant, then deliverInvoice with captured owned contact, server/property-cron.ts); no DB locks over providers; an uncertain send or refused/failed post-send record is reconciliation-required 503
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** domain-errors
 - **Finding:** No limit on resending: each call is an email, SMS or WhatsApp message to the tenant, at the platform's cost (operations).
@@ -3039,15 +3273,15 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares invoice.merchantId !== merchantId`
-- storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** voids an invoice that is not paid (a paid or externally paid one is 409 'Cannot void a paid invoice', 400 until 2026-09-27, P2.2); a voided one is voided again, with a new time, and logged again
+- **Idempotency:** voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 - **Finding:** Voiding while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
@@ -3059,16 +3293,16 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: markInvoicePaidExternalSchema`
-- authChecks: `compares invoice.merchantId !== merchantId`
-- storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and not voided (409, since 2026-09-27: a voided one stays voided); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; not voided (409, since 2026-09-27); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)
-- **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2)
+- **Idempotency:** markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
 - **Finding:** Marking an invoice paid outside TaptPay while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
@@ -3078,7 +3312,7 @@ Reviewed policy:
 
 - params: `token: raw`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `getActiveSchedule`, `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getQuote`, `getTenantProfile`, `uploadedFileOwnedByMerchant`
+- storageMethods: `cleanUploadedFileOwnedByMerchant`, `getActiveSchedule`, `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getQuote`, `getTenantProfile`
 - statuses: `200`, `404`, `410`, `429`, `500`
 - rateLimits: `tokenRateLimit`
 - helpers: `getCheckoutParty`, `invoiceHasCheckoutDocument`, `tokenRateLimit`
@@ -3098,14 +3332,14 @@ Reviewed policy:
 
 - params: `token: raw`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `consumeInvoiceDocumentReadLimit`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getUploadedFileForMerchant`
+- storageMethods: `consumeInvoiceDocumentReadLimit`, `getCleanUploadedFileForMerchant`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`
 - statuses: `200`, `404`, `410`, `429`, `500`, `503`
 - rateLimits: `storage.consumeInvoiceDocumentReadLimit`
 - helpers: `sendPrivateDocument`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; the file must be the invoice's own attachment and belong to the invoice's business (getUploadedFileForMerchant)
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; the file must be the invoice's own attachment, belong to the invoice's business and have a clean scan on record (getCleanUploadedFileForMerchant)
 - **Input:** token: must match /^[A-Za-z0-9_-]{1,200}$/ (404 otherwise), then looked up
 - **Idempotency:** read-only (each read spends the link's read budget)
 - **Success:** the attached document's bytes, with its stored type, Cache-Control private, no-store and nosniff (sendPrivateDocument)
@@ -3117,180 +3351,157 @@ Reviewed policy:
 ### POST `/api/checkout/:token/split`
 
 - params: `token: raw`
-- body: `schema: z.object({ count: z.number().int().min(2).max(12) }).strict()`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `invoiceHasSplitSessions`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- statuses: `200`, `400`, `404`, `409`, `429`, `500`
-- rateLimits: `tokenRateLimit`
-- helpers: `splitInvoiceRef`, `tokenRateLimit`, `updateCheckoutInvoice`
+- body: `schema: z.object({count:z.number().int().min(2).max(12)}).strict()`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- statuses: `200`, `400`, `404`, `409`, `429`, `503`
+- rateLimits: `deps.checkRateLimit`
+- helpers: `server/invoice-checkout-handlers.ts:split`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
-- **Input:** token: read raw, then looked up; body: count, a whole number from 2 to 12, strict (400 otherwise; parseInt until 2026-09-26)
-- **Idempotency:** sets the invoice's share count; refused once any session has been opened for it or a share is paid (409, since 2026-09-26) and when the business has not allowed splitting (400)
-- **Success:** { splitCount, splitPaidCount: 0, shareCents }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token resolves one invoice; strict body {count: integer 2..12}; guarded aggregate CAS refuses recorded attempts, legacy sessions and paid shares.
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Success:** splitCount, splitPaidCount and shareCents
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
-- **Replay:** the same count again changes nothing; another count is taken only until someone starts paying
-- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
-- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/checkout/:token/session`
 
 - params: `token: raw`
-- body: `fields: payerEmail`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getClientProfile`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: createWindcaveSession`
-- statuses: `200`, `404`, `409`, `429`, `500`, `502`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `tokenRateLimit`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `recordUncountedShare`, `sendRentGstInvoices`, `splitInvoiceRef`, `tokenRateLimit`, `updateCheckoutInvoice`
+- body: `schema: openSchema`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider through durable attempt coordinator: checkout.open`, `provider: runtime.client.createSession`, `provider: runtime.client.querySession`
+- statuses: `200`, `202`, `400`, `404`, `409`, `410`, `429`, `503`
+- capabilityGates: `config.features.invoicePayments`
+- rateLimits: `deps.checkRateLimit`
+- helpers: `linksFromBody`, `pending`, `result`, `server/invoice-checkout-handlers.ts:session`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
-- **Input:** token: read raw, then looked up; body read without a schema: payerEmail (checked as an email address; for a split invoice kept with that session only, never on a list)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)
-- **Idempotency:** none: every call opens another provider session (finding)
-- **Side effects:** creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
-- **Success:** the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache); or { alreadyComplete, approved }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** actual R2 session client through the durable coordinator; no communication from this route
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
-- **Replay:** each call opens another provider session for the same invoice
-- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
-- **Finding:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
-- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/checkout/:token/hosted-fields-complete`
 
 - params: `token: raw`
-- body: `fields: sessionId`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `200`, `400`, `403`, `404`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`, `splitSessionOpenedFor`
+- body: `schema: completeSchema`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.invoicePayments`
+- rateLimits: `deps.checkRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `linksFromBody`, `pending`, `result`, `server/invoice-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)
-- **Input:** token: read raw, then looked up; body read without a schema: sessionId (required; sent to the provider as one encoded path segment)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
-- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per recorded session (atomicClaimSplitShare / atomicClaimJobSplitShare, then markInvoiceSplitSessionPaid), and an approved session that finds every share paid is recorded for a refund; a single payment settles by a read then a write
-- **Side effects:** queries the provider for the session (queryWindcaveSession); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
-- **Success:** { approved, status, splitCount, splitPaidCount }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment or a session recorded for it for a split share
-- **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
-- **Rate:** none — every call asks the provider about the session sent, with the platform's credentials
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/checkout/:token/googlepay-complete`
 
 - params: `token: raw`
-- body: `fields: googlePayToken, sessionId`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`
-- statuses: `200`, `400`, `403`, `404`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `assertWindcaveUrl`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`, `splitSessionOpenedFor`
+- body: `schema: completeSchema`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.invoicePayments`
+- rateLimits: `deps.checkRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `linksFromBody`, `pending`, `result`, `server/invoice-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)
-- **Input:** token: read raw, then looked up; body read without a schema: sessionId (required), googlePayToken (any object, passed to the provider as it came)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
-- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session; a single payment settles by a read then a write
-- **Side effects:** submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl) or queries the provider (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)
-- **Success:** { approved, status, splitCount, splitPaidCount }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment or a session recorded for it for a split share
-- **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
-- **Rate:** none — every call reaches the provider, with the platform's credentials
-- **Finding:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/checkout/callback`
 
-- query: `result: raw`, `token: raw`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `302`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`
+- query: `state: raw`, `token: raw`
+- authChecks: `compares found.attempt.merchantId!==invoice.merchantId`, `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider reconciliation: runtime.reconcile`
+- statuses: `303`, `404`, `409`, `410`, `429`, `503`
+- rateLimits: `deps.checkRateLimit`
+- helpers: `server/invoice-checkout-handlers.ts:callback`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url), in the query, selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown one is sent home (302), this being a browser's return (the shared rule's 404 does not apply here; corrected 2026-09-27 by R1-T3's matrix)
-- **Input:** query read raw: token (looked up; unknown goes to /) and result (only "cancelled" is acted on: no query)
-- **Capability gate:** isWindcaveConfigured() (while unconfigured it only redirects)
-- **Idempotency:** a settled invoice only redirects; otherwise the invoice's pinned session is queried and settled (a split invoice pins none, so nothing is)
-- **Side effects:** queries the provider for the pinned session (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)
-- **Success:** a 302 to the invoice's checkout page (/r/<token>), or to / for an unknown token
+- **Who:** public-bearer. **Tenant (token):** hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required.
+- **Input:** state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** narrow local outcome/receipt share or safe redirect; pending remains processing
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else; the outcome always comes from querying the provider about the pinned session
-- **Replay:** a settled invoice only redirects; two calls at once can both settle it (R3 / C20)
-- **Rate:** none — each call with a real link to an unpaid single-payment invoice asks the provider
-- **Finding:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### ALL `/api/windcave/rent-notification`
 
-- middleware: `express.urlencoded(…)`, `express.json(…)`
-- query: `sessionId: raw`, `sessionid: raw`
-- body: `fields: sessionId, sessionid`
-- storageMethods: `atomicClaimSplitShare`, `getInvoiceRentRequest`, `getInvoiceRentRequestByWindcaveSessionId`, `getInvoiceSplitSession`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`
-- sideEffects: `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `200`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimSplitShare`
-- helpers: `finalizeRentInvoice`, `recordUncountedShare`, `sendRentGstInvoices`
+- statuses: `200`, `400`, `405`, `413`, `415`, `429`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing
-- **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
-- **Idempotency:** a settled invoice (paid, paid externally, voided) is skipped; a split share is claimed atomically per session (storage.atomicClaimSplitShare), but a single payment is marked paid by a read then a write (finding)
-- **Side effects:** queries the provider; when paid, emails the GST invoice (sendRentGstInvoices → sendGstInvoices)
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
-- **Replay:** a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read
-- **Rate:** none — any caller can prompt a provider query for a pending session whose id they hold
-- **Finding:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### ALL `/api/windcave/trades-notification`
 
-- middleware: `express.urlencoded(…)`, `express.json(…)`
-- query: `sessionId: raw`, `sessionid: raw`
-- body: `fields: sessionId, sessionid`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByWindcaveSessionId`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `200`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`
+- statuses: `200`, `400`, `405`, `413`, `415`, `429`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing
-- **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
-- **Idempotency:** a settled invoice is skipped; a split share is claimed atomically per session (storage.atomicClaimJobSplitShare), but a single payment is marked paid by a read then a write (finding)
-- **Side effects:** queries the provider; when paid, sends the payment invoice (sendTradePaymentInvoice: email or SMS). The facts also list the rent path's GST email, which finalizeCheckoutInvoice can call, but this route always passes a trades invoice
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
-- **Replay:** a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read
-- **Rate:** none — any caller can prompt a provider query for a pending session whose id they hold
-- **Finding:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### POST `/api/webhooks/whatsapp`
 
@@ -3331,7 +3542,7 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: updateRentReminderSettingsSchema`
-- storageMethods: `updateMerchant`
+- storageMethods: `updateMerchantSettings`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `err.errors`
 - helpers: `reminderSettingsOf`
@@ -3340,7 +3551,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: updateRentReminderSettingsSchema (on or off, the first reminder 0 to 90 days after the due date, then every 1 to 90 days, at most 0 to 20 reminders with 0 for no limit, shown as ∞; each optional; other fields are dropped; 400 with the issues)
-- **Idempotency:** sets the given settings on the business (updateMerchant); the same again changes nothing
+- **Idempotency:** sets the given settings on the business (updateMerchantSettings, rent-reminders: the four reminder columns only); the same again changes nothing
 - **Success:** the four settings afterwards
 - **Error disclosure:** input-issues
 - **Finding:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
@@ -3363,7 +3574,7 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: updateTradeReminderSettingsSchema`
-- storageMethods: `updateMerchant`
+- storageMethods: `updateMerchantSettings`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
@@ -3371,7 +3582,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: updateTradeReminderSettingsSchema (tradeRemindersEnabled, true or false, required; other fields are dropped; 400 with the issues)
-- **Idempotency:** sets the switch on the business (updateMerchant); the same again changes nothing. Off stops the trades payment reminders (runTradesReminderPass, which follows the rent reminder days and count); overdue invoices are still marked due
+- **Idempotency:** sets the switch on the business (updateMerchantSettings, trade-reminders: that column only); the same again changes nothing. Off stops the trades payment reminders (runTradesReminderPass, which follows the rent reminder days and count); overdue invoices are still marked due
 - **Success:** { tradeRemindersEnabled } afterwards
 - **Error disclosure:** input-issues
 - **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
@@ -3395,7 +3606,7 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - body: `schema: updateTradeGstSettingsSchema`
 - authChecks: `isAccountOwner`
-- storageMethods: `updateMerchant`
+- storageMethods: `updateMerchantSettings`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
@@ -3403,7 +3614,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business, its owner only (isAccountOwner: a teammate is 403 since 2026-09-27, as the settings page shows these to a teammate greyed out with the business's other details); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: updateTradeGstSettingsSchema (gstRegistered, true or false, and tradeGstMode, inclusive or exclusive, each optional; other fields are dropped; 400 with the issues)
-- **Idempotency:** sets the given settings on the business (updateMerchant); the same again changes nothing. Quotes made afterwards take them (a quote keeps the GST worked out when it was made); the payment receipts (sendTradePaymentInvoice), the quote PDF's GST number and the public quote page read them when shown
+- **Idempotency:** sets the given settings on the business (updateMerchantSettings, trade-gst: the two GST columns only); the same again changes nothing. Quotes made afterwards take them (a quote keeps the GST worked out when it was made); the payment receipts (sendTradePaymentInvoice), the quote PDF's GST number and the public quote page read them when shown
 - **Success:** { gstRegistered, tradeGstMode } afterwards
 - **Error disclosure:** input-issues
 
@@ -3425,7 +3636,7 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: createClientProfileSchema`
-- storageMethods: `createClientProfile`
+- storageMethods: `createClientProfileForMerchant`
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
@@ -3433,7 +3644,7 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: createClientProfileSchema (a first and last name of 1 to 80 characters, the site address of 1 to 200, an optional email of at most 200 and phone of at most 40, notes of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's and the client active; 400 with the first issue)
-- **Idempotency:** none: each call adds another client (no check for the same person)
+- **Idempotency:** createClientProfileForMerchant projects profile fields and forces explicit merchant and active status; each call adds another client (no check for the same person). Internal quote/invoice prospect creation uses the same explicit merchant contract with server-selected prospect status
 - **Success:** 201 with the client, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
 - **Error disclosure:** input-issues
 
@@ -3441,13 +3652,12 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares row.merchantId !== merchantId`
-- storageMethods: `getClientProfile`
+- storageMethods: `getClientProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
 - **Idempotency:** read-only
 - **Success:** the client, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
@@ -3458,16 +3668,15 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: updateClientProfileSchema`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getClientProfile`, `updateClientProfile`
+- storageMethods: `getClientProfileForMerchant`, `updateClientProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one, rechecked in the update's id/merchant predicate; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateClientProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or notes is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped, so the status cannot be set here; 400 with the first issue)
-- **Idempotency:** sets the given fields and clears the emptied ones (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed
+- **Idempotency:** updateClientProfileForMerchant projects the given editable fields and clears explicit nulls, an archived client's or a prospect's too; identity/status/archive metadata cannot be injected; a moved row is 404 without mutation; the same again changes nothing but the time changed
 - **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
 - **Error disclosure:** input-issues
 
@@ -3475,32 +3684,29 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `archiveClientProfile`, `createJobEvent`, `getClientProfile`, `getJobSchedulesByMerchant`, `terminateJobSchedule`
+- storageMethods: `archiveClientProfileForMerchant`, `getClientProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one, rechecked by archiveClientProfileForMerchant at its write; parent locks before only same-merchant children; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** archives the client (archiveClientProfile), then cancels each of the client's recurring invoices not already cancelled, recording when (terminateJobSchedule) with a schedule_terminated event (owner decision 2026-09-27: they went on billing the archived client every period); invoices already sent stay payable. Again archives again, with a new time, and has nothing left to cancel
+- **Idempotency:** archiveClientProfileForMerchant archives the owned client, cancels its owned recurring schedules not already cancelled and saves each schedule_terminated event in one transaction (owner decision 2026-09-27); any history failure rolls back the entire archive. Issued invoices stay payable. Again archives again, with a new time, and has nothing left to cancel
 - **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
 - **Error disclosure:** fixed
-- **Finding:** The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.
 
 ### POST `/api/trades/clients/:id/unarchive`
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getClientProfile`, `unarchiveClientProfile`
+- storageMethods: `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one, rechecked in the restore's id/merchant predicate; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** sets the client active, whatever it was (a hidden prospect too), with no archive time (unarchiveClientProfile); recurring invoices cancelled by the archive stay cancelled. Again changes nothing but the time
+- **Idempotency:** unarchiveClientProfileForMerchant sets the owned client active, whatever it was (a hidden prospect too), with no archive time; a moved row is 404 without mutation; recurring invoices cancelled by archive stay cancelled. Again changes nothing but the time
 - **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
 - **Error disclosure:** fixed
 
@@ -3508,15 +3714,14 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getClientProfile`, `updateClientProfile`
+- storageMethods: `getClientProfileForMerchant`, `promoteClientProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one, rechecked by promoteClientProfileForMerchant with current status under a row lock; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** a hidden quick-invoice prospect becomes a listed client (status active); any other client is 409 'Client is already saved' (400 until 2026-09-27, P2.2)
+- **Idempotency:** promoteClientProfileForMerchant makes the currently owned hidden prospect active; any other current status is 409 'Client is already saved' (400 until 2026-09-27, P2.2); a moved row is 404 without mutation
 - **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
 - **Error disclosure:** fixed
 
@@ -3524,16 +3729,15 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `getClientProfile`, `getJobEventsByClient`
+- storageMethods: `getClientProfileForMerchant`, `getJobEventsByClientForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one; getJobEventsByClientForMerchant requires both event and current profile ownership in one SQL predicate; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
 - **Idempotency:** read-only
-- **Success:** the client's history, newest first, at most 50 (getJobEventsByClient): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)
+- **Success:** the owned client's same-merchant history, newest first, at most 50 (getJobEventsByClientForMerchant): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)
 - **Error disclosure:** fixed
 
 ### GET `/api/trades/quotes`
@@ -3548,29 +3752,28 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each quote's status (one that no quote has matches nothing)
 - **Idempotency:** read-only
-- **Success:** the business's quotes, or those of one status, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed) each, newest first, all at once (no paging)
+- **Success:** the business's quotes whose client is the business's too (getQuotesByMerchant), or those of one status, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed) each, newest first, all at once (no paging)
 - **Error disclosure:** fixed
 
 ### POST `/api/trades/quotes`
 
 - middleware: `authenticateToken`
 - body: `schema: createQuoteSchema`
-- authChecks: `compares client.merchantId !== merchantId`
-- storageMethods: `createClientProfile`, `createJobEvent`, `createQuote`, `getClientProfile`, `getMerchant`, `getOrCreateSubscription`, `uploadedFileOwnedByMerchant`
-- sideEffects: `email/SMS: sendTradeQuote`
+- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant`
+- sideEffects: `email/SMS: sendTradeQuoteForMerchant`
 - statuses: `201`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
+- helpers: `requireBillingCard`, `requireOwnedInvoiceDocument`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** a client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; without one, a hidden prospect is made from the recipient's details, or with none for a link-only quote; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
-- **Input:** body: createQuoteSchema (exactly one of a client's UUID, a recipient (a name of 1 to 160 characters, an optional email and address) or skipClient; 1 or more lines, each a description of 1 to 200 characters, a whole quantity of 1 to 100,000 and a unit price of 0 to $1,000,000, the line total sent being ignored and worked out again; a channel; a deposit, a percentage of at most 100 or a fixed amount, its type and value required when enabled; valid until as a date-time; notes of at most 1,000 characters; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument)
+- **Who:** merchant (owner, member). **Tenant (resource):** a client named in the body (getClientProfileForMerchant) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; createQuoteForMerchant locks and rechecks it at the write; without one, a hidden prospect is made with the quote from the recipient's details, or with none for a link-only quote; the answer is read back through the business's scope (getQuoteDeliveryForMerchant); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Input:** body: createQuoteSchema (exactly one of a client's UUID, a recipient (a name of 1 to 160 characters, an optional email and address) or skipClient; 1 or more lines, each a description of 1 to 200 characters, a whole quantity of 1 to 100,000 and a unit price of 0 to $1,000,000, the line total sent being ignored and worked out again; a channel; a deposit, a percentage of at most 100 or a fixed amount, its type and value required when enabled; valid until as a date-time; notes of at most 1,000 characters; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument), rechecked under a share lock at the write
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** none: each call makes another quote, sent at once with a new public link, and another hidden prospect when no client is named; its GST is worked out from the business's settings at that moment and kept
-- **Side effects:** sends the client the quote's link, with the quote as a PDF by email by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts); a send that fails is recorded (quote_dispatch_failed) and the link still works
-- **Success:** 201 with the quote, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed), with delivered and deliveryReason (a fixed code: not_found, missing_data, billing_card_required, send_failed or no_deliverable)
+- **Idempotency:** none: each call makes another quote, sent at once with a new public link made by the server, and another hidden prospect when no client is named: createQuoteForMerchant commits the prospect, the quote and its quote_sent history in one transaction, and takes no identity, ownership, status or token from the caller; its GST is worked out from the business's settings at that moment and kept
+- **Side effects:** sends the client the quote's link, with the quote as a PDF by email by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts) (sendTradeQuoteForMerchant: the quote read in one statement with its owned client, and logged only while both are still the business's); a send that fails is recorded (quote_dispatch_failed, recordQuoteDeliveryForMerchant) and the link still works
+- **Success:** 201 with the quote, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed), with delivered and deliveryReason (a fixed code: not_found, missing_data, billing_card_required, send_failed or no_deliverable); a quote whose scope is lost before the answer is 404; a send attempted with an uncertain outcome or history is a fixed 503 (TRADES_QUOTE_DELIVERY_RECONCILIATION_REQUIRED) with no quote
 - **Error disclosure:** input-issues
 - **Finding:** An archived client can still be quoted here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
 - **Finding:** Each quote to someone not saved as a client makes another hidden prospect, and nothing removes them.
@@ -3579,17 +3782,16 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares quote.merchantId !== merchantId`
-- storageMethods: `getClientProfile`, `getMerchant`, `getQuote`
+- storageMethods: `getMerchant`, `getQuoteDeliveryForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
-- helpers: `streamQuotePdf`
+- helpers: `sendQuotePdf`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the quote read by id (getQuote) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the quote read by id (getQuoteDeliveryForMerchant) must be the session's business's: another business's is 404, the same as a missing one, read in one statement with its client, which must be the business's too; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
 - **Idempotency:** read-only
-- **Success:** the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, its client and the business (generateQuotePdf); 404 'Quote details unavailable' when the client or the business is gone
+- **Success:** the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, the client read with it and the business (generateQuotePdf); 404 'Quote details unavailable' when the business is gone
 - **Error disclosure:** fixed
 
 ### GET `/api/trades/quotes/token/:token/pdf`
@@ -3598,7 +3800,7 @@ Reviewed policy:
 - authChecks: `storage.getQuoteByToken`
 - storageMethods: `getClientProfile`, `getMerchant`, `getQuoteByToken`
 - statuses: `200`, `404`, `500`
-- helpers: `streamQuotePdf`
+- helpers: `sendQuotePdf`
 
 Reviewed policy:
 
@@ -3615,7 +3817,7 @@ Reviewed policy:
 
 - params: `token: raw`
 - authChecks: `storage.getQuoteByToken`
-- storageMethods: `createJobEvent`, `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `updateQuote`
+- storageMethods: `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `recordQuoteViewForMerchant`
 - statuses: `200`, `404`, `500`
 
 Reviewed policy:
@@ -3635,12 +3837,11 @@ Reviewed policy:
 - params: `token: raw`
 - body: `schema: acceptQuoteSchema`
 - authChecks: `storage.getQuoteByToken`
-- storageMethods: `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote`
-- sideEffects: `email/SMS: resendTradeInvoice`, `email: tellBusinessQuoteAcceptanceBlocked`
-- statuses: `200`, `400`, `402`, `404`, `409`, `410`, `500`
+- storageMethods: `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteByToken`, `respondToQuoteForMerchant`
+- sideEffects: `email/SMS: resendTradeInvoiceForMerchant`
+- statuses: `200`, `400`, `402`, `404`, `409`, `410`, `503`
 - errorTextInResponse: `parsed.error.errors`
 - entitlementGates: `billingCardIsReady`
-- helpers: `generateInvoiceToken`
 
 Reviewed policy:
 
@@ -3669,29 +3870,28 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** clientProfileId: strictUuidParam when given (400 'Invalid clientProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each invoice's status (one that no invoice has matches nothing)
 - **Idempotency:** read-only
-- **Success:** the business's invoices (or one client's, or those of one status), a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id) each, newest first, all at once (no paging)
+- **Success:** the business's invoices whose client is the business's too (getJobInvoicesByMerchant), or one client's, or those of one status, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id) each, newest first, all at once (no paging)
 - **Error disclosure:** fixed
 
 ### POST `/api/trades/invoices`
 
 - middleware: `authenticateToken`
 - body: `schema: createJobInvoiceSchema`
-- authChecks: `compares client.merchantId !== merchantId`, `compares linkedQuote.merchantId !== merchantId`
-- storageMethods: `createClientProfile`, `createJobEvent`, `createJobInvoice`, `getClientProfile`, `getOrCreateSubscription`, `getQuote`, `uploadedFileOwnedByMerchant`
-- sideEffects: `email/SMS: resendTradeInvoice`
-- statuses: `201`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
+- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getCreationCommandForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`
+- sideEffects: `email/SMS: resendTradeInvoiceForMerchant`
+- statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
+- helpers: `commandActor`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** a client named in the body (getClientProfile) must be the session's business's, and a quote named (getQuote) the business's and that client's (since 2026-09-27; it had only to be the business's): each otherwise 404, the same as a missing one; for a quick invoice, a hidden prospect is made from the recipient's details; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
-- **Input:** body: createJobInvoiceSchema (a client's UUID or, for a quick invoice, a recipient: a name of 1 to 120 characters, with the email or phone its channel, email or SMS, needs; an amount of 1 cent to $1,000,000; a channel; the due date and an optional send date as date-times; the kind, full or deposit, since 2026-09-27 (a balance is made by send-balance and a recurring invoice by the cron: both were taken here); a quote's UUID, required for a deposit and not allowed for a quick invoice, which must be full; job details of at most 500 characters; splitting; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument)
+- **Who:** merchant (owner, member). **Tenant (resource):** a client named in the body (getClientProfileForMerchant) must be the session's business's, and a quote named (getQuoteDeliveryForMerchant) the business's and that client's (since 2026-09-27; it had only to be the business's): each otherwise 404, the same as a missing one; createJobInvoiceForMerchant locks and rechecks the client, and holds the quote under a share lock, at the write; for a quick invoice, a hidden prospect is made with the invoice from the recipient's details; the answer is read back through the business's scope (getJobInvoiceForMerchant); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Input:** body: createJobInvoiceSchema (a client's UUID or, for a quick invoice, a recipient: a name of 1 to 120 characters, with the email or phone its channel, email or SMS, needs; an amount of 1 cent to $1,000,000; a channel; the due date and an optional send date as date-times; the kind, full or deposit, since 2026-09-27 (a balance is made by send-balance and a recurring invoice by the cron: both were taken here); a quote's UUID, required for a deposit and not allowed for a quick invoice, which must be full; job details of at most 500 characters; splitting; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument), rechecked under a share lock at the write
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** none: each call makes another invoice with a fresh checkout token, and a hidden prospect for a quick invoice. Several deposits on one quote are taken; send-balance subtracts them all
-- **Side effects:** sends the client the payment link by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts), at once unless the send date is later (the cron sends it then); a send that fails stays pending and the cron retries it
-- **Success:** 201 with the invoice, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id), with delivered and deliveryReason (a fixed code: scheduled, not_found, not_payable, missing_data, send_failed or no_deliverable)
+- **Idempotency:** none: each call makes another invoice with a fresh checkout token made by the server, and a hidden prospect for a quick invoice: createJobInvoiceForMerchant commits the prospect, the invoice and its invoice_sent history in one transaction, and takes no identity, ownership, status, token or payment field from the caller. Several deposits on one quote are taken; send-balance subtracts them all
+- **Side effects:** sends the client the payment link by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts) (resendTradeInvoiceForMerchant: the invoice read in one statement with its owned client, its delivery recorded under the client's and the invoice's row locks), at once unless the send date is later (the cron sends it then); a send that fails stays pending and the cron retries it
+- **Success:** 201 with the invoice, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id), with delivered and deliveryReason (a fixed code: scheduled, not_found, not_payable, missing_data, send_failed or no_deliverable); an invoice whose scope is lost before the answer is 404; a send attempted with an uncertain outcome or record is a fixed 503 (TRADES_INVOICE_DELIVERY_RECONCILIATION_REQUIRED) with no invoice
 - **Error disclosure:** input-issues
 - **Finding:** An archived client can still be invoiced here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
 - **Finding:** A deposit's amount is the one typed, not checked against the deposit its quote worked out.
@@ -3701,42 +3901,40 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: sendJobBalanceSchema`
-- authChecks: `compares dep.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `createJobInvoice`, `getJobInvoice`, `getJobInvoicesByMerchant`, `getOrCreateSubscription`, `getQuote`
-- sideEffects: `email/SMS: resendTradeInvoice`
+- storageMethods: `createJobBalanceInvoiceForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`
+- sideEffects: `email/SMS: resendTradeInvoiceForMerchant`
 - statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `body.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `generateInvoiceToken`, `requireBillingCard`
+- helpers: `commandActor`, `requireBillingCard`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the deposit invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one; its quote is the one the deposit names (getQuote); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the deposit invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one; createJobBalanceInvoiceForMerchant rechecks it under the client's and its own row locks; its quote is the one the deposit names, and must be the business's too (404 'Linked quote not found' otherwise, the same as a missing one); the answer is read back through the business's scope; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: sendJobBalanceSchema (splitEnabled, true or false, optional, and nothing else, since 2026-09-27: it was read from the raw body, so "yes" turned splitting on; 400 with the first issue)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** one balance per quote: the invoice must be a deposit (400), paid (409) and on a quote (400); a balance already made and not voided is 409. The balance is the quote's total less every invoice of the client's on that quote not voided (400 when nothing is left), due in 7 days, by the deposit's channel
-- **Side effects:** sends the client the balance's payment link by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts), at once
-- **Success:** 201 with the balance invoice, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id), with delivered and deliveryReason (a fixed code: not_found, not_payable, missing_data, send_failed or no_deliverable)
+- **Idempotency:** one balance per quote: the invoice must be a deposit (400), paid (409) and on a quote (400); a balance already made and not voided is 409. The balance is the quote's total less every invoice of the client's on that quote not voided (400 when nothing is left), due in 7 days, by the deposit's channel. createJobBalanceInvoiceForMerchant reads what is billed and commits the balance with its balance_sent history in one transaction under the client's row lock, so two signed-in sends at the same moment make one (since R1-T7 S4b2: each found no balance and made one)
+- **Side effects:** sends the client the balance's payment link by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts) (resendTradeInvoiceForMerchant, as the invoice create), at once
+- **Success:** 201 with the balance invoice, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id), with delivered and deliveryReason (a fixed code: not_found, not_payable, missing_data, send_failed or no_deliverable); a balance whose scope is lost before the answer is 404; a send attempted with an uncertain outcome or record is a fixed 503 (TRADES_INVOICE_DELIVERY_RECONCILIATION_REQUIRED) with no invoice
 - **Error disclosure:** input-issues
-- **Finding:** Two sends at the same moment can each find no balance and each make one, billing the client twice: the one-balance check is a read, then a write (R3).
+- **Finding:** A customer's acceptance of the quote makes its deposit or full invoice without the client's lock (the public lane), so one landing beside a balance send is not counted in that balance (R3).
 
 ### POST `/api/trades/invoices/:id/mark-paid-external`
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: markJobPaidExternalSchema`
-- authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`
+- storageMethods: `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and neither voided nor already paid (409 each, since 2026-09-27); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and neither voided nor already paid (409 each, since 2026-09-27); markJobInvoicePaidExternalForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)
-- **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time, and logs it; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt)
-- **Side effects:** emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoice); nothing when the client has no email
+- **Idempotency:** markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A row moved or settled after the lookup is 404 or 409 with nothing written or sent. Legacy initiation before attachment still requires R3 convergence
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
 - **Finding:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
@@ -3746,15 +3944,14 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
+- storageMethods: `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one; completeJobInvoiceForMerchant rechecks the business, the client and the invoice's state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** records the job complete, with the time and a job_completed event, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again
+- **Idempotency:** completeJobInvoiceForMerchant records the job complete, with the time and a job_completed event saved in the same transaction, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again; a row moved after the lookup is 404 with nothing written
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 
@@ -3762,15 +3959,15 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
+- storageMethods: `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); voidJobInvoiceForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** voids the invoice with the time and logs it in the client's history (invoice_voided, since 2026-09-27); a voided one is voided again, with a new time, and logged again
+- **Idempotency:** voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written. Legacy initiation before attachment still requires R3 convergence
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 - **Finding:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
@@ -3788,15 +3985,14 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** nothing
 - **Idempotency:** read-only
-- **Success:** every recurring invoice of the business, cancelled ones included (the recurring-invoice page lists them with their status), a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled) each, newest first, all at once (no paging)
+- **Success:** every recurring invoice of the business whose client is the business's too (getJobSchedulesByMerchant), cancelled ones included (the recurring-invoice page lists them with their status), a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled) each, newest first, all at once (no paging)
 - **Error disclosure:** fixed
 
 ### POST `/api/trades/schedules`
 
 - middleware: `authenticateToken`
 - body: `schema: createJobScheduleSchema`
-- authChecks: `compares client.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription`
+- storageMethods: `createJobScheduleForMerchant`, `getClientProfileForMerchant`, `getOrCreateSubscription`
 - statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
@@ -3804,10 +4000,10 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; and not archived (409 since 2026-09-27: archiving cancels a client's recurring invoices, owner decision); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the client named in the body (getClientProfileForMerchant) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; and not archived (409 since 2026-09-27: archiving cancels a client's recurring invoices, owner decision); createJobScheduleForMerchant locks the client and rechecks both at the write; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body: createJobScheduleSchema (the client's UUID, an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the first issue). An end before the start is 400, and a start more than a day before now is 400 "The start date can't be in the past" (owner decision 2026-09-27: it billed every period since, one overdue invoice per cron run; the day's grace is because the forms send today's UTC date at 09:00 UTC)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
-- **Idempotency:** none: each call adds another recurring invoice, first run on its start date; a client may have several, one per job
+- **Idempotency:** none: each call adds another recurring invoice, first run on its start date; a client may have several, one per job. createJobScheduleForMerchant commits it with its schedule_created history under the client's row lock, and takes only the amount, frequency, channel and dates from the caller: an archive at the same moment either cancels it or refuses it (since R1-T7 S4c: it could be left live)
 - **Success:** 201 with the recurring invoice, a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
 - **Error disclosure:** input-issues
 
@@ -3816,16 +4012,15 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: updateJobScheduleSchema`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobSchedule`, `updateJobSchedule`
+- storageMethods: `getJobScheduleForMerchant`, `updateJobScheduleForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the recurring invoice read by id (getJobSchedule) must be the session's business's: another business's is 404, the same as a missing one, and not cancelled (409 since 2026-09-27: a cancelled one stays cancelled); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the recurring invoice read by id (getJobScheduleForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and not cancelled (409 since 2026-09-27: a cancelled one stays cancelled); updateJobScheduleForMerchant rechecks the business, the client and that state at its write, under the client's and the row's locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateJobScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the first issue)
-- **Idempotency:** sets the given fields (updateJobSchedule). Resuming a paused one moves its next date to the first date on its cycle after now, a monthly one kept on its start date's day of the month (nextJobRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Every call logs an event (paused, resumed or updated, with the change), again too
+- **Idempotency:** updateJobScheduleForMerchant sets the given editable fields and saves its event in the same transaction. Resuming a paused one moves its next date to the first date on the locked row's own cycle after now, a monthly one kept on its start date's day of the month (nextJobRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Every call logs an event (paused, resumed or updated, with the change), again too; a row moved or cancelled after the lookup is 404 or 409 with nothing written
 - **Success:** the recurring invoice afterwards, a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
 - **Error disclosure:** input-issues
 
@@ -3833,15 +4028,14 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares existing.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobSchedule`, `terminateJobSchedule`
+- storageMethods: `getJobScheduleForMerchant`, `terminateJobScheduleForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the recurring invoice read by id (getJobSchedule) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the recurring invoice read by id (getJobScheduleForMerchant) must be the session's business's: another business's is 404, the same as a missing one; terminateJobScheduleForMerchant rechecks the business and the client at its write, under the client's and the row's locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** cancels the recurring invoice, recording when (terminateJobSchedule), and logs it; a cancelled one is cancelled again, with a new time, and logged again. Invoices it already made stay payable
+- **Idempotency:** terminateJobScheduleForMerchant cancels the owned recurring invoice, recording when, and saves its event in the same transaction; a cancelled one is cancelled again, with a new time, and logged again. Invoices it already made stay payable; a row moved after the lookup is 404 with nothing written
 - **Success:** the recurring invoice afterwards, a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
 - **Error disclosure:** fixed
 
@@ -3872,7 +4066,7 @@ Reviewed policy:
 - **Who:** cron. **Tenant (system):** a scheduled run over every merchant's billing, invoices and reminders
 - **Input:** nothing is read but the x-cron-secret header (link URLs come from getBaseUrl(req))
 - **Idempotency:** one run at a time in this server process (409 while one runs); each pass is meant to act once per period. Another server instance can run at the same time (finding)
-- **Side effects:** charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts)
+- **Side effects:** charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts); scans a few invoice documents that have no scan verdict yet and records it, clean or infected, never without one (server/upload-lifecycle.ts, owner decision 2026-09-29); deletes invoice documents no invoice or quote names 12 calendar months after they were uploaded, never an attached one or a logo, and logs the count
 - **Success:** 200, or 207 when a pass failed: { ok, ranAt, failedPasses, and each pass's counts }
 - **Error disclosure:** fixed
 - **Authenticity:** x-cron-secret must equal CRON_SECRET, compared in constant time (authorizeCronRequest); 503 when CRON_SECRET is unset

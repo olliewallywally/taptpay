@@ -70,8 +70,6 @@ const exportButton = () => screen.getByRole("button", { name: "Export" });
 
 beforeEach(() => {
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
-  localStorage.setItem("merchantId", "77");
 });
 
 describe("property analytics when payments fail to load (R1-T9)", () => {

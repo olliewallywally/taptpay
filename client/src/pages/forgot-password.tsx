@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Mail, Loader2 } from "lucide-react";
@@ -13,6 +13,7 @@ import { forgotPasswordSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { z } from "zod";
+import { apiPath } from "@shared/api-path";
 
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
@@ -30,7 +31,7 @@ export default function ForgotPassword() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (data: ForgotPasswordFormData) => {
-      const response = await fetch("/api/auth/forgot-password", {
+      const response = await fetch(apiPath("POST /api/auth/forgot-password"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -67,7 +68,7 @@ export default function ForgotPassword() {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-4">
             <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
@@ -104,12 +105,12 @@ export default function ForgotPassword() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <CardTitle className="text-2xl font-bold text-gray-900">Forgot Password</CardTitle>
@@ -134,6 +135,7 @@ export default function ForgotPassword() {
                         disabled={forgotPasswordMutation.isPending}
                       />
                     </FormControl>
+                    <FormDescription className="sr-only">Email address for your password reset</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -169,6 +171,6 @@ export default function ForgotPassword() {
           </Form>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

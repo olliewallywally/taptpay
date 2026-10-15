@@ -1,3 +1,4 @@
+import { tabListKeyDown } from '@/lib/tab-list-keyboard';
 import {
   useCallback,
   useEffect,
@@ -46,6 +47,9 @@ import {
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
+import { sessionFetch } from "@/lib/session";
+import { retailResponse } from "@/lib/response-data";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -58,8 +62,8 @@ const INK = "#12162E";
 const DEEP_BLUE = "#1D48C8";
 const SHEET_BG = "#F4F5F8";
 const SHEET_INK = "#04103A";
-const SHEET_DIM = "#8A90A4";
-const SHEET_LABEL = "#9AA0B2";
+const SHEET_DIM = "#586079";
+const SHEET_LABEL = "#586079";
 const DONUT_COLORS = ["#5E9EFF", "#93BAFF", "#DCE7FF", "rgba(94,158,255,0.35)", "rgba(94,158,255,0.18)"];
 
 /* Sheet geometry, straight from the prototype. */
@@ -148,34 +152,33 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const chipRef = useRef<HTMLDivElement>(null);
 
   const authFetch = async (path: string) => {
-    const token = localStorage.getItem("authToken");
-    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return retailResponse(path, await res.json());
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId })),
     enabled: !!merchantId,
   });
 
   const txQuery = useQuery<Tx[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/transactions`),
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId })),
     refetchInterval: 15000,
     enabled: !!merchantId,
   });
 
   const stockQuery = useQuery<{ id: number; name: string; cost: string }[]>({
-    queryKey: ["/api/merchants", merchantId, "stock-items"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/stock-items`),
+    queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:merchantId/stock-items", { merchantId })),
     enabled: !!merchantId,
   });
 
   const boardsQuery = useQuery<RetailBoard[]>({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/tapt-stones`),
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId })),
     enabled: !!merchantId,
   });
 
@@ -356,7 +359,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   /* ── mutations ── */
   const refundMutation = useMutation({
     mutationFn: async (v: { txId: number; amount: string; reason: string }) => {
-      const res = await apiRequest("POST", `/api/transactions/${v.txId}/refunds`, {
+      const res = await apiRequest(...apiTo("POST /api/transactions/:transactionId/refunds", { transactionId: v.txId }), {
         refundAmount: v.amount,
         refundReason: v.reason,
         refundMethod: "original_payment_method",
@@ -364,7 +367,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
       return res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
       toast({ title: "Refund successful", description: data?.message || "The refund has been processed." });
       setRefundFor(null);
       setRefundAmount("");
@@ -381,10 +384,8 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const downloadReceipt = async (tx: Tx) => {
     setBusyTx(tx.id);
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/transactions/${tx.id}/receipt-pdf`, {
+      const res = await sessionFetch(apiPath("POST /api/transactions/:id/receipt-pdf", { id: tx.id }), {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("receipt");
       const blob = await res.blob();
@@ -555,7 +556,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                 )}
               </div>
 
-              <div className="ra-segs" role="tablist" aria-label="revenue range" data-tutorial-id="retail-analytics-period">
+              <div className="ra-segs" role="tablist" onKeyDown={tabListKeyDown} aria-label="revenue range" data-tutorial-id="retail-analytics-period">
                 {RANGES.map((r) => {
                   const on = r.k === tf;
                   return (
@@ -564,10 +565,11 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                       type="button"
                       role="tab"
                       aria-selected={on}
+                      tabIndex={on ? 0 : -1}
                       className="ra-seg"
                       style={{
                         background: on ? ACTIVE : "transparent",
-                        color: on ? NAVY : "#6B7BB8",
+                        color: on ? NAVY : "#93BAFF",
                         fontWeight: on ? 700 : 600,
                       }}
                       onClick={() => setTf(r.k)}

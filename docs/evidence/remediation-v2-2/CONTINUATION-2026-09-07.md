@@ -1,6 +1,1106 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-22, resumed after the 2026-09-21 session hit its usage limit
+Latest continuation **2026-10-14 — R4-T2 (refund operations schema, migration 0039)
+implemented as repository work.**
+[Evidence](r4/R4-T2-2026-10-14.md),
+[ADR rev. 3](../../decisions/2026-10-14-r4-t2-refund-operation-schema.md),
+[runbook](../../operations/runbook-2026-10-14-apply-0039-refund-operations.md).
+
+- **Reviews:** pass 4 refused revision 1 and pass 5 refused revision 2; pass 6 approved
+  revision 3, scoped, with five conditions, all met.
+- **Results:**
+  - PostgreSQL on fresh databases: R4-T2 28/28, R1 S2a 25/25 with 0039, R2-T4 12/12,
+    R2-T7 7/7, R3 50/50;
+  - refund and migration tests: 1,157 pass;
+  - typecheck clean.
+- **0039 is applied nowhere.** The owner applies it to the test database only, after
+  0034–0038, by the runbook.
+- **The refund flag stays off** until R4-T5's DTOs.
+- **Next:** R4-T3 (atomic local claim). It must follow the ADR's lock-order, send-intent and
+  lease rules.
+
+Prior continuation **2026-10-14 — OI-1, OI-2 and the merge review's outstanding items
+done; R4-T2 refund schema designed, not yet approved.**
+[Evidence](r3/OUTSTANDING-2026-10-14.md),
+[R4-T2 ADR](../../decisions/2026-10-14-r4-t2-refund-operation-schema.md),
+[R4 pass 4](r4/R4-review-pass-4-2026-10-14.md).
+
+- **OI-1:** a merchant can cancel a sale, or void or mark paid an invoice, after someone has
+  tried to pay.
+  - Only money already taken refuses it.
+  - Windcave is asked first, outside any lock.
+  - A payment landing afterwards is recorded, never lost.
+- **OI-2:** sessions with more than one card attempt follow R2's verifier.
+- **H-1–H-3, D2, D4 fixed** (latent; the R3 worker stays unmounted). Also fixed: the
+  same-tab retry after an unsent attempt expires, and the cash terminal findings.
+- **Independent review:**
+  - Fixed: R-1, R-2, R-3b and T-3, plus the test gaps.
+  - **One owner question:** may a merchant route record a payment it finds verified, using
+    unscoped finalizers? R1-T7 forbids it today.
+  - Recorded, not fixed: low items I-2 to I-5.
+- **R4-T2:**
+  - The ADR is at revision 2, after pass 4 refused revision 1 (five blockers, all checked
+    and answered).
+  - Pass 5, the independent reread, stopped at a session limit and is owed.
+  - The migration (0039) and its PostgreSQL verifier are drafted, not committed.
+- **Results:** full suites on `555686d8`: server 212/5,060 and client 130/1,480, all pass.
+  PostgreSQL: R3 50/50, R2-T4 12/12, R2-T7 7/7.
+- **No new migration;** 0034–0038 are unchanged.
+
+Prior continuation **2026-10-13 — R2 and R3 merged on `ccr-e07e3100-0wm8kr`; two merge
+fixes; owner runbook for the test database.**
+[Claude's independent review](r3/R2-R3-MERGE-REVIEW-2026-10-13.md),
+[runbook](../../operations/runbook-2026-10-13-apply-0034-0038-test-database.md).
+
+- **Merged:** Codex's `fix/qwen-aligned-20261010` at `27d235b8` (0036–0038, manual-change
+  guards, cash commands), on top of `332b0153` (Option A decision, R4-T1).
+- **B-1 fixed (blocker, found by three reviewers):** a failed Windcave session creation left
+  the attempt held forever. The sale could never be paid or cancelled.
+  - R2's rule is restored: an expired attempt with no attached session and no R3 send
+    intent is abandoned by the next claim, by a late attach and by the merchant's cancel.
+  - R3's other holds are unchanged.
+  - Failing first in memory/HTTP (2) and PostgreSQL (1).
+- **B-2 fixed:** the cash write takes its business explicitly. This was red on Codex's head:
+  `tenant-storage-inventory`, 3 tests.
+- **Latent (R3 worker/inbox unmounted):** H-1–H-3 must be fixed before activation.
+- **Owner items:** OI-1 (the cancel/void guard holds after a verified decline; needs a UAT
+  answer) and OI-2 (multi-transaction sessions).
+- **Review coverage:** four of six reviewers completed. The worker and cash dimensions, the
+  verify pass and the critic stopped at a session limit. Claude covered the cash commit
+  directly.
+- **Results:**
+  - server 208 / 4,993 and client 128 / 1,471, all pass; typecheck pass;
+  - PostgreSQL 16 on fresh databases: 0023–0038 rehearsal applied, R3 durability 40/40,
+    R2-T4 12/12, R2-T7 7/7.
+- **Migrations:** 0034–0038 are applied nowhere shared. The owner applies them to the test
+  database by the runbook, with the app stopped (0036/0037 commit separately). R4-T2 onward
+  may start.
+
+Prior continuation **2026-10-12 — R4-T1 implemented (refund provider boundary).**
+[Evidence](r4/R4-T1-2026-10-12.md), [review pass 2](r4/R4-review-pass-2-2026-10-12.md).
+Refunds go out under the caller's X-ID, are never resent, and count only when the reply is
+strictly this refund; the refund route releases a reservation only when the provider definitely
+did not refund, and keeps it on anything ambiguous (RD-2, RD-3 closed). The flag stays off. The
+refund request's original-transaction field is unconfirmed (UAT). Server 201 / 4,924. R4-T2
+onward wait for the merged R2+R3 tree.
+
+Prior continuation **2026-10-12 — owner chose Option A for the R2↔R3 conflict.**
+[Decision](../../decisions/2026-10-12-r2-r3-option-a-owner-decision.md),
+[exact R3 adaptation](R2-R3-OPTION-A-ADAPTATION-2026-10-12.md). R2's `payment_attempts` columns
+stay the retail representation; R3 (Codex, `fix/qwen-aligned-20261010`) renumbers its migration
+to 0036, drops its duplicate expectations table and `processor_transaction_id`, protects R2's
+columns write-once instead of freezing them, and verifies through R2's verifier. R2 is unchanged.
+R4-T1 (refund provider boundary, no schema) may start on the R2 branch; R4-T2 onward wait for
+the merged tree.
+
+Prior continuation **2026-10-12 — R2-T7 (migration 0035), an R2↔R3 schema conflict, and the R4
+preflight** on `ccr-e07e3100-0wm8kr`. [R2-T7 evidence](r2/R2-T7-2026-10-12.md),
+[owner direction](../../decisions/2026-10-12-r2-t7-processor-x-id-index-owner-direction.md),
+[conflict record](R2-R3-SCHEMA-CONFLICT-2026-10-12.md), [R4 preflight](r4/R4-preflight-2026-10-12.md).
+
+- R2-T7: `0035_payment_attempt_processor_x_id_unique.sql` (plan §9.4's third unique index)
+  behind an in-migration duplicate check that reports counts only; a lost attach race is a
+  conflict, not an error. PostgreSQL 16: 0035 verifier 7/7, T4 verifier 12/12. Applied
+  nowhere. R2 exit R-4 closed as repository work.
+- **Owner decision needed — R2 and Codex's R3 collide.** Both added a migration 0034;
+  R3 (`fix/qwen-aligned-20261010`, `9d52d8a5`) stores expected values, the provider
+  transaction ID and X-ID uniqueness in its own tables/columns, and its
+  `retail_attempt_immutable` trigger would refuse R2's writes to `payment_attempts` (every
+  retail session start would fail with both applied). Nothing is applied anywhere.
+  Recommendation: R2's columns for retail (plan §10.1), R3 adapts and renumbers.
+- R4 (durable refunds) preflight and review pass 1: 13 defects (RD-1–RD-13; flag off, none
+  live), five slices; **implementation blocked** on the R2/R3 decision.
+- Server 198 / 4,872; typecheck pass.
+
+Prior R2 continuation **2026-10-12 — R2-T6 implemented; R2 exit record written (R2 not
+closed)**, `1f1fe82a`, `f68a8459`, `08b9dfc3`, `7f017808` on `ccr-e07e3100-0wm8kr`.
+[Evidence](r2/R2-T6-2026-10-12.md), [exit record](r2/R2-exit-2026-10-12.md),
+[owner direction](../../decisions/2026-10-12-r2-t6-proceed-owner-direction.md),
+[review](r2/R2-T6-review-2026-10-12.md).
+
+- RF-6 closed: no provider reply text or transport message in any error string or log; the
+  provider routes log internal IDs only. A marker guard covers every provider function and
+  route.
+- Found here: the subscription card-on-file flow was outside T1–T5. Its hosted-page link,
+  callbacks, read-back and charge now get R2's checks; read-back and charge fields are
+  checked when present, required only on the owner's word after UAT. No transport follows
+  a redirect.
+- §9.4's reconciliation code, promised by the T4 ADR for T5 and never written, is now
+  written on every retail query (PostgreSQL 16 verifier 12/12).
+- The §9.6 matrix in one suite. Failing first throughout. Typecheck; server **198 / 4,872**;
+  client **127 / 1,464**.
+- **Open for the owner (exit record):** the processor X-ID unique index (§9.4, needs
+  migration 0035), no metric on mismatch, no official UAT reply yet, stored-card field
+  requirement, the T5 items, applying 0034, and the independent review.
+
+Prior R2 continuation **2026-10-12 — R2-T5 implemented (repository work)**, `657134de` on
+`ccr-e07e3100-0wm8kr`. [Evidence](r2/R2-T5-2026-10-12.md),
+[owner direction](../../decisions/2026-10-12-r2-t5-complete-owner-direction.md),
+[review](r2/R2-T5-review-2026-10-12.md).
+
+- One verifier (`server/windcave-verify.ts`) on every enabled completion path — retail token,
+  numbered sales, rent and trades invoices: session, exact cents, currency, reference,
+  environment and account, for every transaction in the session. Only a verified approval or
+  decline settles; pending, unverifiable and mismatched outcomes change nothing (mismatch:
+  sanitized security event). RF-1 (Google Pay settles from the query), RF-2 (no unknown
+  becomes a decline: numbered and invoice card completion did) and RF-3 (no approval from a
+  duplicate reply) closed. The numbered callback's browser cancel no longer fails the sale.
+- Found here: gap 11's cross-share half — a repeat of one approved split-share session
+  counted the next share — shown red on `6f1a67e2`, closed by the reference check. An
+  unsplit sale's repeat is still re-settled (R3/C20).
+- Failing first (26 of 29 new route tests red on `6f1a67e2`; the other 3 kept as guards).
+  Typecheck; server **194 / 4,788**; client **127 / 1,464**. No migration; 0034 still applied
+  nowhere.
+- For the owner's R1–R2 review: the UAT check on cancelled/abandoned pages, and the payer
+  page's generic "try again" on a payment still being checked (evidence, last section).
+- Next: R2-T6 (test matrix and the logging guard, RF-6), then the owner's R1–R2 review.
+
+Prior R2 continuation **2026-10-12 — R2-T4 implemented (repository and local rehearsal)**,
+`673a7043` on `ccr-e07e3100-0wm8kr`. [Evidence](r2/R2-T4-2026-10-12.md),
+[ADR](../../decisions/2026-10-12-r2-t4-expected-values-schema.md),
+[owner direction](../../decisions/2026-10-12-r2-t4-proceed-owner-direction.md),
+[review](r2/R2-T4-review-2026-10-12.md).
+
+- Migration `0034`: expected cents/currency/reference/environment, provider transaction ID
+  (partial unique) and reconciliation fields on `payment_attempts`, nullable for in-flight
+  attempts. Recorded before session creation, required to attach, frozen after; finalize
+  stores the provider transaction ID and refuses a duplicate as a conflict.
+- Failing first. Local PostgreSQL 16.15 rehearsal **11/11**, including 0034 over an
+  in-flight legacy attempt. Typecheck; server **190 / 4,731**; client **126 / 1,463**.
+- **Not applied to any shared database** — owner step after a restored-snapshot rehearsal.
+- Pre-existing, found here: `npm run test:server:postgres` fails at
+  `verify-server-postgres-storage.mjs:208` on `f0578517` too (unrelated to T4); for R1's
+  final review.
+- Next: T5 verifier for the retail token flow; legacy/invoice T5 waits on preflight Q1/Q3.
+
+Prior continuation **2026-10-11 — R2-T1–T3 implemented** on `ccr-e07e3100-0wm8kr`:
+T1 `8bca01cc`, T2 `956e74d4`, T3 `a044533e`. [Evidence](r2/R2-T1-T3-2026-10-11.md),
+[review pass 2](r2/R2-review-pass-2-2026-10-11.md) (recorded reread by this session; the
+independent R2 review remains owed).
+
+- T1: injectable session client with typed outcomes; nothing unknown becomes approved or
+  declined. T2: every provider link held to its documented relation, the mode's host and
+  canonical form; callbacks on exactly `PUBLIC_ORIGIN`; no any-`REDIRECT` hosted page;
+  Google Pay token refused before an unvalidated link. T3: exact cents and strict session
+  classification (not wired yet).
+- Failing first for each slice. Typecheck; full server 187 / 4,597 (T1), 188 / 4,664 (T2);
+  windcave suites 185 tests (T3).
+- Routes still settle on RF-1/RF-2/RF-3 until T5. **T4–T6 wait on the owner's answers**
+  (legacy flows in R2, migration approval, invoice references). No schema, provider call or
+  deployment.
+
+Prior continuation **2026-10-11 — R2 started (preflight and §21.1 pass 1; no R2 code)**
+on `ccr-e07e3100-0wm8kr` from `0cf210be`, while Codex finishes R1 on
+`fix/qwen-aligned-20261010`. [Owner decision](../../decisions/2026-10-11-r2-start-while-codex-finishes-r1.md),
+[preflight](r2/R2-preflight-2026-10-11.md), [review pass 1](r2/R2-review-pass-1-2026-10-11.md).
+
+- Inventory: one provider client (`server/windcave.ts`); retail token, legacy numbered
+  and invoice checkout completions are all live in UAT; Tap to Pay and refunds are off.
+- Nine baseline defects characterized (RF-1–RF-9), notably: Google Pay completions
+  settle money from the wallet-submit reply's link text; an empty or non-final session
+  query is stored as a final decline; provider links reach the browser unvalidated;
+  raw session IDs and provider error bodies are logged.
+- Pass 1 (author-performed): **Approve R2-T1–T3 only** (injectable client, URL/link
+  validation, strict parser and exact cents; no schema), pending the required second
+  pass. T4–T6 wait on three owner questions (legacy flows in R2, migration approval,
+  invoice references).
+- R1 stays open; this session returns for R1's final review when Codex is done
+  (deferred items in the [review handover](../../HANDOFF-2026-10-11-review-findings-fixes.md)).
+
+Prior continuation **2026-10-11 — independent review of `10f12c8d` and `3720c5f1`,
+and its fixes**: `1bec6b68`, `128b09bb`, `b6100c03` on `ccr-e07e3100-0wm8kr`, based on
+`fix/qwen-aligned-20261010` at `3720c5f1`.
+[Immediate handover](../../HANDOFF-2026-10-11-review-findings-fixes.md),
+[owner direction](../../decisions/2026-10-11-review-findings-fix-owner-direction.md).
+
+- Re-verified `10f12c8d` (client 123 / 1,447, server 186 / 4,573, contrast recomputed)
+  and the claims of `2e96a318` (server/shared unchanged, typecheck, client 124 / 1,458).
+- Fixed: removed the unmounted `merchant-validation` middleware the Qwen
+  "indistinguishable refusals" item edited; React-19-safe `inertWhen` on all nine
+  hand-written `inert` sites (seven added by `2e96a318`) with a widened source guard;
+  86 lockfile URLs moved off Replit's internal mirror. Withdrawn after recheck:
+  tutorial overlay polling cost and evidence JSON size.
+- **Open, escalated to the owner:** `browserZoomFactor()` treats a side panel or
+  docked DevTools as browser zoom (an 800px page in a 1200px window reads 1.5× and
+  becomes desktop instead of tablet; the scaled canvas stops fitting). Not changed.
+- Failing-first guard. Typecheck; client **125 / 1,461**; server **185 / 4,559**;
+  clean `npm ci`; isolated build. Device matrix on the 11 changed surfaces × four
+  contexts: normal **44/44**, `--accessibility` **44/44**, `--tutorial-accessibility`
+  **40/40**, all exit 0.
+- No deployment/provider/payment/database/flag/golden activity. **T10e/T10f/R1,
+  release and the independent implementation review remain open.**
+
+Latest continuation **2026-10-12 — terminal repairs, completed automated followup
+and next-task readiness review**, branch `fix/qwen-aligned-20261010`, base
+`b5730b8aa7f5ebdd224509499a7c11381594e921`. Implementation
+`7b10df91c2fb1c0a7d2527a2357d69388a875d79` was committed and pushed; fresh
+`git ls-remote` verified that exact SHA on `origin/fix/qwen-aligned-20261010`.
+A documentation-only publication record follows it.
+[New immediate handover](../../HANDOFF-2026-10-12-r1-t10-terminal-followup.md).
+[Preflight](r1/R1-T10-terminal-followup-preflight-2026-10-12.md),
+[structural evidence](r1/R1-T10-terminal-followup-browser-summary-2026-10-12.json),
+[implementer reread](r1/R1-T10-terminal-followup-review-2026-10-12.md) and
+[next-task dependency/readiness review](r1/R1-next-phase-readiness-2026-10-12.md).
+
+- Fixed the newly found terminal text/keypad contrast and two backspace names.
+  Actual Enter/Space deletion is proved. Final **15 states / two flows** pass,
+  selected WCAG findings and measured low bounds zero; original incompletes and
+  30 manual candidates remain. Final **126 client suites / 1,461 tests**,
+  typecheck/build and six selected normal/zoom/reduced real-route cells pass.
+- Full quiet reduced tutorials **88/88 cells / 176/176 cases**, exit 0, including
+  the old desktop-short Trades focus-origin failure. Retain the old 87/88 run.
+  The earlier complete normal/zoom and 306-cell reports are historical; do not
+  relabel them as fresh runs on this followup source/build.
+- Corrected synthetic cash-sale and external-banner fixtures, the real quote-close
+  selector and complete-flow screenshot budget. Canonical tier-3 comparisons now
+  render **24/24**, with actual exit 1 solely for pixel differences; no reference,
+  pixel tolerance or individual screenshot timeout changed.
+- Oliver chose **Keep the current feed-under-dock layout**; the
+  [dated decision](../../decisions/2026-10-12-property-feed-under-dock.md) resolves
+  that product question. Five covered property centres remain recorded, not zeroed
+  or added to a new baseline. Dock/keyframe/geometry source is unchanged; the prior
+  isolated dock pass stays explicitly historical.
+- A fresh 15-state before/after packet is ready privately. Color-review and dev
+  hostname questions are pending. Actual iPhone/iPad/Safari/VoiceOver, other visual
+  acceptance and Claude task 7 / stock review remain open. The next available
+  read-only R1 exit/dependency review is completed; it does not approve R2 code.
+- **R1-T10/R1/release remain open.** No deployment, merge, provider/payment/message,
+  DB, migration, flag or golden update. Private artifacts are retained outside Git;
+  preserve the owner's development server and explicit staging exclusions.
+
+Previous checkpoints follow; their immediate task state is historical.
+
+Latest continuation **2026-10-12 — publish completed R1-T10 tasks 2–6 work**,
+branch `fix/qwen-aligned-20261010`, exact base
+`c70018022d19b641ddc7612d79061ddb8aee8a45`. The owner requested commit/push of
+completed work; he deploys on Replit. Implementation
+`95ad8bb63171531414e955bb04e9f493468e88f3` was committed and pushed to
+`origin/fix/qwen-aligned-20261010`; fresh `git ls-remote` verified that exact SHA.
+A documentation-only publication record follows it.
+[Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tasks-2-6.md).
+[Evidence](r1/R1-T10-tasks-2-6-checkpoint-2026-10-11.md),
+[structural report](r1/R1-T10-tasks-2-6-browser-summary-2026-10-11.json),
+[preflight](r1/R1-T10-tasks-2-6-preflight-2026-10-11.md),
+[implementer reread](r1/R1-T10-tasks-2-6-review-2026-10-11.md) and
+[actual-device procedure](../../operations/r1-t10-real-device-acceptance.md).
+
+- Completed bounded contrast/semantics, Analytics focus/reflow, expanded local
+  draft keyboard checks and a bounded dock SVG filter. Frozen candidate 6 client
+  source SHA256 `4cb64b978be8098113e9589ae4c97c53ed9bb3f4c96976939a8679dfb9185857`.
+- **126 client suites / 1,461 tests**, typecheck/build, 36 geometry controls and
+  **306 selected browser cells** pass. Active tutorials: normal 88/88 and native
+  zoom 88/88 pass; reduced motion has 87/88 full cells and one pre-tutorial
+  focus-origin failure, actual exit 1. The exact failed cell passes in isolation;
+  the full-run failure is retained. Full isolated dock phases A–F pass: 29ms goo
+  and 20ms flag-off worst frames, unchanged 32ms limit.
+- A subsequent meaningful control exposed animated text suppression/restoration.
+  The completed conservative guard leaves paint transitions untouched/manual.
+  Final controls and a targeted real-route smoke pass. The report retains the
+  original matrix checker hashes/counts and separately hashes the guarded checks;
+  it does not claim a full guarded-matrix rerun.
+- Strict mobile remains red at five property tap centres. Canonical goldens
+  remain red (11 failed scenarios / 31 rendered comparisons); references and
+  tolerances are unchanged. The complete private review packet has 42 candidate
+  states, strict comparison triples, 20 auth pairs and tested visual alternatives.
+  Owner visual acceptance and the property layout choice remain pending.
+- A later 15-state terminal audit remains red: split-rent contrast, two unnamed
+  backspace keys and additional static-paint contrast defects need followup app
+  repairs. No unfinished palette/keypad change is included in this publication.
+  Actual iPhone/iPad/Safari/VoiceOver and other manual acceptance remain open;
+  no reachable public dev URL or actual-device pass is claimed. Claude owns
+  independent task 7 and the stock hidden-focus review.
+- **Tasks 2–6 / R1-T10 / R1 / release remain open.** No live provider/payment/DB,
+  message, migration, golden update or deployment. Private artifacts remain outside
+  Git; the owner's development server is preserved.
+
+Previous checkpoints follow; their counts and immediate task-state claims are
+historical and are superseded by the checkpoint above.
+
+Historical publication checkpoint: implementation `2e96a318d277856f292d3d93fd848e30eba32a5d` was pushed to `origin/fix/qwen-aligned-20261010` on 2026-10-11. A fresh `git ls-remote` returned that exact SHA. This documentation checkpoint follows the implementation; deployment and the listed manual acceptance gates remain pending.
+
+
+Prior continuation **2026-10-11 — R1-T10e accessibility engineering checkpoint**,
+branch `fix/qwen-aligned-20261010`, exact base
+`10f12c8d9e6a6317b1416fd1a71f4c769e03aa0d`; implementation is the commit containing
+[this handover](../../HANDOFF-2026-10-11-r1-t10-accessibility-completion.md).
+[Evidence](r1/R1-T10e-completion-2026-10-11.md),
+[structural results](r1/R1-T10e-completion-browser-summary-2026-10-11.json),
+[review](r1/R1-T10e-completion-review-2026-10-11.md).
+
+- Captured contrast/target, keyboard/modal/hidden state, native zoom/reflow and
+  reduced-motion corrections. No business API/calculation/schema/provider change.
+- **124 client suites / 1,458 tests; 876 selected browser cells** (204 normal,
+  204 native zoom, 204 reduced; 88 tutorials in each variant) pass. Typecheck,
+  isolated builds and probe controls pass. Preserve adverse checks and the two
+  explicit checker manifests; reduced-only sampler correction has byte-proven
+  normal/zoom reuse and fresh reduced checks. No changed checker during any
+  selected final run; source/build remains frozen.
+- Incomplete contrast/ARIA, experimental semantics, real devices/Safari/AT,
+  owner visuals/goldens and final independent acceptance remain open. The handover
+  identifies the payment-return span and Radix guard candidates concretely.
+  **T10e/T10f/R1/release remain open.** No deployment or live provider/DB activity.
+
+Previous checkpoints follow; their narrower counts/claims are historical.
+
+Latest continuation **2026-10-11 — R1-T10 shared tutorial contrast**, implementation
+`f9ccd53c0777ec0b1e3d858ddf446927f20544c5` on `fix/qwen-aligned-20261010`;
+base `ea6c55379e36b17a971db3bba72165995f5ef7f7` verified published.
+[Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tutorial-contrast.md),
+[evidence](r1/R1-T10e-tutorial-contrast-2026-10-11.md),
+[complete structural report](r1/R1-T10e-tutorial-contrast-browser-summary-2026-10-11.json),
+[preflight/rereads](r1/R1-T10e-tutorial-contrast-preflight-2026-10-11.md),
+[retained failures](r1/R1-T10e-tutorial-contrast-regression-history-2026-10-11.md).
+
+- Reused existing card navy/body colors for small eyebrow/counter text and both
+  focus outlines; only three application CSS declarations change. No geometry,
+  tutorial/business logic or golden baseline change.
+- Failing-first actual CSS and four real-route baseline contexts retained.
+  Typecheck/build, **4 tutorial suites / 27 tests**, four CSS fixtures, four clean
+  settled-helper controls / 13 negative checks and 12 axe controls pass.
+- **204 normal cells** have no non-accessibility faults; **841 requests / 45 routes**.
+  Full-page accessibility remains **76 pass / 128 fail**: contrast 124 cells / 841
+  nodes; target-size 19 cells / 21 nodes. Additional phone Recurring target
+  reproduces on both old and candidate builds, and is retained as an existing issue.
+- Final **88 active tutorial cells / 176 keyboard cases / 382 settled step samples /
+  2,292 shared contrast measurements** pass their bounded checks. Thirty before/after
+  focused-card geometry comparisons match. Active full-page scans improve from
+  **1 pass / 87 fail** to **48 pass / 40 fail**; remaining contrast 40 cells / 226
+  nodes and target-size two cells / four nodes still keep actual exit 1.
+- First full active attempt's one animation/readiness sampling failure is retained.
+  Final sampler waits/measures atomically per control, with the same 10-second bound,
+  no forced focus and no threshold change; all 88 active cells rerun on the identical
+  frozen build. The 204 normal cells use unchanged normal source/evaluator.
+- No deployment/live provider/payment/database/message/flag or golden activity.
+  **T10e/T10f/R1/release, incomplete/manual/zoom/AT/visual and independent review
+  remain open.** Next: identify and review remaining target geometry, then bounded
+  correction; keep broader contrast/manual acceptance gates. Derive publication
+  checkpoint from this handover's commit and recheck the remote branch.
+
+Prior continuation **2026-10-11 — R1-T10 accessibility checkpoint**, implementation
+`0f123cc1d4e93482bdd91d7e09133e73233af0a0` on `fix/qwen-aligned-20261010`.
+[Immediate handover](../../HANDOFF-2026-10-11-r1-t10-accessibility-continuation.md),
+[accessibility evidence](r1/R1-T10e-accessibility-2026-10-11.md),
+[full structural report](r1/R1-T10e-browser-summary-2026-10-11.json),
+[bounded correction rereads](r1/R1-T10e-preflight-2026-10-11.md),
+[retained failures](r1/R1-T10e-regression-history-2026-10-11.md),
+[pending manual checklist](r1/R1-T10e-manual-acceptance-2026-10-11.md).
+
+- Verified the prior tutorial checkpoint was already published, then continued
+  T10e using actual WCAG scans on all real routes plus active tutorial keyboard tests.
+- Fixed tutorial focus return, names/labels and scroll access; the closed retail
+  stack is inert/hidden from AT while preserving its opened actions and boundaries.
+- Final **123 client suites / 1,447 tests**, typecheck and isolated client/server
+  builds pass. Evaluator **12 controls** and invalid mode/selection **seven checks**
+  pass. Preserve the initial evaluator/config/fixture and overloaded test failures.
+- Fresh **204 normal cells**: no route/session/shell/request/geometry/runtime or
+  name/field/link/scroll violation. Accessibility remains **76 pass / 128 fail**:
+  contrast in 124 cells, target-size in 18; incomplete checks remain pending.
+- Fresh **88 active tutorial cells / all 20 keys**: **176/176 keyboard cases pass**,
+  174 real-control returns and two explicit phone NFC document-origin returns.
+  Active full-document accessibility remains **1 pass / 87 fail**, due to contrast
+  and target-size. Every matrix process keeps its actual failing accessibility exit.
+- No deployment, live/provider/payment/database/message/flag or golden-baseline
+  activity. **R1/T10e/T10f and independent implementation review remain open.**
+  Next: concrete contrast/target corrections, incomplete/manual/zoom/AT checks and
+  owner visual acceptance. Derive the evidence checkpoint from this handover's commit
+  and verify the remote branch; source/build/harness hashes are in the evidence.
+
+Prior continuation **2026-10-11 — R1-T10 tutorial continuation on the reviewed
+security-fix branch.** [Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tutorial-continuation.md),
+[tutorial evidence](r1/R1-T10d-tutorials-2026-10-11.md),
+[bounded preflight/correction rereads](r1/R1-T10d-preflight-2026-10-10.md),
+[durable c2 geometry evidence](r1/R1-T10c-2-geometry-2026-10-11.md).
+
+- Added a real-route tutorial mode: all 20 tutorials / 22 surfaces at four device
+  sizes; completion/reload persistence, actual Settings restart/generation reset,
+  targets/spotlights, independent fallback recovery, resize, SPA departure and Back.
+- Corrected observed phone Trades anchors, active/pending responsive startup,
+  device step limits, hidden/stale target geometry, phone quote fallback, phone
+  Settings restart surface, and merchant-stream page departure/restoration.
+- Typecheck and isolated production client/server builds pass. Full quiet client:
+  **121 suites / 1,440 tests**; focused **29 regressions**, tutorial geometry
+  **18 fixtures**, invalid tutorial options/selections **four checks**.
+- Reverified **35 device geometry fixtures**, **23 planted device faults / five
+  controls**, **33 session fixtures**, and a fresh isolated full **dock A–F pass**
+  at unchanged thresholds. The older dock failures remain in history.
+- Final browser runs: **88/88 tutorial cells**, all 20 page keys / 22 surfaces at
+  four contexts; **176 completed/persisted rounds**, **55 fallback recovery pairs**,
+  **176 responsive measurements**, **88 route-exit/Back checks**; **204/204 screen
+  cells**, **840 API requests / 45 registered routes**. Every process exited 0.
+  [Durable per-cell/hash summary](r1/R1-T10d-browser-summary-2026-10-11.json).
+- Implementation committed as `07ccd385a9bf72241a9835e8016d738a1c889df0`.
+  Normal push is authorized; use the new handover's exact Git checks to verify
+  publication after committing its evidence checkpoint. Original 55/88, expanded
+  73/88 and wrapper-probe 86/88 failures, interrupted candidates and first
+  client-suite failures remain retained, including
+  [sanitized original outputs](r1/R1-T10d-regression-history-2026-10-11.md).
+- No migration, production provider, native/real-device check or deployment.
+  **R1-T10 remains open:** final independent implementation review, T10e
+  accessibility and T10f owner/manual acceptance remain. Broader R1 reviews and
+  Apple/provider/native gates remain; R2 is not authorized by this continuation.
+
+Latest continuation **2026-10-10 — interrupted T10c-2/T10c-3 work recovered,
+completed changes committed for the owner's requested push.** Immediate detailed
+handover: [HANDOFF-2026-10-10-r1-t10-commit-and-push](../../HANDOFF-2026-10-10-r1-t10-commit-and-push.md).
+This supersedes the older T10c-2/T10c-3 "not started" descriptions below.
+
+- `ebcba947`: preserve Oliver's phone Transactions swipe layout; covered graph
+  controls become inert/aria-hidden when expanded and restore on collapse. Real
+  drag/focus/geometry checks pass; the dated owner decision is committed.
+- `e0e69b4d`: historical layout fixtures use observed HttpOnly cookie-session
+  startup, strict public optout and tutorial precedence. Protocol/screen probes
+  and a loopback fixture runner are included.
+- Fresh typecheck/build, **118 client suites / 1,427 tests**, **33 fixture checks**,
+  **8 representative screens**, mobile **21 cells** and desktop P0 pass. Fresh
+  real-route device matrix: **204/204 cells**, 840 API requests to 45 registered routes.
+- Full dock rerun has one invalid-flick harness finding (0.15px/ms instead of
+  >0.4px/ms); retain the failure and read the handover for the isolated rerun.
+  Isolated gesture rerun exits 0 at 0.88px/ms; a fresh full A–F green run remains owed.
+  Existing cartographer/browser-data warnings remain visible. No baseline update.
+- No fresh full server suite, PostgreSQL check, migration, production provider,
+  deployment or real-device check. Review remains owed. **R1-T10 stays open:**
+  durable T10c-2 evidence/review, T10d tutorials, T10e accessibility and T10f
+  owner/manual acceptance remain. Push state and resume commands are in the handover.
+
+Latest continuation **2026-10-07 — R1-T10c-1 the device matrix as one gate,
+code-complete `86d5785d`, `8a4a13e2`, `6c553579`**, local, awaiting independent review.
+[Evidence](r1/R1-T10c-1-device-matrix-2026-10-07.md),
+[plan, preflight and completion](../../PLAN-2026-10-06-r1-t10-acceptance-matrix.md),
+[immediate handoff](../../HANDOFF-2026-10-06-r1-t10.md).
+**R1-T10 is not complete: T10c-2 (the measurements), T10c-3 (the old gates), the
+tutorial and accessibility matrices (T10d, T10e) and what only the owner can close (T10f)
+remain.**
+
+- **The old device gates cannot see a signed-in app** since R1-T4 phase E moved sign-in
+  to the session cookie: they still sign in with a token in `localStorage`. A copy of the
+  containment gate run against this tree passes 4 of 20 scenarios, and those four are on
+  the screen "We couldn't check your session". They need a dev server the sandbox cannot
+  reach, so nobody could have seen it. The app itself is not shown broken by this.
+- The new gate (`scripts/verify-r1-t10-device-matrix.ts`) stands this tree's app up in
+  one process, **signs in through the real login page**, and opens the 22 merchant
+  screens and ten pages outside the merchant frame at phone, tablet, desktop and the
+  short desktop: **128 cells, 128 pass**. A cell must show a mark of its own screen, the
+  expected shell, no page error, no console error, no failed request, and only
+  addresses the server registers. 584 requests to 31 routes.
+- **Thirteen planted faults caught**, three controls pass. Red first: on the gate's own
+  commit one cell failed for a real fault, a console error on every draw of the phone's
+  transactions page, fixed in `8a4a13e2` with a client test (6 of 6 planted mistakes
+  caught; the chart's measured box unchanged).
+- **Full client 118 suites / 1,422 tests and full server 180 suites / 4,479 tests pass**
+  on an archived copy of `8a4a13e2`.
+- Also found, not changed: the server answers an API address it does not have with the
+  app's page and a 200 (owner question 7); the phone's trades home has none of its
+  tutorial's own targets (T10d); every page asks replit.com for a dev-banner script
+  (owner question 8).
+- `6c553579` was made by the Replit agent of this session's working tree during a
+  pause; it holds the gate's script as verified and a draft of the evidence, since
+  finished. It is left as it is.
+- No browser but Chromium on this machine; only each screen's first load; property and
+  trades on rows put behind eleven storage reads. No app DB/provider, push or deploy.
+
+**Active next:** T10c-2 (the measurements on the same cells), with what a customer opens
+and the admin area added to the gate. Independent/external gates remain below.
+
+Latest continuation **2026-10-07 — R1-T10b every screen the app renders is on the route
+builder, code-complete `997c28ad` to `7f62a6b0`**, local, awaiting independent review.
+[Evidence](r1/R1-T10b-screens-on-the-builder-2026-10-07.md),
+[plan, what was settled and what it does not show](../../PLAN-2026-10-06-r1-t10-acceptance-matrix.md),
+[immediate handoff](../../HANDOFF-2026-10-06-r1-t10.md).
+**R1-T10 is not complete: the device, tutorial and accessibility matrix (T10c to T10e)
+and what only the owner can close (T10f) remain.**
+
+- Seven batches, each its own commit (Settings; retail; property; trades; the customer's
+  pay, split, checkout and receipt pages; the shell; the admin area): 51 files, **457
+  spelled addresses moved** onto `apiPath`. **No file the app loads spells an API
+  address.** Six of the audit's 463 were never API addresses (the admin area has a page
+  of its own at `/api`).
+- The builder changed once, in batch 1: **it never throws**. A value it cannot use
+  leaves the parameter's own name in the path, which the server refuses as it refused
+  `undefined`. Also new: a value a page may not have yet, `wholeNumber()` for an id that
+  arrives as text, five cache labels. Every cache key keeps its value.
+- The contract test went from 28 tests to 43 and now holds **every source file of the
+  client**, plain JavaScript included, with two named exceptions: 14 files the app never
+  loads (held to the 118 addresses they spell today, and to staying unloaded) and the
+  admin's page address. Two checks were added because a real file needed them: nothing
+  is added to a built address but a query; the first word of a cache key is a GET
+  route's.
+- Each address was placed by a rewrite and then shown, by a proof written apart from it,
+  to be the same address, method and cache key as on the commit before, with nothing
+  else in its file changed: **448 paired, none different**. Nine more were placed by
+  hand and run side by side with what they replaced. The payment helpers were run whole,
+  old beside new: **297 results, none different**.
+- Red first for each batch; **233 of 233 planted mutations caught** across the seven;
+  the proof and the side-by-side run were themselves tried on 104 planted mistakes, all
+  caught in the end (each was tightened once, for a kind of mistake it had missed).
+  Typecheck/build/whitespace and **194 routes / 0 gaps; 266 contracts; 178 browser
+  routes** after every batch; the app's source names 160 of the 178.
+- **Full client 117 suites / 1,420 tests and full server 180 suites pass** on an
+  archived copy of each of the seven commits (the server's tests went from 4,472 to
+  4,479 as the contract test grew).
+- **One existing test changed, on purpose**: `split-payment-view-boundary.test.tsx`, two
+  lines. It read the split page's source for two addresses as they were spelled.
+- No browser was driven (that is T10c). No route, schema, request or behaviour changed.
+  No app DB/provider, push or deploy.
+- For the owner when he wants: fifteen files the app never loads; the evidence lists
+  them. Deleting them is his call.
+
+**Active next:** T10c (the device matrix as one gate). Independent/external gates remain
+below.
+
+Latest continuation **2026-10-06 — R1-T10a one typed spelling for every API address,
+and the sign-in pages on it, code-complete `9f9182e5`**, local, awaiting independent
+review. [Evidence](r1/R1-T10a-route-contract-2026-10-06.md),
+[plan, design and preflight](../../PLAN-2026-10-06-r1-t10-acceptance-matrix.md),
+[immediate handoff](../../HANDOFF-2026-10-06-r1-t10.md).
+**R1-T10 is not complete: the remaining screens (T10b), the device, tutorial and
+accessibility matrix (T10c to T10e) and what only the owner can close (T10f) remain.**
+
+- R1-T10 was read and split into T10a to T10f (the plan above). T10a: a page names a
+  route by its registration and a small builder fills its path
+  (`apiPath("GET /api/merchants/:id/profile", { id })`). The names are
+  `shared/api-routes.ts`, generated with the route policy from the server's own
+  registrations, types only: 178 of the 194 routes, each with the type of every path
+  parameter from the server's own parser. A route the server does not have, a missing
+  parameter, or text where the server reads a whole number does not typecheck; at run
+  time the builder refuses instead of building a wrong address.
+- `server/__tests__/api-route-contract.test.ts` holds the list to the registrations, the
+  builder to every route, every route name in client source to the list (read from the
+  source, so a cast is still caught), each spelled method to its route's, and is the
+  guard: the twelve moved files may no longer spell an API address.
+- Red on `8d6ba483` (the suite cannot load); contract test **28**; **29 spelled addresses
+  became 26 uses of 22 route names**, shown from the commit to be the same addresses; no
+  client test changed; the built client holds exactly the 22 names in use; **37 of 37**
+  planted mutations caught; route suites, contract test and source guards **28 / 1,811**;
+  **full client 117 suites / 1,420 tests** and **full server 180 suites / 4,464 tests pass** on
+  `9f9182e5`. Typecheck/build/whitespace and **194 routes / 0 gaps; 266 contracts; 178
+  browser routes**.
+- No route, schema, address, method or behaviour changed. No app DB/provider, push or
+  deploy.
+
+**Active next:** T10b (the remaining screens onto the builder, in reviewed batches).
+Independent/external gates remain below.
+
+Latest continuation **2026-10-06 — R1-T5e runbooks written; R1-T5's engineering scope
+(T5a to T5e) implemented**, local, awaiting independent review and the owner's Apple setup.
+[Runbook](../../operations/sign-in-with-apple.md),
+[plan and preflights](../../PLAN-2026-10-04-r1-t5-sign-in-with-apple.md),
+[immediate handoff](../../HANDOFF-2026-10-06-r1-t5.md).
+**R1-T5 is not closed.**
+
+- Documentation only: what the owner sets up at Apple, the settings, the eight checks to
+  make on a real iPhone before it is called live, every message and its meaning, rotating
+  the key, why the Services ID must never change, and the design for revoking Apple's
+  grant when an account is closed (A-T6). Written against the code; nothing in it was
+  done against a real Apple account.
+- Owed for R1-T5: independent review of T5a to T5e; the owner's Services ID, key and team
+  ID; the iPhone checks, recorded; his look at the button and the Settings row.
+
+**Active next:** R1-T10 (typed route constants, then the device, tutorial and
+accessibility matrix). Independent/external gates remain below.
+
+Latest continuation **2026-10-06 — R1-T5d the Apple button and the Settings row
+code-complete `3e5db51d`**, local, awaiting independent review.
+[Evidence](r1/R1-T5d-apple-screens-2026-10-06.md),
+[plan and preflights](../../PLAN-2026-10-04-r1-t5-sign-in-with-apple.md),
+[immediate handoff](../../HANDOFF-2026-10-06-r1-t5.md).
+**R1-T5 is not complete: the runbooks (T5e) and the owner's Apple setup and iPhone check
+remain.**
+
+- `GET /api/auth/apple/available` (one boolean: all four Apple settings and an https
+  origin). The login page asks it and shows "Continue with Apple" only on a yes, directly
+  under Google's and the same size; until Apple is set up the page is as it was. Apple's
+  return is redeemed by POST as Google's is. The owner's "Sign in with Apple" row is in
+  Settings (Account) on the phone and on tablet and desktop, from one shared piece: the
+  current password, one button, leaving only for Apple's own page; a return says how it
+  went by one of eight fixed words, and "connected" only when the server agrees.
+- Red on `d86d6f11` (5 server assertions; the 5 new client suites could not load; 1
+  changed test); server focused **60**; client **117 new tests**; route suites and
+  neighbours **32 / 1,881**; **a real browser on the real routes with a stand-in Apple:
+  83 of 83 checks at phone, tablet and desktop**; **81 of 81** planted mutations caught;
+  **full client 117 suites / 1,420 tests** and **full server 179 suites / 4,436 tests pass** on
+  `3e5db51d`. Typecheck/build/whitespace and **194 routes / 0 gaps; 266 contracts**.
+- One existing test moved on purpose (the login page's request count).
+- No real Apple account, key, endpoint or device. No app DB/provider, push or deploy.
+
+**Active next:** T5e (runbooks); R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-06 — R1-T5c connecting Apple from a signed-in owner
+code-complete `3520df77`**, local, awaiting independent review.
+[Evidence](r1/R1-T5c-apple-connect-2026-10-06.md),
+[plan and preflights](../../PLAN-2026-10-04-r1-t5-sign-in-with-apple.md),
+[immediate handoff](../../HANDOFF-2026-10-06-r1-t5.md).
+**R1-T5 is not complete: no screen leads to these routes yet.**
+
+- The session of 2026-10-04 stopped mid-step with T5c's tests, storage and connect
+  cookie uncommitted and no route. That tree was treated as an unverified draft and
+  re-proved; one thing in it was changed (the cookie's login id: at most ten digits).
+- `POST /api/auth/apple/connect` (the owner's current password, counted with
+  change-password's; a starting cookie naming the login and the session under a key of
+  its own), Apple's return through the one callback (**who is connected is the cookie's,
+  never the post's**; the session must still stand and still be that owner's before
+  Apple is asked and again before the write; a linked identity is never moved, a login
+  has one), `GET /api/auth/apple/connection` and `POST /api/auth/apple/disconnect`.
+  Sign-in's path through the callback is unchanged. No migration, no client change.
+- Red **93 of 95** new tests on `3cf92efa` (two test T5b's untested per-address limit and
+  pass there by design); focused **100 pass**; route suites **25 / 1,740**; affected **86
+  suites / 2,891 pass**; fresh actual PostgreSQL **13 pass**, races included (T5b's 10
+  again); **117 of 117** planted mutations caught after one weak test was tightened;
+  **full server 179 suites / 4,432 tests pass** on `3520df77`. Typecheck/build/whitespace and
+  **193 routes / 0 gaps; 266 contracts**.
+- No real Apple account, key, endpoint or device. No app DB/provider, push or deploy.
+- Correction to the whole-plan count: the master list below has **61** rows, not 44; the
+  2026-10-04 count left out the 17-item Xero track. 23 done or awaiting only review, 2
+  in progress, 36 not started.
+
+**Active next:** T5d (the login button, the handoff, the Settings row, a browser check),
+T5e (runbooks); R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-04 — R1-T5b Apple identities and sign-in code-complete
+`0a12124a`**, local, awaiting independent review.
+[Evidence](r1/R1-T5b-apple-identities-and-sign-in-2026-10-04.md),
+[plan and preflights](../../PLAN-2026-10-04-r1-t5-sign-in-with-apple.md).
+**R1-T5 is not complete: no screen leads to these routes yet.**
+
+- `GET /api/auth/apple`, `POST /api/auth/apple/callback` (Apple's form post, admitted
+  only from Apple's exact origin) and `POST /api/auth/apple/session`. A state and
+  nonce bound to the browser by a signed `SameSite=None` cookie, ten minutes, taken up
+  once; the session handed over by a one-time code, never in an address. By Apple's
+  stable subject: known signs in; unknown with an unused verified email makes a
+  business, owner login and linked identity in one transaction; **unknown with an
+  email that already has a login gets no session and no link** (pending).
+- Migration **0033** (`apple_identities`, additive) applied to no application
+  database. Convergence rehearsed: 35 applied, 0 pending; recorded fingerprint moved.
+- Also this session, at the owner's request: `UPLOAD_SCANNER=simulation` for
+  development only in `.replit` (`5019ee43`). The development migrations could not be
+  applied from the session: the safety check refuses any connection to that database.
+- Red **43 of 43** on `71b4fe18`; route suites **25 / 1,709**; affected **73 suites /
+  2,603 pass**; fresh actual PostgreSQL **10 pass**; **44 of 44** planted mutations
+  caught after one weak test was tightened; **full server 175 suites / 4,307 pass** on
+  `0a12124a`. Typecheck/build/whitespace and **190 routes / 0 gaps; 263 contracts**.
+- No real Apple account, key, endpoint or device. No app DB/provider, push or deploy.
+
+**Active next:** T5c (connecting Apple from a signed-in owner's session; starting
+facts in the plan), T5d (the screens), T5e (runbooks); R1-T10. Independent/external
+gates remain below.
+
+Latest continuation **2026-10-04 — R1-T5a Apple's token boundary code-complete
+`8b026aa7` (+ harness fix `01e22c4b`)**, local, awaiting independent review.
+[Evidence](r1/R1-T5a-apple-token-boundary-2026-10-04.md),
+[plan and preflight](../../PLAN-2026-10-04-r1-t5-sign-in-with-apple.md),
+[immediate handoff](../../HANDOFF-2026-10-04-r1-t7-s6.md).
+**R1-T5 is not complete: nobody can sign in with Apple yet.** Owner decision
+2026-09-29 (answer 2) governs.
+
+- `server/apple-sign-in.ts`: the five-minute ES256 client secret, the code exchange,
+  and identity-token verification (RS256 only, a key Apple publishes, issuer, the
+  Services ID as the only audience, expiry, issue time, the browser's nonce, a
+  subject), with Apple's keys cached and refetched at most once a minute. The
+  network is a parameter; every failure is no identity. Configuration: four
+  `APPLE_*` settings, all or none, an EC P-256 key, the public origin required.
+  No route, schema, client or dependency change.
+- The suite could not load on `7c6f0f69`; **49 pass**; related **11 suites / 274**;
+  **36 of 36** planted mutations caught after two weak tests were tightened. The
+  first full server run failed one test (the harness's provider-secret guard);
+  fixed in `01e22c4b`; **full server 171 suites / 4,259 pass** on it.
+- No real Apple account, key, endpoint or device. No app DB/provider, migration,
+  push or deploy.
+
+**Active next:** T5b (the identity table, Apple's form-post callback, the session
+handoff, a new business on first sign-in, no joining by email), then T5c–T5e;
+R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-04 — S6b the two scheduled upload passes code-complete
+`382de840`; S6 (a, b) and R1-T7's engineering scope (S0–S6) implemented**, local,
+awaiting independent review. [Evidence](r1/R1-T7-S6b-upload-passes-2026-10-04.md),
+[immediate handoff](../../HANDOFF-2026-10-04-r1-t7-s6.md).
+Owner decisions 2026-09-29 (answers 3 and 4) govern.
+
+- At the end of each scheduler run, isolated like every other pass: documents with
+  no scan on record get their verdict, five per run (clean readable again; infected
+  recorded, logged and kept unreadable; no verdict stops the pass and records
+  nothing), and a document uploaded more than 12 calendar months ago that no
+  property invoice, trades quote or trades invoice names, in any form of its
+  address, is deleted. Never a logo or an attached document. The deletion takes the
+  attach's own row lock, so the two serialize either way round.
+- Red on `910c89b1`: 20 storage tests, a suite that could not load, and the pin.
+  Affected **102 suites / 3,115 pass**; fresh actual PostgreSQL **13 pass**; **47 of
+  47** planted mutations caught on the final code; **full server 170 suites / 4,210
+  pass** on `382de840`. Typecheck/build/whitespace and **187 routes / 0 gaps; 260
+  contracts**.
+- ClamAV was not available here: the passes ran against the stand-in scanner. No app
+  DB/provider, live migration, client change, push or deploy.
+- **Owner actions, unchanged from S6a:** ClamAV with `CLAMAV_HOST` (or, in
+  development only, `UPLOAD_SCANNER=simulation`); apply `0032` with `0030`/`0031`;
+  then the scheduler's runs restore earlier documents.
+
+**Active next:** R1-T5 Sign in with Apple (server and app side with stand-ins; its
+§21.1 preflight first) and R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-04 — S6a a clean scan on record code-complete
+`34faf453`**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S6a-upload-scans-2026-10-04.md),
+[S6 preflights](../../PLAN-2026-10-04-r1-t7-s6-uploads.md),
+[operations note](../../operations/upload-scanning.md).
+Owner decision 2026-09-29 (answer 3) governs; finish-R1 authorization persists.
+
+- An uploaded invoice document is scanned before anything is stored (ClamAV's
+  INSTREAM; `server/malware-scanner.ts`): clean stores the file and its verdict in
+  one transaction; blocked is 400 and nothing stored; no scanner, a fault, a timeout
+  or a non-verdict is 503 and nothing stored. Every reader and every attach requires
+  a clean verdict in its own query. Documents from before this have none, so they
+  are unreadable until S6b's pass. The stand-in scanner is development and tests
+  only, refused by configuration in staging and production.
+- Migration **0032** (`uploaded_file_scans`, additive) applied to no application
+  database. Convergence rehearsed as CI runs it: 34 applied, 0 pending; recorded
+  fingerprint moved (1 table, 5 columns, 4 constraints, 1 index added).
+- Red on `d1eb5fb4`: two suites could not load, 24 storage and 12 configuration
+  tests and both pins failed. Affected **103 suites / 3,314 pass**; fresh actual
+  PostgreSQL **14 pass** (it found and closed a stale-verdict gap before commit);
+  **47 of 47** planted mutations caught; **full server 168 suites / 4,171 pass** on
+  `34faf453`. Typecheck/build/whitespace and **187 routes / 0 gaps; 257 contracts**.
+- The gap-13 verifier is 12 pass / 2 fail, identical on the base: the two shell out
+  to the `tsx` command, which the sandbox refuses.
+- **Owner actions this creates:** run ClamAV where the app runs and set
+  `CLAMAV_HOST`; apply 0032 with the other pending development migrations; in
+  development without ClamAV, `UPLOAD_SCANNER=simulation`. Until then document
+  upload answers 503 there.
+- ClamAV was not available here: its protocol is tested against a loopback stand-in.
+  No app DB/provider, live migration, client change, push or deploy.
+
+**Active next:** S6b the two scheduler passes (preflight and separate reread approve
+it on `34faf453`); then Apple and R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-04 — S5b the stragglers code-complete `587842cb`; S5
+engineering scope (a, b) implemented**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S5b-stragglers-2026-10-04.md),
+[immediate handoff](../../HANDOFF-2026-10-04-r1-t7-s5.md).
+
+- Stock create takes its business as its own argument (the global create retired);
+  the team resend and remove read the login through the business; a property
+  tenant's create, archive and restore commit their history line in the write's
+  transaction; the two push stops name the business, the address and the active
+  state in one statement; the print request reads its board through the business.
+- Two real defects closed: a failed history insert left a tenant made, archived or
+  restored with no history (a retried create made a second tenant); a device
+  re-registered to another business between the stop's read and write was stopped
+  for that business. A database fault while stopping a device is now 500, not 403.
+- The S5 starting query: **41 → 9**, each of the 9 a reviewed exception held by a
+  test with its reason (account scope, per-login push, validated admin, public board
+  branch, the print limit's counter).
+- Red **46 of 52** and three pins on `c294f007`; affected **87 suites / 2,874
+  pass**; fresh actual PostgreSQL **14 pass**, five earlier verifiers rerun; **36 of
+  36** planted mutations caught; **full server 165 suites / 4,107 pass** on
+  `587842cb`. Typecheck/build/whitespace and **187 routes / 0 gaps; 255 contracts**.
+- No app DB/provider, live migration, client/schema change, push or deploy.
+
+**Active next:** S6 the private upload lifecycle (starting facts and the one thing
+the owner should know before it ships are in the handoff); then Apple and R1-T10.
+Independent/external gates remain below.
+
+Latest continuation **2026-10-04 — S5a the business's own settings row code-complete
+`c294f007`**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S5a-merchant-settings-2026-10-04.md),
+[S5 preflights](../../PLAN-2026-10-04-r1-t7-s5-settings.md).
+Picked up from a clean tree at `e836c60a` after a usage-limit stop; nothing was in
+flight. Owner finish-R1 authorization persists.
+
+- The S5 starting query, rerun on the S4c commit: **41** signed-in registrations
+  with a storage call lacking a required business; all 41 handlers read. 26 touch
+  only the business's own row (this batch); 15 are S5b's.
+- Six routes left the general update (which writes any column but the Windcave key)
+  for `updateMerchantSettings`: each purpose writes its own columns, never another's
+  or the row's identity, sign-in, status, credential, billing or branding columns;
+  storage sets the onboarding flag. The row's own methods are named and guarded by
+  the business; the database's details update is projected. The served-route tests
+  now fail if a business's login is served from another business's row.
+- Red **50 of 64** and the pin on `e836c60a`; affected **76 suites / 2,663 pass**;
+  fresh actual PostgreSQL **18 pass**; **33 of 34** planted mutations caught (one
+  equivalent); **full server 163 suites / 4,053 pass** on `c294f007`.
+  Typecheck/build/whitespace and **187 routes / 0 gaps; 253 contracts** pass.
+- No app DB/provider, live migration, client/schema change, push or deploy.
+
+**Active next:** S5b the stragglers and the closing pin (preflight and separate
+reread approve it on `c294f007`); then S6, Apple and R1-T10. Independent/external
+gates remain below.
+
+Latest continuation **2026-10-04 — S4c trades recurring invoices code-complete
+`df54069e`; S4 engineering scope (a, b1, b2, c) implemented**, local, awaiting
+independent review. [Evidence](r1/R1-T7-S4c-trades-schedules-2026-10-04.md),
+[immediate handoff](../../HANDOFF-2026-10-04-r1-t7-trades.md).
+
+- Create under the client's lock (an archive beside it can no longer leave it live);
+  edit and cancel under client-then-row locks with history; resume from the locked
+  row. All 25 signed-in trades registrations use merchant-required storage (pinned).
+- Red **43 of 43** on `22628b95`; affected **36 suites / 1,833 pass**; fresh actual
+  PostgreSQL **21 pass**; **26 of 26** planted mutations caught after one survivor was
+  fixed by a new test. Typecheck/build and **187 routes / 0 gaps; 252 contracts** pass.
+- **Full server on `df54069e`: 161 suites / 3,988 pass** (read after the documentation
+  commit `19eb6cd7`, which changed no source).
+- No app DB/provider, live migration, client/schema change, push or deploy.
+
+**Active next:** S5 (starting facts in the
+handoff), S6, Apple and R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-04 — S4b2 trades quote, invoice and balance creation and
+delivery code-complete `9b124dea`**, local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S4b2-trades-create-2026-10-03.md),
+[S4 preflights](../../PLAN-2026-10-03-r1-t7-s4-trades.md).
+Owner finish-R1 authorization persists.
+
+- Each create is one scoped storage call: the owned client locked (or the hidden
+  prospect made last), projected input, a server token, a linked quote and an attached
+  document held under share locks, and the row committed with its creation history.
+  The balance is worked out and made under the client's lock, so signed-in sends
+  serialize. Sending uses explicit-business services and one joined read; uncertain
+  post-send outcomes are a fixed 503 with no row. Global quote create and unscoped
+  quote sender retired; the invoice ones kept for the public acceptance and the cron.
+- Red **94 of 94** on `51e0b186` (7 genuine HTTP races); affected **34 suites / 1,788
+  pass**; fresh actual PostgreSQL **34 pass**; **49 of 49** planted mutations caught;
+  **full server 159 suites / 3,942 pass**. Typecheck/build/whitespace and **187 routes
+  / 0 gaps; 250 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or
+  deploy. Disposable PostgreSQL stopped and deleted.
+
+**Active next:** S4c trades recurring invoices (preflight and separate reread approve
+it on `9b124dea`), the last S4 batch; then S5–S6, Apple and R1-T10.
+Independent/external gates remain below.
+
+Latest continuation **2026-10-03 — S4b1 trades invoice state changes, receipts and
+quote PDF code-complete `394da7d6`**, local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S4b1-trades-invoices-2026-10-03.md),
+[S4 preflights](../../PLAN-2026-10-03-r1-t7-s4-trades.md).
+Owner finish-R1 authorization persists.
+
+- Quote and invoice reads/lists need the row and its current client; void, external
+  payment and job complete lock the owned client then the invoice, recheck state and
+  commit fixed fields with history; the signed-in PDF and the external-payment
+  receipt use one joined row/owned-client read; the receipt's history is scoped.
+  The global invoice, quote, client and event methods stay for the public, checkout,
+  provider, WhatsApp and cron lanes and, until S4b2, authenticated creation/sending.
+- Red **51 of 51** on `c0fb5bc3` (11 genuine HTTP races, a foreign client printed in
+  the PDF); affected **31 suites / 1,693 pass**; fresh actual PostgreSQL **27 pass**;
+  **28 of 28** planted mutations caught; the payment lane's receipt byte-identical
+  across the extraction; **full server 156 suites / 3,847 pass**.
+  Typecheck/build/whitespace and **187 routes / 0 gaps; 246 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or
+  deploy. Disposable PostgreSQL stopped and deleted.
+
+**Active next:** S4b2 authenticated quote/invoice/balance creation and delivery
+(preflight and separate reread approve it on `394da7d6`), S4c schedules; S5–S6, Apple
+and R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-03 — S4a trades clients code-complete `22c6dc9c`**,
+local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S4a-trades-clients-2026-10-03.md),
+[S4 preflights](../../PLAN-2026-10-03-r1-t7-s4-trades.md).
+Picked up from the preceding session's uncommitted, unverified draft: its logs and
+disposable PostgreSQL were gone, so the draft was reread and every check repeated
+before commit. Owner finish-R1 authorization persists.
+
+- Seven merchant-required client contracts (create, read, update, archive, restore,
+  promote, history); runtime field projection; atomic same-business archive cascade
+  with its history; no restart on restore; promotion under a row lock. Five global
+  client mutators/history reader retired; the global profile read kept for the
+  public, checkout, PDF, delivery and provider lanes until S4b.
+- Red replayed on `c5260cc1`: **23 of 23 fail** (17 storage, 6 genuine HTTP races).
+  Affected **28 suites / 1,641 pass**; fresh actual PostgreSQL **16 pass**; **16 of
+  16** planted storage mutations caught; **full server 153 suites / 3,795 pass**.
+  Typecheck/build/whitespace and **187 routes / 0 gaps; 239 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or
+  deploy. Disposable PostgreSQL stopped and deleted.
+
+**Active next:** S4b1 trades quote/invoice reads, signed-in PDF and manual state
+changes (preflight and separate reread approve it on `22c6dc9c`), S4b2 creation and
+delivery, S4c schedules; S5–S6, Apple and R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-03 — S3c2 property creation/delivery code-complete
+`1b80cb8d`**, local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S3c2-property-invoice-send-2026-10-03.md).
+S3a/b/c1/c2 engineering scopes are implemented; S3/R1-T7/R1 are not independently closed.
+Owner finish-R1 authorization persists.
+
+- Atomic scoped create/reuse and creation history; attached document recheck under
+  share lock; explicit merchant manual delivery from a joined owned snapshot;
+  scoped locked delivery record/history; uncertainty is fixed 503 with no invoice DTO.
+  Unused global live lookup and unscoped manual resend retired; cron/provider kept.
+- Red **14 storage / 13 service / 3 HTTP fail**; affected **20 suites / 562 pass**;
+  fresh actual PostgreSQL **24 pass**; **full server 151 suites / 3,771 pass**.
+  Final typecheck/build/whitespace and **187 routes / 0 gaps; 237 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or deploy.
+  Disposable PG continues only for active S4 verification; stop before handoff.
+
+**Active next:** S4a trades clients/history (reviewed decomposition), S4b quote/invoice
+and S4c schedules; S5–S6, Apple and R1-T10. Independent/external gates remain below.
+
+Latest continuation **2026-10-03 — S3c1 property invoice reads/settlement code-complete
+`ff237d24`**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S3c1-property-invoices-2026-10-03.md),
+[preflight/separate reread](../../PLAN-2026-10-03-r1-t7-s3-property.md).
+Owner's finish-R1 authorization persists; continue without routine permission questions.
+
+- Invoice reads/list enrichment require current parent and invoice tenant. Void and
+  external-payment records lock parent then child, recheck current state/identity,
+  and commit fixed changes with history. Archived issued invoices stay payable.
+- Red first **14 storage + 7 HTTP fail**; final affected **17 suites / 528 pass**;
+  fresh actual PostgreSQL **18 pass**, including real rollback and waited races.
+  Typecheck/build/whitespace pass; **187 routes / 0 gaps; 235 contracts**.
+- No app DB/provider, live migration, schema/client, enablement, push or deploy.
+  Disposable PG stays running only for the next c2 verification; stop before handoff.
+
+**Active next:** S3c2 property creation/reuse and scoped authenticated delivery;
+then S4–S6, Apple and R1-T10. S3c1 does not close S3/R1-T7/R1. Independent reviews,
+existing owner decisions and external gates below remain in force.
+
+Latest continuation **2026-10-03 — S3b property schedules code-complete `17a9f71d`**,
+local, awaiting independent review. [Evidence](r1/R1-T7-S3b-property-schedules-2026-10-03.md),
+[S3 preflight/separate reread](../../PLAN-2026-10-03-r1-t7-s3-property.md).
+Owner direction to finish all R1 work without routine permission questions persists.
+
+- Replacement and creation/termination history now commit together under the owned
+  parent's lock. Scoped reads and parent-then-child mutations recheck ownership/state;
+  resume derives its next date from the current locked cycle. Three global contracts
+  retired; public checkout and cron lanes preserved; runtime fields projected.
+- Independently reverified S3a **78 tests + 9 actual PostgreSQL checks**. Red first:
+  storage **17 fail**, corrected committed-base HTTP replay **8 fail**. Final affected
+  **14 suites / 419 pass**, fresh actual PostgreSQL **17 pass**, typecheck/build and
+  whitespace pass. Inventories **187 routes / 0 gaps; 232 contracts**.
+- No application DB/provider, live migration, schema/client change, push or deploy.
+  Disposable PostgreSQL stays running only for S3c in this turn; stop before handoff.
+  No new full-server/client/browser run is claimed.
+
+**Active next:** S3c property invoices and scoped authenticated delivery; S4 trades,
+S5 settings/exports, S6 upload lifecycle, Apple implementation and R1-T10 acceptance.
+S3b does not close S3/R1-T7/R1. Independent review and existing external gates remain.
+
+Latest continuation **2026-10-03 — S3a property profiles code-complete `8e7f315f`**,
+local, awaiting independent review. [Evidence](r1/R1-T7-S3a-property-profiles-2026-10-03.md),
+[S3 plan/preflight](../../PLAN-2026-10-03-r1-t7-s3-property.md).
+Owner instruction to finish all R1 work without routine permission questions persists.
+
+- Six merchant-required contracts, narrow create/update projection, scoped read/write
+  predicates, atomic same-tenant archive cascade, no resumed schedules on restore,
+  and event/current-parent scoped history. Retired four global profile mutations.
+- Red first: storage 15 fail; corrected/replayed actual HTTP base 4 fail. Final
+  focused 19 pass; affected **10 suites / 227 pass**; actual PostgreSQL **9 pass**
+  including real rollback and all three waited ownership races; final inventory
+  **33 pass**; typecheck/build/whitespace pass. **187 routes / 0 gaps; 231 methods**.
+- Instance DB used for real profile reads; memory remains DB-only. No client/schema,
+  application DB/provider, live migration, capability enablement, push or deployment.
+  Disposable PostgreSQL is stopped. No full-server rerun claimed for this slice.
+
+**Active next:** S3b property schedules (atomic create/replacement and scoped mutations),
+S3c invoices/scoped delivery; then S4 trades, S5 settings/exports, S6 upload lifecycle,
+Apple implementation and R1-T10 acceptance. This is still active finish-R1 work,
+not authorization to mark R1 complete from a batch. Existing owner decisions and
+external/device/provider gates below remain in force.
+
+Latest continuation **2026-10-03 — R1-T7 S2 engineering scope implemented**:
+S2a `ea4759cf`, S2b1 `42792fd8`, S2b2 `cb8a61cf`, all local, independent review
+still owed. [Refund evidence](r1/R1-T7-S2b-refund-writes-2026-10-03.md),
+[creation evidence](r1/R1-T7-S2b2-transaction-creation-2026-10-03.md).
+Owner explicitly directed finishing all R1 work without routine permission questions;
+[dated authorization](../../decisions/2026-10-03-finish-r1-general-authorization.md).
+
+- Refund reservation/release/creation/status now require tenant at the write;
+  parent-locked creation/status; false-success/foreign-compensation races refuse
+  with reconciliation-required 503. Retired unused globally keyed refund mutators.
+- Sale creation checks active owned board under a lock through insert and uses
+  explicit merchant scope. Retail/API-key token minting unchanged; cash defaults
+  preserved. Disabled native reads/writes scoped, stale-success fallback removed.
+- Tests failed first for both batches. Latest affected **12 suites / 268 pass**,
+  real PostgreSQL **25 pass**, typecheck/build/whitespace and inventories pass
+  (**187 routes / 0 unclassified / 0 gaps; 229 methods**). Prior S2b1 focused 19
+  and policy/inventory 31 pass; no new full-server claim.
+- Disposable PostgreSQL stopped; no application database, live migration/provider,
+  UI change, feature enablement, push or deployment.
+
+**Next in active finish-R1 work:** S3 property, S4 trades, S5 settings/exports,
+S6 private upload/scanner/download/retention lifecycle, Apple implementation and
+R1-T10 typed-route/device/tutorial/accessibility acceptance. Existing September 29
+decisions already authorize Apple with stand-ins, ClamAV and 12-month orphan cleanup;
+do not ask those questions again. Real provisioning/device and independent review
+evidence cannot be inferred from code or stand-in tests. R3/R4 enablement gates,
+Keychain A-T4 assignment and owner development 0030/0031 actions remain explicit.
+
+Latest continuation **2026-10-03 — R1-T7 S2a is code-complete: `ea4759cf`, local,
+awaiting independent review** ([evidence](r1/R1-T7-S2a-transactions-refunds-2026-10-03.md),
+[immediate handoff](../../HANDOFF-2026-10-03-r1-t7-transactions.md),
+[preflight](../../PLAN-2026-10-03-r1-t7-s2-transactions-refunds.md),
+[R1 exit assessment](r1/R1-exit-assessment-2026-10-03.md)). Recovered the timeout's
+uncommitted implementation from Git; historical temporary logs did not survive.
+
+- Explicit merchant transaction/refund readers in both storage implementations;
+  refunds require matching refund AND parent ownership. Cancellation locks and
+  rechecks tenant and pending/processing state, and broadcasts only the persisted row.
+  Four registrations migrated; current owner/member/admin/status/DTO policy preserved.
+- Prior session recorded red first **37 fail / 3 pass**, full server **138 suites /
+  3,631 tests pass**, and independent S1 PostgreSQL **10 pass**. These historical
+  counts were not repeated in the recovery; no new full-server claim is made.
+- Recovery independently reread the code/tests/verifier and repeated focused
+  **3 suites / 44 pass**, affected route/payment **11 suites / 372 pass**, actual
+  fresh isolated PostgreSQL **14 pass**, typecheck, build and whitespace.
+  Inventories regenerated: **187 routes / 0 unclassified / 0 gaps; 227 methods**.
+- No application database, provider, live migration, UI change, push or deployment.
+  Disposable PostgreSQL stopped. Only exact reviewed paths staged.
+
+**Next:** S2b scoped authenticated refund writes and transaction creation/board
+association, with preflight/separate reread and failing tests first; then S3–S6.
+S2a does not close S2 or R1-T7. Independent reviews, R1-T5 Apple and R1-T10 remain
+open. R3 gap-11 C2–C5, R4 durable refunds/unknown outcomes, S6 provider/scanner/
+retention decisions, Keychain A-T4 and owner development 0030/0031 actions retain
+their recorded gates. Production remains closed.
+
+Latest continuation **2026-10-02 — R1-T7 S0/S1 is code-complete: `47fdab71`, local,
+awaiting independent review** ([evidence and review brief](r1/R1-T7-S1-stock-board-storage-2026-10-02.md),
+[immediate handoff](../../HANDOFF-2026-10-02-r1-t7-storage.md),
+[batch plan/preflight](../../PLAN-2026-10-02-r1-t7-tenant-storage.md)). The owner asked to commit and
+continue; E3 and its documentation were already committed (`8d5bad38`, `bc5eba3c`). Re-verified
+the relevant base behavior: 4 suites / 84 tests pass, then moved into the tenant-storage remainder.
+
+- S0 inventory covers all 187 routes and 225 storage methods (217 declared + 8 inherited), including
+  authentication middleware in its count. This is a structural audit, not whole-task closure.
+- S1 stock/board management: seven explicit-merchant operations in both storage implementations;
+  reads and writes constrain record id AND merchant id. Narrow runtime patches protect ownership,
+  identity and metadata. Five routes migrated; role/status/validation/soft-delete behavior preserved.
+- Failing tests first: 33 fail / 6 pass. Actual PostgreSQL found an oversized-ID boundary issue;
+  seven new SQL checks failed before correction. Final focused **40 pass**, real PostgreSQL **10 pass**,
+  including all five concurrent-write refusals. **Full server: 136 suites / 3,590 tests pass**;
+  final generated-inventory checks 26 pass; typecheck, build and whitespace pass.
+- No application database/provider action, migration, UI change, push or deployment. The isolated
+  PostgreSQL instance was stopped. The evidence records full-run timing and scope limits.
+
+**Next:** independent review of S1 and the outstanding earlier scopes; S2 transaction/refund storage
+preflight and failing tests, then S3 property, S4 trades, S5 settings/exports and S6 upload lifecycle.
+Gap 11 C2–C5 still needs its R3 schema decision. R1-T5 Apple and R1-T10 gates remain; Keychain stays
+A-T4; development 0030/0031 actions remain with the owner. R1-T7 and the full integration remain open.
+
+Earlier continuation **2026-10-02 — R1-T4 phase E3 is code-complete: `8d5bad38`, local,
+awaiting independent review** ([evidence and review brief](r1/R1-T4-phase-E3-bearer-retired-2026-10-02.md),
+[immediate handoff](../../HANDOFF-2026-10-02-full-integration-continuation.md)). Recovered Claude's
+interrupted E3 test/harness draft on `f1ca29a8`, saved it, and re-verified the actual tree rather than
+historical workflow IDs. E1/E2 and the admin totals fix were already committed; production still
+issued and accepted old account bearer tokens.
+
+- The server now signs account requests in only by the cookie; an old merchant/admin token cannot
+  override it or bypass CSRF. Password/admin/Google/password-change responses hand out no account token.
+  The recovered harness/matrix now uses cookies and explicitly refuses correctly signed old tokens,
+  retaining unchanged-storage and no-external-effect assertions. Added source guard and focused regressions.
+- Red first: recovered server draft 17 suites / 278 tests fail; six focused regressions all fail before
+  production edits. Final client 112/1,303 pass; focused tests/guard 18/18; typecheck/build/whitespace pass.
+  Server full run 132 suites pass / 1 fixture failure, 3,549/3,550 tests; the fixture was corrected and its
+  entire suite rerun, 44/44 pass. No known failure remains; a second full clean run is not claimed.
+- Production-build browser: **50 checks pass**, phone/tablet/desktop; no account credential in storage,
+  URLs, logs or auth bodies, no Authorization header, zero unexplained missing-CSRF app changes.
+  Inventory: 187 registrations / 0 unclassified / 0 suspected gaps. Production client UI unchanged.
+- No dev/production/database/provider action, migration, deployment or push. `0031` in dev remains the
+  owner's recorded action (`0030` also pending in this ledger). Keychain remains assigned to A-T4.
+
+**Next:** independent review of E3 alongside E1/E2 and the external-review/deadlock fixes (older scopes
+below remain owed), then review/decompose R1-T7's tenant-storage/upload remainder. Gap 11's C2–C5
+replay work needs its R3 schema decision. R1-T5 needs real Apple provisioning/device evidence; R1-T10
+remains gated. The full integration plan and R1 exit are not complete.
+
+Previous continuation (2026-09-22, resumed after the 2026-09-21 session hit its usage limit
 mid-push). **This branch's history was cleaned before its first push**
 ([decision](../../decisions/2026-09-22-push-cleaned-branch-history.md),
 [evidence](r1/R1-branch-history-clean-2026-09-22.md)). On 2026-09-21 the owner asked to stop, save
@@ -647,14 +1747,96 @@ The work itself:
   result or any summary; resumed 2026-09-28 from its transcript and scratch logs, its claims re-run, and
   the admin test's resend case strengthened (it read only the reply). Server 119/3,024, client 104/1,156, `tsc` clean.
 
-**Next:** R1-T3's last rows: the allowed callers on the 69 routes with their own gates (sign-in and
-account opening, the public pages and links, provider callbacks, the scheduler, the ecommerce API, the
-WhatsApp webhook); then the matrix recorded in the inventory table (the plan's check; the table does
-not show it yet). **For the owner** (the R1-T3 notes, "Where R1-T3 stands"): (1) the body-token pages'
-400, where P2.2 says 401 (invisible on screen); (2) the platform admin on the four money routes (taking
-a sale, a cash sale, Tap to Pay, cancelling): refuse (403) or keep.
+- **R1-T3 batches (k)–(r) (2026-09-29): `9eaafe30`, `af9439d5`, `a8308e12`, `e5812030`, `b0500c5d`,
+  `d6be3369`, `2133d1fd`, `b191d600`; the branch was pushed through `b0500c5d` at 08:33 UTC, the rest is
+  local; awaiting independent review. R1-T3 is code-complete**
+  ([working notes](r1/WORKING-2026-09-27-r1-t3.md), "Where R1-T3 stands (2026-09-29)"). Resumed from the
+  2026-09-28 session, which stopped right after its
+  docs commit (`cb878aea`) without its summary; its final checks were read from its logs first.
+  - **The allowed callers succeed on the 69 routes with their own gates** (75 cases): sign-in and account
+    opening (12), the public pages and a board's pages (18), a retail sale's customer (19), an invoice's
+    payer and a quote's customer (10), the provider's calls, the scheduler and the ecommerce API (10). The
+    matrix now records who each serves (anyone, a link's holder, the provider, the scheduler, an API key),
+    and the two board routes a business also reads signed in. With (f)–(j): all 184 routes, 291 cases,
+    each a real request with the success status and what the success did.
+  - **The matrix is recorded in the inventory table** (the plan's check): each route's row shows who it
+    serves and each refused caller's status; a test holds the table to the matrix, and a route serving a
+    caller that no served test holds fails.
+  - **Fixed:** a board's page answered 403 for another business's board or a missing one, where the
+    board's stream, brand and QR answer 404 (P2.2's tenant-safe answer; invisible on screen). **Pinned:**
+    a provider's call naming a session, state or message that is no one's is acknowledged and changes
+    nothing (held by a test only for rent and trades before).
+  - Mutations 18/18, 25/26, 21/21, 19/19, 17/18, 6/7, 6/6, 7/7; each miss explained in the notes (two
+    breakages that changed nothing, replaced; one test weakness, fixed). At `b191d600`: server 125/3,137,
+    client 104/1,156 (no client file changed after `d6be3369`), `tsc` clean.
+
+- **R1-T4 phase E1, the server side of the session rebuild (2026-09-30): `9e993da2`, then the mutation
+  check's tests and this evidence; local, awaiting independent review**
+  ([evidence](r1/R1-T4-phase-E1-sessions-server-2026-09-30.md),
+  [working notes](r1/WORKING-2026-09-30-r1-t4-phase-e.md)). A sign-in is a session the server keeps
+  (`auth_sessions`, 0031): an HttpOnly `__Host-` cookie, 1 day unused / 7 days (the admin's 30 minutes /
+  12 hours), a daily secret swap with reuse detection, a CSRF token on every change, Log Out per session, and
+  every sign-out path recording its ends. Changes from other websites are refused before any route; CORS names
+  only the site's origin. The token keeps working beside the cookie until E3. Red first 44 of 56; mutations
+  34/34 (three first misses closed with tests); server 127/3,216; PostgreSQL verifier 34/34; CI's
+  empty-database rehearsal 33/0/0/0 and the fingerprint re-recorded (0031 only). **Owner action: apply 0031
+  (and 0030) to dev**; until then dev sign-in fails once the dev server runs this code.
+
+- **The external review's R1 fixes, on this branch (2026-10-01): `d9382672`, and a deadlock its checks found,
+  `bc9f37ff`; local, awaiting independent review**
+  ([evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md),
+  [owner direction](../../decisions/2026-10-01-r1-review-patch-on-this-branch-owner-direction.md),
+  [working notes](r1/WORKING-2026-10-01-r1-review-fixes.md)). The owner's patch from an external review of
+  `b0500c5d` (R1-T1/T2/T3/T4/T8/T9) was on GitHub, applied unchanged by a cloud session as `ce4473df` on
+  `claude/trusting-cannon-l7wb6n` ([its handoff](r1/R1-review-fixes-2026-09-29.md)). Applied verbatim here
+  its own tests pass and a stream opened with a session cookie gets no check, so each fix was carried onto
+  phase E's sessions: a signed-in stream's sign-in is read again before each event and every five seconds
+  (a cookie's by its session id, with nothing written), a device is registered only under the login's
+  current session version, the Google start cookie is signed and taken up once, the route inventory covers
+  every method, refusals are checked for effects besides storage, and the test guard reads a request's
+  destination before a proxy can take it. Red first 44 of 76 (the patch verbatim leaves 20 of 28 failing);
+  mutations 39 of 40 (one changes nothing); server 130/3,278; PostgreSQL 16 verifier 40/40, six new.
+  **Found by running the review's race on real PostgreSQL, and fixed:** logins of one business ended at
+  the same moment could deadlock over the business's unattributed devices, and the one rolled back kept
+  its devices switched on (3 of 4 runs before; 7 of 7 clean after). In the code since 2026-09-22. **The
+  patch's client half (R1-T9), `9fede25d`**, on phase E2's client: a reply that says OK and is not the data
+  reads as a failed load on the desktop retail pages, desktop settings, and the property and trades lists
+  and settings; client 111/1,291, mutations 27 of 28 (one changes nothing). For the release: one count-only
+  check in production for sales with no date, which would refuse a business's whole sales list.
+
+- **R1-T4 phase E2, the app on the session cookie (2026-10-01): `2611e80e`; local, awaiting independent
+  review** ([evidence](r1/R1-T4-phase-E2-client-2026-10-01.md),
+  [working notes](r1/WORKING-2026-09-30-r1-t4-phase-e.md)). Resumed from the 2026-09-30 session, which had
+  stopped mid-step (09:57 UTC, no summary) with the client an uncommitted draft; the draft was saved, then
+  re-read. The page keeps nothing of its sign-in in storage: who is signed in and the page's CSRF token
+  come from the start-up check and are held in memory; every call goes with the cookie, a change carries
+  the token, and no `Authorization` header is sent. Found on re-reading and fixed: the terminal's read of
+  its current sale would have been answered 410 (the route knew only the token; red first 2 of 4); a Log
+  Out made while the server is unreachable would have been undone by the next load (the sign-out is now
+  marked as begun and finished by that load); an answer arriving after its check was cancelled was still
+  held; with only the admin signed in a change on a business route carried no token; three unrouted Logout
+  buttons signed no one out. Client 109/1,222, server 130/3,278, `tsc` and the build clean; mutations 53 of
+  53 (first run 49 of 51); **a real browser on the production build, 43 checks, three clean runs**
+  (`scripts/verify-r1-t4-sessions-browser.ts`): no `Authorization` header in 720 requests, no credential in
+  any address, in storage or in the request log, another site's fetch and form post refused.
+
+**Current next (2026-10-02):** independent review of R1-T4 E1/E2/E3 and the other owed scopes, then
+R1-T7's remainder (tenant-scoped storage across every domain and upload lifecycle; gap 11's replay,
+C2–C5, needs an R3 schema decision). Phase E's web rebuild is now code-complete; Keychain is assigned
+to A-T4 by owner decision. **R1-T3's three owner questions were answered the same day** ("keep 400, 2. leave it.
+3. block it."; [decision](../../decisions/2026-09-29-r1-t3-owner-answers.md), `6a7db213`), and 3 is built
+(`c8055341`: a removed board's page no longer shows its open sale; the matrix's new caller
+`removed-board`; red first 4 of 4, mutations 4/4).
+**R1-T4 phase E's design** was written and committed (`1d807c6a`, [design](../../PLAN-2026-09-29-r1-t4-phase-e-sessions.md));
+its three questions answered the same day ([decision](../../decisions/2026-09-29-r1-t4-phase-e-owner-answers.md)):
+a business sign-in lasts 1 day without use and 7 days at most; the admin's 30 minutes and 12 hours; the
+Keychain adapter moves to A-T4. **The owner's go came 2026-09-30** ([decision](../../decisions/2026-09-30-r1-t4-phase-e-go-owner-answers.md)):
+build phase E as designed, with two additions (a rotation completes on the new secret's first use; an
+explicit exception list for cross-site callbacks), and fix the admin home page's always-$0 totals. The
+session that recorded the three answers had stopped straight after its commit (`d901adcb`, 19:37 UTC), before
+its reply; the container restarted at 04:51 UTC and dev relaunched on the clean tree at 05:00.
 Found on the way, for the owner: the admin area's home page shows $0 revenue and 0 sales whatever the
-platform holds (it reads a route that does not exist; the R1-T3 notes, "Where R1-T3 stands").
+platform holds (it reads a route that does not exist; the R1-T3 notes, "Where R1-T3 stands" of 2026-09-28).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -662,14 +1844,19 @@ shared no-board sale (count-only check once production is reopened), with
 
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
+- R1-T4 phase E3 (`f1ca29a8..8d5bad38`; [brief](r1/R1-T4-phase-E3-bearer-retired-2026-10-02.md));
+- the external review's fixes on this branch, and the deadlock fix (`cee3cf05..bc9f37ff` and
+  `2611e80e..9fede25d`; [brief](r1/R1-review-fixes-on-phase-E-2026-10-01.md)); R1-T4 phase E1
+  (`4a6ea450..cee3cf05`) and E2 (`1cf5461c..2611e80e`; [brief](r1/R1-T4-phase-E2-client-2026-10-01.md));
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`),
   C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
   (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), batch 5
   (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`), batch 6a
   (`64d2b17f..e6530ab6`), batch 6b (`cd486341..cb24fbd8`), batch 6c (`5659c03e..bdbd6a60`), and batch 6d
   (`9e4d6399..ed7082f0`);
-- the two fixes before R1-T3 (`87c03ff0..996a5c7f`), and R1-T3 so far: its plan and batches (a)–(j)
-  (`48fc96d6..a8f8af19`, each batch with its docs commit);
+- the two fixes before R1-T3 (`87c03ff0..996a5c7f`), and R1-T3, all of it: its plan and batches (a)–(s)
+  (`48fc96d6..c8055341`; (a)–(j) each with its docs commit, (k)–(r) with one docs commit after them, (s) with
+  its owner answers);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
@@ -1614,19 +2801,19 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H3 | Deploy and verify the rotation took | 567 | Owner/professional/provider | **Owner-attested via H2's disposition records (2026-09-12).** This check's own acceptance criterion (old credential rejected) is itself owner-badged in the plan; this session never had visibility into old secret values and does not independently re-test it. Not the same as an agent-verified technical re-check. |
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | **CLOSED 2026-09-14 on owner attestation** — no suspicious access found ([record](../../decisions/2026-09-14-r0-h4-access-log-review-disposition.md)); same caveat as R0-H3, no agent here has hosting/log access to independently re-verify. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | **CLOSED 2026-09-14** — the three tracked `uploads/invoices/` entries (2 dev-fixture PNGs, 1 zero-byte glob artifact) were content-inspected, confirmed unreferenced anywhere in the repo and unreproducible by current code, and `git rm`'d per explicit owner instruction ([record](../../decisions/2026-09-14-r0-h5-tracked-uploads-deletion.md)). The historical "41 tracked, 38 ignored" figure remains unsourced — flagged as an open curiosity, not a known gap. |
-| R1-T1 | No-live-system HTTP test harness | 610 | Engineering | **AUDIT CODE-COMPLETE 2026-09-25 (`05195728`; local), awaiting independent review** ([evidence](r1/R1-T1-harness-audit-2026-09-25.md)): every server test fails if it reaches off the machine (the guard caught two that dialled `192.0.2.1`); the harness builds production's app (`server/app.ts`, shared with `index.ts`); `providerNotification`, `useFakeClock`, `openEventStream`; the public payment bearer is exercised; red first 21 of 24, mutations 30/30, server 81/1,456. Found by it and fixed: live updates never reached a browser (`3fac8ac8`, [evidence](r1/R1-live-updates-compression-2026-09-25.md)). Was: Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof — **unblocked 2026-09-21** (R0 exit established). `165fd605` already made the server harness clear single-key email and SMS credentials. |
-| R1-T2 | Checked-in route policy inventory | 622 | Engineering | **CLOSED 2026-09-27 on the day's code (`2ea74684`), awaiting independent review** ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md), "R1-T2 closed"): 184 registrations inventoried (5 of them ALL), 0 unclassified; a route, method, mounted router or middleware added without policy fails (12/12 breakages caught); 184 of 184 routes reviewed (`server/route-review.ts`: each branch's principals, roles and tenant rule, the capability, entitlement and idempotency, the success DTO and error disclosure; the generated facts carry the storage methods), `PENDING_CEILING` 0. Row brought up to date 2026-09-28: it still read PARTIAL after the closure. Was: PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open), **closed by retirement 2026-09-25** (owner decision; `09df766f..5c2cdb27`, local, awaiting review; [evidence](r1/R1-no-board-rework-2026-09-25.md)): the anonymous no-board feed and read are gone, and the inventory has 0 suspected gaps (223 registrations, 0 unclassified). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
-| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | **IN PROGRESS 2026-09-27/28: the matrix (`server/route-matrix.ts`) and its runtime tests, batches (a)–(j), local, awaiting independent review** ([working notes](r1/WORKING-2026-09-27-r1-t3.md), [owner answers](../../decisions/2026-09-27-r1-t3-owner-answers.md)): every refusal of the two sign-in gates, each with nothing changed (683 cases); the own gates' refusals (48); the role and tenant refusals (38 routes); another business's record answered as a missing one; the page guards on phone, tablet and desktop for every caller (331); the allowed callers served on all 115 gated routes (216). Fixed on the way: sign-in failures 401 (owner decision), the platform admin 403 on 68 business routes, eight state conflicts 409, `/smart-terminal` retired, three sale routes and the numbered Windcave return no longer tell which sale numbers exist. Left: the allowed callers on the 69 own-gate routes; the matrix in the inventory table; two owner questions (the body-token pages' 400; the platform admin on the money routes). Was: PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **Update 2026-09-19:** Oliver chose Option C on 2026-09-14 and it is now implemented — migration `0023` applied to the development database only, not production; see gap list item 13. **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
+| R1-T1 | No-live-system HTTP test harness | 610 | Engineering | **External review fix applied 2026-10-01 (`d9382672`; local, awaiting independent review; [evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md)):** the guard reads where `fetch` and `http(s)` are going before a proxy can take the request, and refuses a resolver's questions even for this machine's own name; three tests that hold whatever the machine's proxy settings. **AUDIT CODE-COMPLETE 2026-09-25 (`05195728`; local), awaiting independent review** ([evidence](r1/R1-T1-harness-audit-2026-09-25.md)): every server test fails if it reaches off the machine (the guard caught two that dialled `192.0.2.1`); the harness builds production's app (`server/app.ts`, shared with `index.ts`); `providerNotification`, `useFakeClock`, `openEventStream`; the public payment bearer is exercised; red first 21 of 24, mutations 30/30, server 81/1,456. Found by it and fixed: live updates never reached a browser (`3fac8ac8`, [evidence](r1/R1-live-updates-compression-2026-09-25.md)). Was: Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof — **unblocked 2026-09-21** (R0 exit established). `165fd605` already made the server harness clear single-key email and SMS credentials. |
+| R1-T2 | Checked-in route policy inventory | 622 | Engineering | **External review fix applied 2026-10-01 (`d9382672`; [evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md)):** the inventory covers every Node HTTP method, `app.del` and literal computed methods; a dynamic method, a non-literal path or a chained registration fails. Still 187 registrations, 0 unclassified. **CLOSED 2026-09-27 on the day's code (`2ea74684`), awaiting independent review** ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md), "R1-T2 closed"): 184 registrations inventoried (5 of them ALL), 0 unclassified; a route, method, mounted router or middleware added without policy fails (12/12 breakages caught); 184 of 184 routes reviewed (`server/route-review.ts`: each branch's principals, roles and tenant rule, the capability, entitlement and idempotency, the success DTO and error disclosure; the generated facts carry the storage methods), `PENDING_CEILING` 0. Row brought up to date 2026-09-28: it still read PARTIAL after the closure. Was: PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open), **closed by retirement 2026-09-25** (owner decision; `09df766f..5c2cdb27`, local, awaiting review; [evidence](r1/R1-no-board-rework-2026-09-25.md)): the anonymous no-board feed and read are gone, and the inventory has 0 suspected gaps (223 registrations, 0 unclassified). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
+| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | **External review fix applied 2026-10-01 (`d9382672`; [evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md)):** every refusal suite also asserts no stream event, push, mail, provider call, fetch or file write (a refusal that broadcasts fails 117 cases), carried to the refusal tests written after `b0500c5d` and to phase E's cross-site and CSRF refusals. **CODE-COMPLETE 2026-09-29 (`48fc96d6..c8055341`; pushed through `b0500c5d`, the rest local), awaiting independent review** ([working notes](r1/WORKING-2026-09-27-r1-t3.md), "Where R1-T3 stands (2026-09-29)"; [owner answers](../../decisions/2026-09-27-r1-t3-owner-answers.md)): the matrix (`server/route-matrix.ts`) is recorded in the inventory table, with a test holding the two together; every refusal it names is driven with nothing changed (the gates' 683, the own gates', the role and tenant refusals, a board or a provider reference that is no one's); the allowed callers succeed on all 184 routes (291 cases), and a route serving a caller that no served test holds fails; the page guards on phone, tablet and desktop for every caller (331). Fixed on the way: sign-in failures 401 (owner decision), the platform admin 403 on 68 business routes, eight state conflicts 409, `/smart-terminal` retired, three sale routes, the numbered Windcave return and a board's page no longer tell which numbers or boards exist. Its three owner questions answered 2026-09-29 ([decision](../../decisions/2026-09-29-r1-t3-owner-answers.md)): the body-token pages keep 400; the platform admin keeps the money routes; a removed board's page no longer shows its open sale (`c8055341`). Was: IN PROGRESS 2026-09-27/28 (batches (a)–(j)). Was: PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **Update 2026-09-19:** Oliver chose Option C on 2026-09-14 and it is now implemented — migration `0023` applied to the development database only, not production; see gap list item 13. **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | **CLOSED 2026-09-14** — Oliver accepted the [auth/onboarding visual baseline](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) ("Looks good", [record](../../decisions/2026-09-14-r1-h1-visual-baseline-acceptance.md)). This lifts gap-list item 8 (client work gated) for tasks blocked only on this sign-off. |
-| R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | **CONFIRM-WITH-PASSWORD AND ADMIN SIGN-IN CODE-COMPLETE 2026-09-23 (`ff16abfe`, `2a935b02`; local), awaiting independent review** ([evidence](r1/R1-T4-admin-sign-in-and-confirm-password-2026-09-23.md), [decision](../../decisions/2026-09-23-r1-t4-confirm-with-password-owner-answers.md)): confirming a sign-up's email needs the password chosen at sign-up; `npm run admin:password` and a case-blind admin email; the owner must set `ADMIN_PASSWORD_HASH`. **PHASE B CODE-COMPLETE 2026-09-23 (`ce3c13de`; local), awaiting independent review and the owner's live check** ([evidence](r1/R1-T4-phase-B-trusted-proxy-2026-09-23.md)): `TRUST_PROXY_HOPS` (off by default), per-address limits for sign-in, forgot-password and the Google callback. **ACCOUNT-DISCOVERY FOLLOW-UPS CODE-COMPLETE 2026-09-23 (`8fdb63e0`; local), awaiting independent review** ([evidence](r1/R1-T4-account-discovery-2026-09-23.md)): sign-up, the confirmation resend and forgot-password answer every address alike, after the same wait. **PHASE C FOLLOW-UPS CODE-COMPLETE 2026-09-23 (`f6c62f50`; local), awaiting independent review** ([evidence](r1/R1-T4-password-rule-and-sign-in-timing-2026-09-23.md), [decision](../../decisions/2026-09-23-r1-t4-phase-c-owner-answers.md)): one password rule (8+, a capital, a number or symbol) wherever a password is set; every sign-in spends one full check's work, so its time no longer tells which emails have logins. **PHASE C CODE-COMPLETE 2026-09-22 (`e60e90c0`; local), awaiting independent review** ([evidence](r1/R1-T4-phase-C-throttling-2026-09-22.md)): attempts counted in `auth_throttle` and slowed down, never locked; known devices counted on their own; forgot-password and change-password limited; address-keyed limits moved to phase B. **PHASES A and D CODE-COMPLETE 2026-09-22 (`a9426330`, `44a5cfc2`; local), awaiting independent review** ([D evidence](r1/R1-T4-phase-D-sessions-2026-09-22.md)). **D follow-ups code-complete the same day (`50a469e7` password change; `36a320d6` push subscriptions per login; `b714efda` disabling a teammate stops their notifications; local). Migration 0029 applied to the development database only (08:04 UTC, owner decision)** ([evidence](r1/R1-T4-phase-D-follow-ups-2026-09-22.md), [decision](../../decisions/2026-09-22-r1-t4-phase-d-owner-answers.md)). Phase A: ([evidence](r1/R1-T4-phase-A-google-sign-in-2026-09-22.md)); 0024–0028 applied to dev only. Earlier the same day: **PHASE A IN PROGRESS.** Owner answers 2026-09-21 ([decision](../../decisions/2026-09-21-r1-t4-t9-owner-answers.md)): A–D now, E designed separately; Google joins an existing merchant only on a verified email; slow repeated attempts down instead of locking. Schema 0026–0028 committed (`662371ba`, originally `7ba8bc7d`), applied nowhere; phase A server side is a local WIP commit, not pushed ([working notes](r1/WORKING-2026-09-21-r1-t4-t9-progress.md)). Was: **PLAN WRITTEN 2026-09-21, awaiting owner answers Q1–Q5** ([plan](../../PLAN-2026-09-21-r1-t4-sign-in-security.md)). Found: the Google sign-in token (1-hour JWT) is in the `/login?token=` address while GA4 runs — probe with a local gtag stub, nothing sent — so each Google sign-in has sent a working token to the GA property; no `state`/nonce/PKCE; `email_verified` unchecked and existing merchants linked by email; no early session cancel (password reset leaves stolen tokens valid) and an hourly sign-out; no `trust proxy`, so the per-IP login throttle may be one bucket for everyone. Proposed phases A (stop the leak: one-time code + state + PKCE) → B proxy → C shared throttling → D session cancel → E full session rebuild. Was: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14); follows R1-T1's audit (plan C11 after C09). OAuth/session/reset/CORS/distributed-abuse work remains — not started. |
-| R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
+| R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | **External review fixes applied 2026-10-01 (`d9382672`, `bc9f37ff`; local, awaiting independent review; [evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md)):** live streams re-check their sign-in (a cookie's by its session id), push registration is checked under the login's row lock, the Google start cookie is signed and taken up once; and logins ended together no longer deadlock over a business's shared devices (found on real PostgreSQL). **PHASE E1 CODE-COMPLETE 2026-09-30 (`9e993da2`; local), awaiting independent review** ([evidence](r1/R1-T4-phase-E1-sessions-server-2026-09-30.md)); **PHASE E2 CODE-COMPLETE 2026-10-01 (`2611e80e`; local), awaiting independent review** ([evidence](r1/R1-T4-phase-E2-client-2026-10-01.md)): the app signs in by the cookie; a real browser, 43 checks. **PHASE E3 CODE-COMPLETE 2026-10-02 (`8d5bad38`; local), awaiting independent review** ([evidence](r1/R1-T4-phase-E3-bearer-retired-2026-10-02.md)): account bearer issuance/acceptance retired, cookie harness/matrix and source guard complete; browser 50 checks pass on phone/tablet/desktop. Phase E web rebuild is code-complete; dev `0031` remains the owner's action, Keychain stays A-T4. **CONFIRM-WITH-PASSWORD AND ADMIN SIGN-IN CODE-COMPLETE 2026-09-23 (`ff16abfe`, `2a935b02`; local), awaiting independent review** ([evidence](r1/R1-T4-admin-sign-in-and-confirm-password-2026-09-23.md), [decision](../../decisions/2026-09-23-r1-t4-confirm-with-password-owner-answers.md)): confirming a sign-up's email needs the password chosen at sign-up; `npm run admin:password` and a case-blind admin email; the owner must set `ADMIN_PASSWORD_HASH`. **PHASE B CODE-COMPLETE 2026-09-23 (`ce3c13de`; local), awaiting independent review and the owner's live check** ([evidence](r1/R1-T4-phase-B-trusted-proxy-2026-09-23.md)): `TRUST_PROXY_HOPS` (off by default), per-address limits for sign-in, forgot-password and the Google callback. **ACCOUNT-DISCOVERY FOLLOW-UPS CODE-COMPLETE 2026-09-23 (`8fdb63e0`; local), awaiting independent review** ([evidence](r1/R1-T4-account-discovery-2026-09-23.md)): sign-up, the confirmation resend and forgot-password answer every address alike, after the same wait. **PHASE C FOLLOW-UPS CODE-COMPLETE 2026-09-23 (`f6c62f50`; local), awaiting independent review** ([evidence](r1/R1-T4-password-rule-and-sign-in-timing-2026-09-23.md), [decision](../../decisions/2026-09-23-r1-t4-phase-c-owner-answers.md)): one password rule (8+, a capital, a number or symbol) wherever a password is set; every sign-in spends one full check's work, so its time no longer tells which emails have logins. **PHASE C CODE-COMPLETE 2026-09-22 (`e60e90c0`; local), awaiting independent review** ([evidence](r1/R1-T4-phase-C-throttling-2026-09-22.md)): attempts counted in `auth_throttle` and slowed down, never locked; known devices counted on their own; forgot-password and change-password limited; address-keyed limits moved to phase B. **PHASES A and D CODE-COMPLETE 2026-09-22 (`a9426330`, `44a5cfc2`; local), awaiting independent review** ([D evidence](r1/R1-T4-phase-D-sessions-2026-09-22.md)). **D follow-ups code-complete the same day (`50a469e7` password change; `36a320d6` push subscriptions per login; `b714efda` disabling a teammate stops their notifications; local). Migration 0029 applied to the development database only (08:04 UTC, owner decision)** ([evidence](r1/R1-T4-phase-D-follow-ups-2026-09-22.md), [decision](../../decisions/2026-09-22-r1-t4-phase-d-owner-answers.md)). Phase A: ([evidence](r1/R1-T4-phase-A-google-sign-in-2026-09-22.md)); 0024–0028 applied to dev only. Earlier the same day: **PHASE A IN PROGRESS.** Owner answers 2026-09-21 ([decision](../../decisions/2026-09-21-r1-t4-t9-owner-answers.md)): A–D now, E designed separately; Google joins an existing merchant only on a verified email; slow repeated attempts down instead of locking. Schema 0026–0028 committed (`662371ba`, originally `7ba8bc7d`), applied nowhere; phase A server side is a local WIP commit, not pushed ([working notes](r1/WORKING-2026-09-21-r1-t4-t9-progress.md)). Was: **PLAN WRITTEN 2026-09-21, awaiting owner answers Q1–Q5** ([plan](../../PLAN-2026-09-21-r1-t4-sign-in-security.md)). Found: the Google sign-in token (1-hour JWT) is in the `/login?token=` address while GA4 runs — probe with a local gtag stub, nothing sent — so each Google sign-in has sent a working token to the GA property; no `state`/nonce/PKCE; `email_verified` unchecked and existing merchants linked by email; no early session cancel (password reset leaves stolen tokens valid) and an hourly sign-out; no `trust proxy`, so the per-IP login throttle may be one bucket for everyone. Proposed phases A (stop the leak: one-time code + state + PKCE) → B proxy → C shared throttling → D session cancel → E full session rebuild. Was: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14); follows R1-T1's audit (plan C11 after C09). OAuth/session/reset/CORS/distributed-abuse work remains — not started. |
+| R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | **ENGINEERING SCOPE T5a–T5e IMPLEMENTED 2026-10-06, awaiting independent review, the owner's Apple setup and a real iPhone ([runbook and the checks to make](../../operations/sign-in-with-apple.md)).** T5a (Apple's token boundary, `8b026aa7` + `01e22c4b`), T5b (identities and sign-in, `0a12124a`, migration 0033) and T5c (connecting and disconnecting from a signed-in owner's session, `3520df77`) and T5d (the login button and the Settings row, `3e5db51d`, with a real-browser check against a stand-in Apple) code-complete, local ([T5a](r1/R1-T5a-apple-token-boundary-2026-10-04.md), [T5b](r1/R1-T5b-apple-identities-and-sign-in-2026-10-04.md), [T5c](r1/R1-T5c-apple-connect-2026-10-06.md), [T5d](r1/R1-T5d-apple-screens-2026-10-06.md), [plan](../../PLAN-2026-10-04-r1-t5-sign-in-with-apple.md)); T5e is the runbook. The button appears only once Apple is set up. Going live needs the owner's Services ID, key and team ID and a real iPhone (owner decision 2026-09-29). Was: GATED: R1-T4, then real Apple provisioning/device verification. |
 | R1-T6 | Strict numeric path and query parsing — review snapshot has 71 path and 7 query sites | 699 | Engineering | **Task check MET 2026-09-11** — [bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md). The handoff's "five remaining sites" undercounted: four more of the same class hid behind `Number(req.query...)`, `Number.parseInt(String(...))`, `parseInt(String(...))` and a `/^\d+$/` that accepted `0` — one of which passed `NaN` to storage — plus three `parseInt(req.params)` in `middleware/merchant-validation.ts`. All migrated to a reviewed typed schema; zero permissive parses remain in production server code; source guard active **with no allowlist**. Two superseded tests corrected, quoted in the evidence. R1-T2's 97 unclassified registrations are unchanged and still gate the wider task. |
-| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. **`C0`/`C1` (preflight + defense-in-depth indexes) landed 2026-09-14**, commit `5318496b` — [evidence](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md). The replay mechanism itself (`C2`-`C5`) remains open — see gap 11. **Uploads tenant authorization (gap 13) implemented 2026-09-19** (dev database migrated; production not): tenant-scoped storage, migration `0023`, and authenticated + checkout-token download routes — [evidence](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md); the "other tenant methods, upload authorization/content/privacy" remainder above is reduced accordingly, but `IStorage` is still not tenant-scoped across every domain. |
-| R1-T8 | Fix the hook-order crash | 758 | Engineering | **IMPLEMENTED 2026-09-21, commit `387d189d` — awaiting independent review** ([evidence](r1/R1-T8-hook-order-crash-2026-09-21.md)). `MerchantGate` resolves the merchant above the page (keyed by merchant, redirects once from an effect); a client test gates `rules-of-hooks` over the whole client (67 → 0); `jest.setup.js` fails any client test in which React warns (18 act() warnings → 0); the repro now asserts no throw. Client 60/552; mutations 5/5; the four routed phone pages pixel-identical to the pre-fix build; Sign out on /settings reproduces React #300 before the fix and lands on /login after it. Originally recorded: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14). Scope measured the same day: `react-hooks/rules-of-hooks` reports **66 violations in exactly the seven named pages** (settings 18, merchant-terminal 13, merchant-terminal-mobile 12, transactions 11, stock-management 6, exports 3, payment-stack 3) plus 1 in `merchant-terminal-mobile-v2.test.tsx` — 67 in the client; the repro test still asserts the crash; the client suite prints 18 `act(...)` warnings (12 from `Settings`, 6 from `MerchantTerminal`). Crash characterization is not a fix. |
-| R1-T9 | Truthful frontend failure states | 773 | Engineering | **COMPLETE 2026-09-23 (`c37f1602..025d638d`, `e4c25fb1..b86f0071`; local), awaiting independent review** ([handoff and brief](r1/R1-T9-INDEPENDENT-REVIEW-BRIEF-2026-09-25.md), 2026-09-25; re-run at `b86f0071`: `tsc` clean, client 86/760, server 79/1,432). Was: **ROLLOUT IN PROGRESS 2026-09-23: retail stock and terminal (`0b0a9fb7`), property analytics (`5805a416`), property terminal (`f48139f6`), trades analytics (`64e12ef8`) done; local, awaiting independent review** ([evidence](r1/R1-T9-rollout-2026-09-23.md)): a failed load says so with Try again instead of "0 products", "$0 today", "$0.00 total revenue" or "no sales yet"; the terminal's send buttons wait for its sales; reports and exports wait for their data (on trades analytics, made only from loaded data); loaded views unchanged. Reports and exports on all three analytics screens are made only from loaded data, each waiting for its sources (`0c75e747`, `d5cf4d5f`, `88fe0e3f`, `721ce328`). Trades terminal (`2e8b308a`) and desktop settings (`6dd7bc68`) done: **the screen list is complete**. 402 banners done (`1f6a8673`, `8a4e8c20`, `09b07a43`, `a2dee290`; [evidence](r1/R1-T9-billing-402-2026-09-23.md)). Pending/double-submit done (`0a257926`, `0220c6f9`, `09000e9f`; [evidence](r1/R1-T9-pending-and-double-submit-2026-09-23.md)): **every R1-T9 item is done, awaiting independent review.** Found on the way and fixed (`707cff2f`, `0f748fde`): exports lacked the business details after a password sign-in ([evidence](r1/R1-T9-export-business-details-2026-09-23.md)). Was: **DESIGN APPROVED 2026-09-21** ([decision](../../decisions/2026-09-21-r1-t4-t9-owner-answers.md)); rollout to the remaining screens follows R1-T4 A–D in the working order. Was: **PILOT 2026-09-21, commit `2c013f33` (cleaned: `025d638d`) — design awaiting owner approval** ([proposal and evidence](r1/R1-T9-failure-states-2026-09-21.md)). `DesktopLoadFailure` (desktop palette only, one `role="alert"` per failure, Try again) on retail analytics: a failed sales load no longer reads "$0.00 / 0 transactions / no sales yet"; Reports/Export unavailable; loaded view pixel-identical. Remaining after approval: retail stock and terminal, property analytics and terminal, trades analytics and terminal (incl. `trades-terminal.tsx:165` mapping a failed request to `[]`), settings; optional-source "unavailable", mutation pending/double-submit rules, 402 banners. Was: GATED: R1-T8. |
-| R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | GATED: T3/T5/T7/T9 and H1; typed routes, devices, tutorials and accessibility acceptance remain. |
-| R2 | Provider boundary and exact verification | 818 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
-| R3 | Durable notifications and payment convergence | 831 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
+| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | **ENGINEERING SCOPE S0–S6 IMPLEMENTED 2026-10-04 (`47fdab71` … `382de840`; local), awaiting independent review** ([S5a](r1/R1-T7-S5a-merchant-settings-2026-10-04.md), [S5b](r1/R1-T7-S5b-stragglers-2026-10-04.md), [S6a](r1/R1-T7-S6a-upload-scans-2026-10-04.md), [S6b](r1/R1-T7-S6b-upload-passes-2026-10-04.md); S2–S4 in the dated entries above): every signed-in business route names its business to storage or is one of 9 reviewed exceptions held by a test; invoice documents are scanned before they are stored, readable only with a clean scan on record (migration 0032, applied nowhere), earlier ones scanned by the scheduler, and uploads no invoice uses deleted at 12 months. Gap 11 C2–C5 stays at its R3 schema gate. Was: PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. **`C0`/`C1` (preflight + defense-in-depth indexes) landed 2026-09-14**, commit `5318496b` — [evidence](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md). The replay mechanism itself (`C2`-`C5`) remains open — see gap 11. **Uploads tenant authorization (gap 13) implemented 2026-09-19** (dev database migrated; production not): tenant-scoped storage, migration `0023`, and authenticated + checkout-token download routes — [evidence](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md); the "other tenant methods, upload authorization/content/privacy" remainder above is reduced accordingly, but `IStorage` is still not tenant-scoped across every domain. **S0/S1 implemented 2026-10-02**, commit `47fdab71`: generated tenant/storage execution inventory and seven scoped stock/board management operations in both implementations, with runtime projection and concurrent-write verification — [evidence](r1/R1-T7-S1-stock-board-storage-2026-10-02.md). Full server 136 suites / 3,590 tests pass; actual PostgreSQL 10 checks pass. Independent review and S2–S6 remain open. |
+| R1-T8 | Fix the hook-order crash | 758 | Engineering | **External review note applied 2026-10-01 (`d9382672`):** the cleaned commit id is `53f5a8b9` (`387d189d` in the history kept locally), checked against the commit map. **IMPLEMENTED 2026-09-21, commit `387d189d` — awaiting independent review** ([evidence](r1/R1-T8-hook-order-crash-2026-09-21.md)). `MerchantGate` resolves the merchant above the page (keyed by merchant, redirects once from an effect); a client test gates `rules-of-hooks` over the whole client (67 → 0); `jest.setup.js` fails any client test in which React warns (18 act() warnings → 0); the repro now asserts no throw. Client 60/552; mutations 5/5; the four routed phone pages pixel-identical to the pre-fix build; Sign out on /settings reproduces React #300 before the fix and lands on /login after it. Originally recorded: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14). Scope measured the same day: `react-hooks/rules-of-hooks` reports **66 violations in exactly the seven named pages** (settings 18, merchant-terminal 13, merchant-terminal-mobile 12, transactions 11, stock-management 6, exports 3, payment-stack 3) plus 1 in `merchant-terminal-mobile-v2.test.tsx` — 67 in the client; the repro test still asserts the crash; the client suite prints 18 `act(...)` warnings (12 from `Settings`, 6 from `MerchantTerminal`). Crash characterization is not a fix. |
+| R1-T9 | Truthful frontend failure states | 773 | Engineering | **External review fix applied 2026-10-01 (`9fede25d`; local, awaiting independent review; [evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md)):** a reply that says OK and is not the data reads as a failed load (desktop retail pages, desktop settings, property and trades lists and settings). **COMPLETE 2026-09-23 (`c37f1602..025d638d`, `e4c25fb1..b86f0071`; local), awaiting independent review** ([handoff and brief](r1/R1-T9-INDEPENDENT-REVIEW-BRIEF-2026-09-25.md), 2026-09-25; re-run at `b86f0071`: `tsc` clean, client 86/760, server 79/1,432). Was: **ROLLOUT IN PROGRESS 2026-09-23: retail stock and terminal (`0b0a9fb7`), property analytics (`5805a416`), property terminal (`f48139f6`), trades analytics (`64e12ef8`) done; local, awaiting independent review** ([evidence](r1/R1-T9-rollout-2026-09-23.md)): a failed load says so with Try again instead of "0 products", "$0 today", "$0.00 total revenue" or "no sales yet"; the terminal's send buttons wait for its sales; reports and exports wait for their data (on trades analytics, made only from loaded data); loaded views unchanged. Reports and exports on all three analytics screens are made only from loaded data, each waiting for its sources (`0c75e747`, `d5cf4d5f`, `88fe0e3f`, `721ce328`). Trades terminal (`2e8b308a`) and desktop settings (`6dd7bc68`) done: **the screen list is complete**. 402 banners done (`1f6a8673`, `8a4e8c20`, `09b07a43`, `a2dee290`; [evidence](r1/R1-T9-billing-402-2026-09-23.md)). Pending/double-submit done (`0a257926`, `0220c6f9`, `09000e9f`; [evidence](r1/R1-T9-pending-and-double-submit-2026-09-23.md)): **every R1-T9 item is done, awaiting independent review.** Found on the way and fixed (`707cff2f`, `0f748fde`): exports lacked the business details after a password sign-in ([evidence](r1/R1-T9-export-business-details-2026-09-23.md)). Was: **DESIGN APPROVED 2026-09-21** ([decision](../../decisions/2026-09-21-r1-t4-t9-owner-answers.md)); rollout to the remaining screens follows R1-T4 A–D in the working order. Was: **PILOT 2026-09-21, commit `2c013f33` (cleaned: `025d638d`) — design awaiting owner approval** ([proposal and evidence](r1/R1-T9-failure-states-2026-09-21.md)). `DesktopLoadFailure` (desktop palette only, one `role="alert"` per failure, Try again) on retail analytics: a failed sales load no longer reads "$0.00 / 0 transactions / no sales yet"; Reports/Export unavailable; loaded view pixel-identical. Remaining after approval: retail stock and terminal, property analytics and terminal, trades analytics and terminal (incl. `trades-terminal.tsx:165` mapping a failed request to `[]`), settings; optional-source "unavailable", mutation pending/double-submit rules, 402 banners. Was: GATED: R1-T8. |
+| R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | **IN PROGRESS 2026-10-12** — typed route/device/tutorial engineering and bounded accessibility repairs are implemented; [latest terminal/harness handover](../../HANDOFF-2026-10-12-r1-t10-terminal-followup.md) records the fresh 15-state/six-route checks and 88-cell reduced tutorials. Owner keeps the property feed-under-dock design; five measured covered centres remain recorded. Actual devices/AT, owner visuals/goldens, manual candidates and independent task 7 remain open. Earlier counts and full matrices are retained with their exact original hashes, not relabelled. |
+| R2 | Provider boundary and exact verification | 818 | Claude | R2 repository work at `14942392` is integrated into the R3 working branch and independently checked. Preserve [R2 exit limits](r2/R2-exit-2026-10-12.md): official UAT, owner/professional gates and independent review remain open. |
+| R3 | Durable notifications and payment convergence | 831 | Codex | IN PROGRESS 2026-10-12 — foundation, manual guards and actual R2 integration implemented and tested; [handoff](../../HANDOFF-2026-10-12-r3-durability-foundation.md). Cash/command idempotency, active route convergence, card/billing attempts, receivers, production restore and exit review remain open. |
 | R4 | Durable refunds | 871 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | R5 | Encryption | 881 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | R6 | Entitlement, scheduler, health, observability | 905 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
@@ -1854,3 +3041,194 @@ Source: [v2.2 audit input](../../PLAN-2026-08-24-taptpay-remediation-v2-2.md).
 
 
 ### 22.16 Checklist stop conditions and final approval
+
+## 23. October 12 — R3 durability foundation checkpoint
+
+Owner assigned all R2 to Claude and R3 to Codex. Starting from `e408f597` on
+`fix/qwen-aligned-20261010`, the bounded foundation adds concrete invoice attempts,
+immutable retail expectations, global session ownership, durable receipt inbox,
+atomic settlement/event/outbox, bounded reconciliation and delivery workers,
+aggregate graphs and compatible invoice/quote token hashing. Components have
+injected ports; no new worker timer or notification endpoint is activated.
+
+Verification: 189 server suites / 4,604 tests passed on the frozen full run;
+later graph and lease-generation corrections passed 4 scoped suites / 40 tests
+and application type checking. The real PostgreSQL verifier passed 29 checks on
+each of two owned PostgreSQL 17.11 clusters. A populated synthetic snapshot
+(1,000 invoices per vertical and 1,000 quotes) was dumped/restored, migrated by
+the real runner and matched the scratch schema fingerprint. The blocked-table
+rehearsal timed out after 5,030 ms, rolled back all DDL and its ledger entry,
+then succeeded after release in 62 ms. See the
+[exact evidence and limits](r3/VERIFICATION-2026-10-12.md) and
+[required preflight plus separate reread](r3/IMPLEMENTATION-REVIEW-2026-10-12.md).
+
+**R3 remains open.** R2 is absent from this checkout; legacy active completion
+routes remain. Cash/cancellation safeguards and card/billing attempt durability
+are still R3 work. Actual provider integration, receiver deduplication,
+production-sized restore/count review and exit approval are not satisfied by
+synthetic tests. No live provider request, email/push, migration, merge or
+deployment occurred. Private fixtures, dumps, credentials, logs and generated
+bundles are excluded. Cloud setup draft save is confirmed; publication and fresh
+task restoration are not. Prior R1 device/visual/review gates remain open.
+
+Foundation publication verified: `9d52d8a5ee72be2493f12e6cf323131e4df31481`
+is the remote head of `fix/qwen-aligned-20261010`. No merge or deployment.
+
+### 23.1 Active manual-change safeguards
+
+The next bounded R3 change guards retail cancellation and both invoice verticals'
+void/external-payment writes against recorded live or expired attempts, send
+intent, legacy sessions and captured shares. See
+[preflight and scope limits](r3/MANUAL-CHANGE-REVIEW-2026-10-12.md). The regression
+first failed in memory/HTTP (six cases) and real PostgreSQL (three new checks).
+An actual waiting cancellation proves the activity read must be a fresh statement
+after acquiring the aggregate lock. The underlying legacy initiation interval
+before durable attachment still requires R2-backed convergence. These guards do
+not claim that the cancellation command's audit/outbox or cash is complete.
+Final guard verification: 12 scoped server suites / 177 tests, 33 actual
+PostgreSQL checks, both type checks and the build passed. The earlier foundation
+full-server evidence is not relabelled as a full run of these later changes.
+
+## 24. October 12 — actual R2 integration
+
+The owner instructed Codex to finish R3. Found Claude's R2 `14942392` on
+`ccr-e07e3100-0wm8kr`; integrate it on the current working branch, with no main
+merge or deployment. A real synthetic clone first reproduced the incompatible
+trigger rejecting three R2 update classes. The
+[canonical-retail ADR](../../decisions/2026-10-12-r2-r3-schema-integration.md)
+follows §10.1: R2 retail columns are canonical; R3 invoice/inbox/binding/outbox
+remain. The original R3 expansion is byte-identical 0036; 0037 aligns triggers
+and preserves compatibility data without inventing historical expectations.
+
+Verification: 10 core/policy suites / 184 tests; 15 provider/route suites / 330
+tests; 35 R3 PostgreSQL checks including actual R2 client/parser/verifier through
+all three settlement domains; 12 R2-T4 and seven R2-T7 PostgreSQL checks; typecheck
+and build passed. Populated synthetic restore (1,000 invoices per vertical plus
+1,000 quotes) matches the fresh full schema. See
+[exact evidence and separate implementation reread](r3/R2-INTEGRATION-REVIEW-2026-10-12.md).
+No new full-server/client run is claimed on this combined checkpoint.
+
+R3 remains open. Cash/commands, active callbacks/FPRNs, card/billing and receiver
+integration continue next. Shared migration/UAT/production-sized restore/release
+gates remain separate. Preserve the older evidence with its original SHA/scope.
+
+## 25. October 12 — durable cash command checkpoint
+
+Cash command identity is implemented on the same R3 working branch: stable
+client UUID across failures/reloads, merchant-scoped fingerprint, one atomic
+sale/audit/manual outbox and immutable database identity. Matching committed
+retries reuse the original receipt; changed details conflict. Both callers send
+the required header. See [review and exact evidence](r3/CASH-COMMAND-REVIEW-2026-10-12.md).
+39 synthetic PostgreSQL checks, nine server suites / 332 tests, three client
+suites / 33 tests, typecheck/build and full scratch/restored fingerprint match
+passed. 0038 is applied only on owned synthetic integrated databases. No shared
+migration or outbound activity. R3 remains open: compatibility cash delivery,
+other commands, active payment convergence and card/billing remain. Continue the
+phase after committing/pushing this checkpoint; do not stop here or claim exit.
+
+## 26. October 13 — R2 and R3 merged (Claude)
+
+Codex's `27d235b8` is merged into `ccr-e07e3100-0wm8kr` with R4-T1. Claude's independent review
+is [R2-R3-MERGE-REVIEW-2026-10-13](r3/R2-R3-MERGE-REVIEW-2026-10-13.md). It fixes B-1 (an expired
+attempt with expected values but no session was held forever) and B-2 (the cash storage write
+now names its business). It lists latent worker findings H-1–H-3, which must be fixed before
+activation, and owner items OI-1/OI-2. Full suites and PostgreSQL verifiers pass. The summary is
+at the top of this file.
+
+## 27. October 14 — OI-1/OI-2 and the outstanding merge items (Claude)
+
+The owner asked for cancel-after-attempt (OI-1) and multi-attempt sessions (OI-2) and the
+rest of the merge review's outstanding work. Commits from `9888af20` onward. The record is
+[OUTSTANDING-2026-10-14](r3/OUTSTANDING-2026-10-14.md): what changed, the independent review
+and its fixes, the activation blockers left for Codex, and the owner and UAT questions.
+
+R4-T2 (refund schema) has its ADR and §21.1 passes 3–4. Pass 4 refused revision 1. Revision 2
+waits on pass 5 before any migration is committed.
+
+## 28. October 14 — R4-T2 refund operations schema (Claude)
+
+Migration 0039 and its Drizzle, MemStorage, contract and test changes, approved in pass 6
+after passes 4 and 5 refused earlier revisions. The record is
+[R4-T2-2026-10-14](r4/R4-T2-2026-10-14.md). The R4-T3/T4 rules are in the ADR. 0039 is
+applied nowhere, and the flag stays off. (Renumbered 0048 when R3 was integrated, §30.)
+
+## 29. October 14 — R3 repository completion (Codex, `3c98dfe9`)
+
+R3 active numeric/token/invoice callbacks and five FPRN registrations converge on
+shared verified durable attempts/finalizers. Amount-first invoice UX, concrete
+creation/manual/quote/balance/subscription commands, card/billing recovery and
+actual keyed receipt/delivery receivers are integrated. Final follow-up fixes
+cover cancellation/card races, paid-period/card supersession, cross-merchant
+billing keys, declined-money fields, cash replay/conflict, confirmed unsent expiry,
+finite worker caps and preserved quote notice content. Claude retains R4.
+
+Verification: complete 214 server-suite / 5020-test coverage using the full run
+plus explicit replacement of all failed and affected suites; 133 client suites /
+1504 tests; typecheck/build; 74/19/15/24/11 PostgreSQL durability/subscription/
+command/registered-HTTP/delivery checks. No skips. Both owned schemas match all
+49 migration files through 0047, immutable checksums and complete fingerprint;
+restored synthetic data retains 1000 invoices per vertical and 1000 quotes.
+
+See [final review and exact evidence](r3/R3-FINAL-REPOSITORY-REVIEW-2026-10-14.md)
+and [repository handoff](../../HANDOFF-2026-10-14-r3-repository-complete.md).
+The original full run was red and is preserved; the completed replacement run
+passes all 28 selected suites / 1591 tests. No full invocation is relabelled.
+Repository work is complete. Official R3 exit remains held for sanitized Windcave
+UAT and production-sized restored migration/preflight/timing sign-off. No shared
+migration, real outbound financial/delivery call, deployment or R5 work occurred.
+
+## 30. October 14 — R3 integrated under R4 (Claude)
+
+Codex's `3c98dfe9` is merged onto R4-T3 part 1 (`8b7c300e`). Where both sides changed the same
+payment behaviour, Codex's version was taken whole; every earlier fix on this branch was then
+checked against it by six read-only agents and a critic. R4-T1, R4-T2 and R4-T3 part 1 are
+re-applied; the refund schema is now 0048 (0039–0047 are Codex's, unchanged). Ten regressions
+were fixed, each with a test that failed first, among them B-1 again (a session request
+Windcave provably never took held the sale for good), links served for a cancelled sale or a
+voided invoice, wallet charges on closed sales, and the merchant's cancel-refusal message.
+Open items for Codex and the owner, T-3 first, are in §5 of
+[R3-INTEGRATION-2026-10-14](r4/R3-INTEGRATION-2026-10-14.md). PostgreSQL 16 on fresh
+databases: R3 88/15/11/24/19, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7. Suites: server
+222/5,139, client 134/1,507. Applied to no
+shared database; nothing deployed; refunds stay off. R4-T3 part 2 (the route) is next.
+
+## 31. October 15 — R3 integration open items (Claude)
+
+The owner asked for the integration's open items to be fixed before R4-T3 part 2, and decided
+R-3a: a payment Windcave confirms when a merchant's change asks first is recorded. Fixed, each
+with a failing test first:
+- the cutover gate and the retirement of legacy outbox rows (owner runbook);
+- D1 (reopening receipts) and D4 (dead-letter signals);
+- the notification rate limit and bounded lookups of unknown sessions;
+- migration 0049 (identity written once; send intent checked in UTC), applied nowhere;
+- R-1 (the legacy split writer removed);
+- the legacy refund route refuses split sales.
+
+T-3's ADR revision 1 was refused in review pass 1. Record:
+[R3-OPEN-ITEMS-2026-10-15](r4/R3-OPEN-ITEMS-2026-10-15.md). Server 224/5,146. PostgreSQL:
+R3 91/15/11/24/20, cutover 5, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7. Nothing deployed.
+
+## 32. October 15 — T-3 revision 2, interim guarantee (Claude)
+
+Review pass 1 refused the full decline supersession. Revision 2 adopts a narrower guarantee: a later
+approval in a session is never lost silently. The payer's handlers still reconcile a declined
+attempt. A decline-only session's receipt reopens on any arrival. An approval that cannot be
+recorded keeps its transaction ID and raises `PAYMENT_APPROVAL_NOT_RECORDED`. Full supersession is
+deferred to a new UAT checklist case or the owner's call. R3 durability 92 (the reopen check is
+mutation-checked); http 24, delivery 11, commands 15, subscriptions 20. Server 224/5,149.
+
+## 33. October 15 — T-3 full decline supersession (Claude)
+
+The owner decided to build T-3's full supersession now. ADR revision 3 was approved with
+conditions C1–C10 in review pass 2. The implementation was approved with conditions D1–D6 in
+pass 3, all resolved.
+
+Migration 0050 (applied nowhere) and both finalizers now record a later verified approval in a
+session that has a recorded decline. The decline is kept as its own event. Every other case stays
+a conflict with the `PAYMENT_APPROVAL_NOT_RECORDED` alert. 0049 was revised, before being applied
+anywhere, to keep 0037's constraint name. Owner runbook for 0049–0050:
+`docs/operations/runbook-2026-10-15-apply-0049-0050.md`.
+
+Record: [T3-2026-10-15](r4/T3-2026-10-15.md). Server 224/5,150, client 134/1,507. PostgreSQL:
+R3 114/15/11/24/20, cutover 5, T-3 upgrade 4, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7.
+Nothing deployed. R4-T3 part 2 is next.

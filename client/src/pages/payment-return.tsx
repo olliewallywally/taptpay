@@ -11,6 +11,7 @@ import {
   paymentTokenForReturnState,
   type PaymentReturnOutcome,
 } from "@/lib/payment-addressing";
+import { apiPath } from "@shared/api-path";
 
 function SafeReturnMessage({ loading = false }: { loading?: boolean }) {
   return (
@@ -24,9 +25,9 @@ function SafeReturnMessage({ loading = false }: { loading?: boolean }) {
             {loading
               ? <Loader2 size={40} color={CT.SKY} style={{ margin: "0 auto", animation: "spin 1s linear infinite" }} />
               : <XCircle size={48} color={CT.RED} style={{ margin: "0 auto" }} />}
-            <p style={{ color: CT.SKY, fontSize: 19, fontWeight: 700, margin: "16px 0 8px" }}>
+            <h1 style={{ color: CT.SKY, fontSize: 19, fontWeight: 700, margin: "16px 0 8px" }}>
               {loading ? "Confirming payment" : "Reopen the original payment link"}
-            </p>
+            </h1>
             <p style={{ color: CT.SKY_DIM, fontSize: 13, lineHeight: 1.5 }}>
               {loading ? "Please wait while we confirm the result…" : "For your security, this result can only be matched in the browser that started the payment."}
             </p>
@@ -46,7 +47,7 @@ export default function PaymentReturn() {
   const { data, error } = useQuery<PaymentReturnOutcome>({
     queryKey: ["payment-return", state],
     queryFn: async () => {
-      const response = await fetch(`/api/pay/return/${encodeURIComponent(state)}`, {
+      const response = await fetch(apiPath("GET /api/pay/return/:state", { state }), {
         headers: { "Cache-Control": "no-cache" },
       });
       if (!response.ok) throw new Error("return-unavailable");

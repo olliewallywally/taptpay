@@ -1,0 +1,4662 @@
+{
+  "dateUTC": "2026-10-11",
+  "branch": "fix/qwen-aligned-20261010",
+  "implementationCommit": "07ccd385a9bf72241a9835e8016d738a1c889df0",
+  "sourceAndBuild": {
+    "base": "27158eeb54a77898f67066f3876630089ee1b2f7",
+    "source": {
+      "client/src/features/tutorial/tutorial.tsx": "12f959a884c8e2b7b98fe424ad094ad8bf15ba066ae4fd0e07c0595705a57df6",
+      "client/src/features/tutorial/tutorial-registry.ts": "979ca5c8bdb62c8e3e75002f060f0625890803e57de27a050249bcabfba89cee",
+      "client/src/features/dashboard/TradesDashboardView.tsx": "79b8384e92c7dc1eb7a99d8898406096890c098a3062e26a0594c8adaf0af444",
+      "client/src/lib/sse-client.ts": "913f61f13a18b4fce12615b2f387c21735c737f988cdecf15e778b8ac90870f7",
+      "client/src/pages/settings.tsx": "09923dc7d524255c6925f3c0d2c5e51c9030767b84151d1d71579d7c2d4f6690",
+      "scripts/verify-r1-t10-device-matrix.ts": "c71b870607bca66b4cc37c490a88b8bf03c192ea6296f99277908ba3c1bf9494",
+      "scripts/verify-r1-t10-tutorials.ts": "34b0df75f34b257f2bb217224c7d4520a8fc3abfd3e1a8d4398787604d6dcfcd",
+      "scripts/tutorial-geometry.mjs": "f7a2aa7e305cb8b304f0bd161d5750aaa73a493932a08bde22da1dcd149a5c6c",
+      "scripts/verify-tutorial-geometry.mjs": "f18a4121da42394a243baea8cc4747bcde4619a66f8f51c1fa1683f1ae67df8b"
+    },
+    "tests": {
+      "client/src/__tests__/tutorial-lifecycle.test.tsx": "fd79984157b23078bf0cb2e7d5b80fcf8384773d2d360ccedc46e1b0d95d83db",
+      "client/src/__tests__/sse-page-lifecycle.test.ts": "7b2e1b0479a9201298e0bd29849b863e9598b32684aa2de645698a70275ee0fb",
+      "client/src/__tests__/trades-dashboard-view-boundary.test.tsx": "6f5796923af85ef99d5a485ccc76270dda232e595776187af133949d28ab62e7",
+      "client/src/pages/settings-tutorial-restart.test.tsx": "576762dd4133e3e93acf178cf3b8039ed06136fc9b6b99ba7d64fe216ca4cf14"
+    },
+    "buildDir": "/workspace/reviews/r1-t10-continuation-2026-10-10/final-build/public",
+    "builtIndexSHA256": "747f9f6d93df46d7ceab4b850cf998d392c56004f63ca02ce02fbf3826d18c9a",
+    "builtFilesCount": 421,
+    "builtTreeSHA256": "74d86115d426df39598cc6ac23f15f9a8699b660f6dc5c5da81575bd584416f4"
+  },
+  "tutorials": {
+    "expected": 88,
+    "passed": 88,
+    "failed": 0,
+    "registeredPageKeys": 20,
+    "merchantSurfaces": 22,
+    "contexts": {
+      "phone": 22,
+      "tablet": 22,
+      "desktop": 22,
+      "desktop-short": 22
+    },
+    "geometrySourceSHA256": "2b6202edcb416adfec917d4ef78b27fb35ab0aa7c1e2c9ba20417d8021907b68",
+    "completionAndReloadPersistenceRounds": 176,
+    "routeDeparturesAndBackChecks": 88,
+    "ordinaryStepMeasurements": 588,
+    "independentFallbackHideRestorePairs": 55,
+    "responsiveMeasurements": 176,
+    "cells": [
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 2,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 3,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 5,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 2,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 6,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 2,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 8,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 9,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 11,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 12,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 14,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 15,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 17,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 18,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 20,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 21,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 23,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 24,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 26,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 27,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 29,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 30,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 32,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 33,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 35,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 36,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 38,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 39,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 41,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 42,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 44,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 45,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 47,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 48,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 50,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 51,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 53,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 2,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 54,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 2,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 56,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 1,
+            "fallbackSteps": 3,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 57,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 1,
+            "fallbackSteps": 3,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 59,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 60,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 62,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 63,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 65,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 66,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 2,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 3,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 5,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 6,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 8,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 9,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 11,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 12,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 14,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 15,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 17,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 18,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 20,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 4,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 21,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 4,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 23,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 24,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 26,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 27,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 29,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 30,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 32,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 33,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 35,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 36,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 38,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 39,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 41,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 42,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 44,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 45,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 47,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 48,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 50,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 51,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 53,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 54,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 56,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 57,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 59,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 60,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 62,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 63,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 65,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 66,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 2,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 3,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 5,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 6,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 8,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 9,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 11,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 12,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 14,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 15,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 17,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 18,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 20,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 4,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 21,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 4,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 23,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 24,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 26,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 27,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 29,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 30,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 32,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 33,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 35,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 36,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 38,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 39,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 41,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 42,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 44,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 45,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 47,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 48,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 50,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 51,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 53,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 54,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 56,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 57,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 59,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 60,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 62,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 63,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 65,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 66,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 2,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 3,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 5,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 6,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 8,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 9,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 11,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 12,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 14,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 15,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 17,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 18,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 20,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 4,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 21,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 4,
+            "fallbackSteps": 1,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 23,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 24,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 26,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 27,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 29,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 30,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 32,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 33,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 35,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 36,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 38,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 39,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 41,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 42,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 44,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 45,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 47,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 48,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 50,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 1,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 51,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 2,
+            "primarySteps": 2,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 53,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 54,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 56,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 57,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 59,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 60,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 3,
+            "primarySteps": 3,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 62,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 63,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 4,
+            "primarySteps": 4,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "routeExit": true,
+        "browserBack": true,
+        "rounds": [
+          {
+            "generation": 65,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 3,
+            "responsiveMeasurements": 2,
+            "faults": []
+          },
+          {
+            "generation": 66,
+            "completed": true,
+            "persistedAfterReload": true,
+            "stepsMeasured": 5,
+            "primarySteps": 5,
+            "fallbackSteps": 0,
+            "independentFallbackHideRestorePairs": 0,
+            "responsiveMeasurements": 0,
+            "faults": []
+          }
+        ],
+        "faults": []
+      }
+    ]
+  },
+  "normalDeviceMatrix": {
+    "expected": 204,
+    "passed": 204,
+    "failed": 0,
+    "contexts": {
+      "phone": 51,
+      "tablet": 51,
+      "desktop": 51,
+      "desktop-short": 51
+    },
+    "apiRequests": 840,
+    "registeredAPIRoutes": 45,
+    "fallbackOnlyCells": 0,
+    "geometrySourceSHA256": "9ae67acac20e6610966c80b8469d4a20a23a0161b2e72f0c9490394b5a054a82",
+    "phoneTransactionsInteraction": {
+      "name": "expanded Transactions sheet by its drag handle",
+      "coveredControlsCannotFocus": true,
+      "restoredControlsCanFocus": true,
+      "geometryRestored": true
+    },
+    "phoneTransactionsInitialClippedTextCount": 2,
+    "cells": [
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "mark": "[aria-label=\"new sale\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "mark": ".tp-amount",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "mark": "[data-tutorial-id=\"ps-header\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "mark": "[data-tutorial-id=\"tx-history\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "mark": "[data-testid=\"button-add-product\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "mark": "[data-tutorial-id=\"nfc-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "mark": "[data-tutorial-id=\"bb-preview\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"set-business\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "mark": "[aria-label=\"set up rent payment\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "mark": "[aria-label=\"Add tenant\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "mark": "[data-tutorial-id=\"tenant-edit\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "mark": "[aria-label=\"new rent request\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "mark": "[data-tutorial-id=\"pa-period\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"set-business\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "mark": "[data-tutorial-id=\"trades-home-health\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "mark": "[aria-label=\"Add client\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "mark": "[aria-label=\"Edit client\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "mark": "[aria-label=\"new invoice\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "mark": "[data-tutorial-id=\"tq-totals\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "mark": "[data-tutorial-id=\"tr-create\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "mark": "[data-tutorial-id=\"ta-period\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"set-business\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/",
+        "pageKey": "nobody",
+        "mark": "#tp-nav",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/login",
+        "pageKey": "nobody",
+        "mark": "[data-testid=\"button-login\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/signup",
+        "pageKey": "nobody",
+        "mark": "\"start with you\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/forgot-password",
+        "pageKey": "nobody",
+        "mark": "input[placeholder=\"Enter your email\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/reset-password",
+        "pageKey": "nobody",
+        "mark": "\"Invalid Reset Link\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/check-email",
+        "pageKey": "nobody",
+        "mark": "\"Check your email\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/info",
+        "pageKey": "nobody",
+        "mark": "\"info pack\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/terms",
+        "pageKey": "nobody",
+        "mark": "\"1. Service Description\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/privacy",
+        "pageKey": "nobody",
+        "mark": "\"Office of the Privacy Commissioner\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/pay/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/checkout/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/split/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/receipt/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (no sale)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (an open sale)",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (a sale just paid)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/checkout/:number",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/split/:number",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/receipt/:number",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/pay/:id",
+        "pageKey": "nobody",
+        "mark": "\"Ask for your payment link\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/pay/return/:state",
+        "pageKey": "nobody",
+        "mark": "\"Reopen the original payment link\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/onboarding",
+        "pageKey": "a new business",
+        "mark": "\"Complete Your Business Profile\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"stat-total-revenue\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin/merchants",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"input-search-merchants\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin/merchants/:id",
+        "pageKey": "admin",
+        "mark": "\"Account Information\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin/api",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"api-management-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin/analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin/web-analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "phone",
+        "mode": "outside",
+        "path": "/admin/settings",
+        "pageKey": "admin",
+        "mark": "\"Settings page coming soon\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "mark": "[data-tutorial-id=\"retail-home-new-sale\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "mark": "[data-tutorial-id=\"retail-terminal-amount\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "mark": "[data-tutorial-id=\"retail-terminal-live-payments\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "mark": "[data-tutorial-id=\"retail-analytics-period\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "mark": "[data-tutorial-id=\"retail-stock-add\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "mark": "[data-tutorial-id=\"nfc-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "mark": "[data-tutorial-id=\"bb-qr\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "mark": "[data-tutorial-id=\"property-home-rent\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "mark": "[data-tutorial-id=\"property-directory-add\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "mark": "[data-tutorial-id=\"tenant-edit\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "mark": "[data-tutorial-id=\"property-terminal-request\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "mark": "[data-tutorial-id=\"pa-period\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "mark": "[data-tutorial-id=\"trades-home-health\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "mark": "[data-tutorial-id=\"trades-directory-add\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "mark": "[aria-label=\"Edit client\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "mark": "[data-tutorial-id=\"trades-terminal-invoice\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "mark": "[data-tutorial-id=\"trades-quote-lines\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "mark": "[data-tutorial-id=\"trades-recurring-create\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "mark": "[data-tutorial-id=\"ta-period\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/",
+        "pageKey": "nobody",
+        "mark": "#tp-nav",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/login",
+        "pageKey": "nobody",
+        "mark": "[data-testid=\"button-login\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/signup",
+        "pageKey": "nobody",
+        "mark": "\"start with you\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/forgot-password",
+        "pageKey": "nobody",
+        "mark": "input[placeholder=\"Enter your email\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/reset-password",
+        "pageKey": "nobody",
+        "mark": "\"Invalid Reset Link\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/check-email",
+        "pageKey": "nobody",
+        "mark": "\"Check your email\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/info",
+        "pageKey": "nobody",
+        "mark": "\"info pack\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/terms",
+        "pageKey": "nobody",
+        "mark": "\"1. Service Description\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/privacy",
+        "pageKey": "nobody",
+        "mark": "\"Office of the Privacy Commissioner\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/pay/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/checkout/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/split/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/receipt/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (no sale)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (an open sale)",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (a sale just paid)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/checkout/:number",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/split/:number",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/receipt/:number",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/pay/:id",
+        "pageKey": "nobody",
+        "mark": "\"Ask for your payment link\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/pay/return/:state",
+        "pageKey": "nobody",
+        "mark": "\"Reopen the original payment link\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/onboarding",
+        "pageKey": "a new business",
+        "mark": "\"Complete Your Business Profile\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"stat-total-revenue\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin/merchants",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"input-search-merchants\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin/merchants/:id",
+        "pageKey": "admin",
+        "mark": "\"Account Information\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin/api",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"api-management-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin/analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin/web-analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "tablet",
+        "mode": "outside",
+        "path": "/admin/settings",
+        "pageKey": "admin",
+        "mark": "\"Settings page coming soon\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "mark": "[data-tutorial-id=\"retail-home-new-sale\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "mark": "[data-tutorial-id=\"retail-terminal-amount\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "mark": "[data-tutorial-id=\"retail-terminal-live-payments\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "mark": "[data-tutorial-id=\"retail-analytics-period\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "mark": "[data-tutorial-id=\"retail-stock-add\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "mark": "[data-tutorial-id=\"nfc-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "mark": "[data-tutorial-id=\"bb-qr\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "mark": "[data-tutorial-id=\"property-home-rent\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "mark": "[data-tutorial-id=\"property-directory-add\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "mark": "[data-tutorial-id=\"tenant-edit\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "mark": "[data-tutorial-id=\"property-terminal-request\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "mark": "[data-tutorial-id=\"pa-period\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "mark": "[data-tutorial-id=\"trades-home-health\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "mark": "[data-tutorial-id=\"trades-directory-add\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "mark": "[aria-label=\"Edit client\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "mark": "[data-tutorial-id=\"trades-terminal-invoice\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "mark": "[data-tutorial-id=\"trades-quote-lines\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "mark": "[data-tutorial-id=\"trades-recurring-create\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "mark": "[data-tutorial-id=\"ta-period\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/",
+        "pageKey": "nobody",
+        "mark": "#tp-nav",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/login",
+        "pageKey": "nobody",
+        "mark": "[data-testid=\"button-login\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/signup",
+        "pageKey": "nobody",
+        "mark": "\"start with you\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/forgot-password",
+        "pageKey": "nobody",
+        "mark": "input[placeholder=\"Enter your email\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/reset-password",
+        "pageKey": "nobody",
+        "mark": "\"Invalid Reset Link\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/check-email",
+        "pageKey": "nobody",
+        "mark": "\"Check your email\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/info",
+        "pageKey": "nobody",
+        "mark": "\"info pack\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/terms",
+        "pageKey": "nobody",
+        "mark": "\"1. Service Description\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/privacy",
+        "pageKey": "nobody",
+        "mark": "\"Office of the Privacy Commissioner\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/pay/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/checkout/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/split/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/receipt/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (no sale)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (an open sale)",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (a sale just paid)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/checkout/:number",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/split/:number",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/receipt/:number",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/pay/:id",
+        "pageKey": "nobody",
+        "mark": "\"Ask for your payment link\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/pay/return/:state",
+        "pageKey": "nobody",
+        "mark": "\"Reopen the original payment link\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/onboarding",
+        "pageKey": "a new business",
+        "mark": "\"Complete Your Business Profile\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"stat-total-revenue\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin/merchants",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"input-search-merchants\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin/merchants/:id",
+        "pageKey": "admin",
+        "mark": "\"Account Information\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin/api",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"api-management-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin/analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin/web-analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "desktop",
+        "mode": "outside",
+        "path": "/admin/settings",
+        "pageKey": "admin",
+        "mark": "\"Settings page coming soon\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/dashboard",
+        "pageKey": "retail-dashboard",
+        "mark": "[data-tutorial-id=\"retail-home-new-sale\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/terminal",
+        "pageKey": "retail-terminal",
+        "mark": "[data-tutorial-id=\"retail-terminal-amount\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/stack",
+        "pageKey": "retail-payment-stack",
+        "mark": "[data-tutorial-id=\"retail-terminal-live-payments\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/transactions",
+        "pageKey": "retail-transactions",
+        "mark": "[data-tutorial-id=\"retail-analytics-period\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/stock",
+        "pageKey": "retail-stock",
+        "mark": "[data-tutorial-id=\"retail-stock-add\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/nfc",
+        "pageKey": "retail-nfc",
+        "mark": "[data-tutorial-id=\"nfc-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/board-builder",
+        "pageKey": "payment-board-builder",
+        "mark": "[data-tutorial-id=\"bb-qr\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "retail",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property",
+        "pageKey": "property-dashboard",
+        "mark": "[data-tutorial-id=\"property-home-rent\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/tenants",
+        "pageKey": "property-tenants",
+        "mark": "[data-tutorial-id=\"property-directory-add\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/tenants/11111111-1111-4111-8111-000000000001",
+        "pageKey": "property-tenant-profile",
+        "mark": "[data-tutorial-id=\"tenant-edit\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/terminal",
+        "pageKey": "property-terminal",
+        "mark": "[data-tutorial-id=\"property-terminal-request\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/property/analytics",
+        "pageKey": "property-analytics",
+        "mark": "[data-tutorial-id=\"pa-period\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "property",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades",
+        "pageKey": "trades-dashboard",
+        "mark": "[data-tutorial-id=\"trades-home-health\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/clients",
+        "pageKey": "trades-clients",
+        "mark": "[data-tutorial-id=\"trades-directory-add\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/clients/55555555-5555-4555-8555-000000000001",
+        "pageKey": "trades-client-profile",
+        "mark": "[aria-label=\"Edit client\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/terminal",
+        "pageKey": "trades-terminal",
+        "mark": "[data-tutorial-id=\"trades-terminal-invoice\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/quote",
+        "pageKey": "trades-quote",
+        "mark": "[data-tutorial-id=\"trades-quote-lines\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/recurring",
+        "pageKey": "trades-recurring",
+        "mark": "[data-tutorial-id=\"trades-recurring-create\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/trades/analytics",
+        "pageKey": "trades-analytics",
+        "mark": "[data-tutorial-id=\"ta-period\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "trades",
+        "path": "/settings",
+        "pageKey": "settings",
+        "mark": "[data-tutorial-id=\"settings-business\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/",
+        "pageKey": "nobody",
+        "mark": "#tp-nav",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/login",
+        "pageKey": "nobody",
+        "mark": "[data-testid=\"button-login\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/signup",
+        "pageKey": "nobody",
+        "mark": "\"start with you\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/forgot-password",
+        "pageKey": "nobody",
+        "mark": "input[placeholder=\"Enter your email\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/reset-password",
+        "pageKey": "nobody",
+        "mark": "\"Invalid Reset Link\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/check-email",
+        "pageKey": "nobody",
+        "mark": "\"Check your email\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/info",
+        "pageKey": "nobody",
+        "mark": "\"info pack\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/terms",
+        "pageKey": "nobody",
+        "mark": "\"1. Service Description\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/privacy",
+        "pageKey": "nobody",
+        "mark": "\"Office of the Privacy Commissioner\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/pay/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/checkout/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/split/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/receipt/t/:token",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (no sale)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (an open sale)",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/pay/:id/stone/:stone (a sale just paid)",
+        "pageKey": "nobody",
+        "mark": "\"Waiting for Payment\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/checkout/:number",
+        "pageKey": "nobody",
+        "mark": "\"enter credit card\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/split/:number",
+        "pageKey": "nobody",
+        "mark": "\"each pays\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/receipt/:number",
+        "pageKey": "nobody",
+        "mark": "\"Payment Accepted!\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/pay/:id",
+        "pageKey": "nobody",
+        "mark": "\"Ask for your payment link\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/pay/return/:state",
+        "pageKey": "nobody",
+        "mark": "\"Reopen the original payment link\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/onboarding",
+        "pageKey": "a new business",
+        "mark": "\"Complete Your Business Profile\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"stat-total-revenue\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin/merchants",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"input-search-merchants\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin/merchants/:id",
+        "pageKey": "admin",
+        "mark": "\"Account Information\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin/api",
+        "pageKey": "admin",
+        "mark": "[data-testid=\"api-management-unavailable\"]",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin/analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin/web-analytics",
+        "pageKey": "admin",
+        "mark": "\"Revenue & Platform\"",
+        "faults": []
+      },
+      {
+        "size": "desktop-short",
+        "mode": "outside",
+        "path": "/admin/settings",
+        "pageKey": "admin",
+        "mark": "\"Settings page coming soon\"",
+        "faults": []
+      }
+    ],
+    "runSourceManifest": "candidate-3-source-manifest.json; only tutorial probe checker/fixture changed afterwards",
+    "runSourceDifferencesFromImplementation": {
+      "scripts/tutorial-geometry.mjs": {
+        "runSHA256": "3d774a2cc3d92d9c28c07b3fdf8cad14c3c8f4b27365802098fe780a1f11ec0c",
+        "implementationSHA256": "f7a2aa7e305cb8b304f0bd161d5750aaa73a493932a08bde22da1dcd149a5c6c"
+      },
+      "scripts/verify-tutorial-geometry.mjs": {
+        "runSHA256": "fdc3d972cf2c5e2050051dc0ce4e86501dfe8ec021d502815ca04abe1190fb67",
+        "implementationSHA256": "f18a4121da42394a243baea8cc4747bcde4619a66f8f51c1fa1683f1ae67df8b"
+      }
+    },
+    "sourceDifferenceExplanation": "Only tutorial probe eligibility/fixture changed after this normal run; the normal gate does not import that checker. All application sources, tests, normal evaluator and built application match."
+  },
+  "otherVerification": {
+    "clientSuites": 121,
+    "clientTests": 1440,
+    "focusedRegressionTests": 29,
+    "tutorialGeometryFixtures": 18,
+    "invalidTutorialOptions": 4,
+    "deviceGeometryFixtures": 35,
+    "devicePlantedFaults": 23,
+    "deviceCleanControls": 5,
+    "sessionProtocolChecks": 33,
+    "dockFullPhases": "A-F pass"
+  },
+  "retainedEarlierFullTutorialRuns": [
+    {
+      "artifact": "tutorial-matrix-first",
+      "cells": 88,
+      "passed": 55,
+      "failed": 33
+    },
+    {
+      "artifact": "tutorial-matrix-candidate-2",
+      "cells": 88,
+      "passed": 73,
+      "failed": 15
+    },
+    {
+      "artifact": "tutorial-matrix-candidate-3",
+      "cells": 88,
+      "passed": 86,
+      "failed": 2
+    }
+  ],
+  "limits": [
+    "Chromium and synthetic local data",
+    "PostgreSQL storage/provider/native/real-device behavior not verified",
+    "T10e accessibility and T10f owner/manual acceptance remain open",
+    "Final independent implementation review remains owed",
+    "No deployment, migration, baseline or payment enablement"
+  ],
+  "recordedAtUTC": "2026-10-11T01:10:43.275881+00:00"
+}

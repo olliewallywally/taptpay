@@ -1,0 +1,1904 @@
+{
+  "scope": "R1-T10e bounded automated accessibility implementation; manual and independent acceptance remain open",
+  "base": "10f12c8d9e6a6317b1416fd1a71f4c769e03aa0d",
+  "branch": "fix/qwen-aligned-20261010",
+  "generated": "2026-10-11T10:33:41.216206+00:00",
+  "build": {
+    "candidate": "candidate-14",
+    "files": 422,
+    "treeSHA256": "1dddc402e3b0d31baf4d32b7eb09710da4756fd0eb97abc9f21c3988e8a63f90",
+    "indexSHA256": "4dc5fb3d949417a9e40207dd5e07e4fbf9639915793f2b875bc5b1745501a632",
+    "manifestSHA256": "bbb518a16b380a399a7b4844443755648d44a0fd3a2c09af74d3dab56285ed9f"
+  },
+  "source": {
+    "clientFiles": 680,
+    "clientTreeSHA256": "32c8d7404ec7ad855c6a84d17ad88f6fa0f9d4eaded8bf4502783441099f0a4a",
+    "changedClientFileSHA256": {
+      "client/src/App.tsx": "2998f95ece9dd6337f674da831a7ef35a9eebfed74cb1344a0ebe3b16193416c",
+      "client/src/__tests__/property-terminal-view-boundary.test.tsx": "eec43d224bacc98483fcefdcbf1816a8d51f024f19f63f63ec83775898bca7e2",
+      "client/src/__tests__/retail-dashboard-view-boundary.test.tsx": "6b64687ce107113b05752615e800e0dc6f78943e5f8eadb1be63c1346eced46a",
+      "client/src/__tests__/use-device-class.test.tsx": "ee01bebeb81e0644e6c35eb1842281e6eb57bd52c5e06d5ca45a313df64bf79c",
+      "client/src/accessibility-reflow.css": "a8816465789de5ad5148b4e2c52196a7a5131304b7b2c8b25d7861f8e3452892",
+      "client/src/components/AnimatedScrollList.accessibility.test.tsx": "434be03225e4c70c611d02b47cd90ade89a68d4d2f69bf4cea1885640dfa6e98",
+      "client/src/components/AnimatedScrollList.tsx": "952042e57a1211fd616d9081c780c875d72af9c8b9a802e393232f10ebec7d17",
+      "client/src/components/reports/ReportModal.test.tsx": "1c087e907d38a87d116baeaacf3b3c1219bf7c339b596578b39c92ca4dbd865e",
+      "client/src/components/reports/ReportModal.tsx": "e42d04691b265226a9d914608bce646692c5530ab6704583987d7b322d066392",
+      "client/src/components/reports/RetailReportsButton.tsx": "ee92964ea30545eb416ef60e481c8660ef6661035f2000508822dfc9644afe4e",
+      "client/src/desktop/DesktopSettingsPage.tsx": "b4ff9048adc725b2f785c6dd8d43ae823666914b9a31c6b0f5e0185e9c65ddb5",
+      "client/src/desktop/DesktopShell.tsx": "05f911407ba174c2080cf2de3dc34344096850c1212583ee982ee017edb893a4",
+      "client/src/desktop/ScaledCanvas.tsx": "3d7a4535d71a303b2f00a47a1ec07ac342c443fa876f3c4747263e0621ee14e6",
+      "client/src/desktop/desktop.css": "a2be30f582653d32f5c9bebc263f8af7a5ab04e006f633ab8b54aef70d6f4099",
+      "client/src/desktop/pages/property-analytics.tsx": "701924befa20b46f7e4e8afd32e8fa1665108215b4d41c8828b3b021c6a94b77",
+      "client/src/desktop/pages/property-clients.tsx": "aedf8b0684ea423bf3142d8f4f783b2635d4f2bab16506ec15937dd94e664608",
+      "client/src/desktop/pages/property-home.tsx": "30f15d037682402ee2fef1fa374b6be65cdf58ef7eb39e3e7e93c4fb3cf8074e",
+      "client/src/desktop/pages/property-terminal.tsx": "273270ecc539c87a9a41526647829f717a874e3d957f831e3fa89630028b8e06",
+      "client/src/desktop/pages/retail-analytics.tsx": "737b491bea3690ecc72d5ae8828f39d933d432bcdc45fc5be66c0841e61f9a25",
+      "client/src/desktop/pages/retail-home.tsx": "c38748f0b218f88fa0878577ef22789d982fea0f73bdae9b6cf56fde982c2fef",
+      "client/src/desktop/pages/retail-stock.tsx": "1eba67ee428d8da14d504c8191f4c4f72127a19e665a6248eefefbd49fb9d085",
+      "client/src/desktop/pages/retail-terminal.tsx": "6cd60286cca5bbee8e4a90d9e4068ed77ae20c34c6c5899c3502ac17e8a23f44",
+      "client/src/desktop/pages/trades-analytics.tsx": "f87ee1e9a653a5c9d8c54d2a7beba9e5c12760e2718c5063689bf6c230e9d459",
+      "client/src/desktop/pages/trades-clients.tsx": "8aadc7174f613a544037908cb576557def07e3482ce22d5b160d05369d95191c",
+      "client/src/desktop/pages/trades-home.tsx": "7bb9583d321d4724f7a4ccc62fe0e121f8d952b2a634ff4c25ff52f34fa8c8f7",
+      "client/src/desktop/pages/trades-terminal.tsx": "93224735f724949b1a52b10133e9db2a00cd4dd6ca57a10547c3a9ca4e3c981d",
+      "client/src/desktop/retail-analytics-failure.test.tsx": "bf25d83b6125b8f13c925cda4a0dca82cadcd1d0de307a5963cdd1a98075df9f",
+      "client/src/features/checkout/CheckoutView.tsx": "b769cf3e738b259e5e4c0b43a6903e6b0e0542f02ad8b3928e03bfe3e943d0e0",
+      "client/src/features/checkout/SplitPaymentView.tsx": "0d1089d73ffea4dbf32988347cd6d32c30c7036ce068a7e1c36471597b6b9790",
+      "client/src/features/dashboard/PropertyDashboardView.tsx": "b3d47d734cc3c389c2b9dba204746f13120eea60a8aacc56b4f7b65bcad72bf0",
+      "client/src/features/dashboard/RetailDashboardView.tsx": "63f17caa00368db9b9218a77908ec23d21a108d192892261a47549507bb89dfc",
+      "client/src/features/dashboard/TradesDashboardView.tsx": "4e4acabf80269079da1b23f47ce415bab32a4cd1b06f8666f81cc6b86438c31b",
+      "client/src/features/navigation/TerminalDockView.tsx": "7a05e2f0ad2f66fd2340b5f71782e48e7c8d8167057ad1f09aef29e86895eaf4",
+      "client/src/features/terminal/property/PropertyTerminalView.tsx": "94f31ae2064456c4bdc286e1ba518e14767ccf092eb955fd4c39d00cf1c2b3df",
+      "client/src/features/terminal/retail/RetailTerminalViewCore.jsx": "211a79493322649a614c5768b636266f92361b28b94e00dfb994acd4829d3ed9",
+      "client/src/features/terminal/retail/retail-terminal-view.css": "049f7a80ede028b6057d8ebe013e6f6d5b2142737ca7a90288c6558153f04003",
+      "client/src/features/terminal/trades/TradesTerminalView.tsx": "6c37485c78c4b3c12bc61b709aaad1b3e599faf7c571850e7fd7e70b2c1a7d24",
+      "client/src/hooks/use-accessible-modal.test.tsx": "495a54ccca318cb78cd53ae177dc1151e34df000ff919203b1482816dbe3521b",
+      "client/src/hooks/use-accessible-modal.ts": "a43816ef07e4a0672859ce7af7ab23a0a30b9cf45a02afa9764bf6ec4dca2424",
+      "client/src/hooks/use-device-class.ts": "1add97c61f74a937866c2416b5081f6a3abece3d65c05e0039df635c3c75337a",
+      "client/src/index.css": "dcce8791340c6d84081215c1b4805f181dec232b6f6014d1a08403a1f2e26f23",
+      "client/src/lib/tab-list-keyboard.ts": "698bb0c72c48613014566943b7c4ef753f37d13390682038b3a9eb65566c6ac5",
+      "client/src/main.tsx": "d8c308b7290bfc9705e5a6568a269902a50962ff670cba0a6103fd7af58ccf36",
+      "client/src/pages/admin/APIManagement.tsx": "bfa8cea250f7843ea9a3d452ab1144a06e4ec83262893590b6d4f212bf0a7b86",
+      "client/src/pages/admin/AdminDashboard.tsx": "71ff72475824b86830f8a45d7a516af930af12daf0dbd60804ab7239f5d8d138",
+      "client/src/pages/admin/Analytics.tsx": "a529d2ad27ee4c5e178687c79a46d239d491c73d2455374767f69553df4aad7b",
+      "client/src/pages/admin/GridDashboard.tsx": "6ee13ff928e3a483d9cbb0c43e0d641a6a95cb0c6f06fb4e5432473522e45c28",
+      "client/src/pages/admin/MerchantDetail.tsx": "3b928eb827a47a41bd49d65609eb2aa9bcbadb3889c1dd5b0a5a8076a628e41f",
+      "client/src/pages/admin/WebsiteAnalytics.tsx": "1b5447adbb5691f186c4fbefc9e7ce93240767fa1ef6d4caa2c0093aa114406e",
+      "client/src/pages/board-builder.tsx": "f6895a84a28bbf7bcf58e396e50242f56af06042ed761a599625a2c71b1f6523",
+      "client/src/pages/check-email.tsx": "e28b6c59fcc07c57ca7c35109fc90106f19ef59e9989cfcef19a8cc035d7e273",
+      "client/src/pages/customer-payment.tsx": "1603f0db05041785d5fc61aa3633761bc430047997d8d15551cc34b5fef94dc1",
+      "client/src/pages/forgot-password.tsx": "7bcc5424601c5b2fe20c962e704fc8d3092ca85eb80d12892c7932128d691462",
+      "client/src/pages/info.tsx": "68605616683bd7d87fd09ba99e7f48f7da3a553c4aa7a86e4f469b32ef3fe55a",
+      "client/src/pages/landing-page.tsx": "743645a13882811e81ea350cd3c7c7974fa30a031b5be991b712e47a43bdbbf4",
+      "client/src/pages/landingRuntime.ts": "0ec5b2d5cfd0f2624bc494b87f081aa203cc2517b95766bc76eb3c8013ea31b5",
+      "client/src/pages/login.tsx": "b686fc48571ce90874c5b2862dab76a00b5bc515a34247891a0f6c25f9531a02",
+      "client/src/pages/merchant-onboarding.tsx": "bc9d2282718904d1cbf46db1516e9acccbe43edd130feca269bcedcf72617066",
+      "client/src/pages/merchant-signup.css": "967175b9a1c6c17fa4bc26f489413cd5d9e389fb83a608f70133f1a161120176",
+      "client/src/pages/payment-stack.tsx": "de6f4761155629949ce4e81210c0b61fd18a81366be9b6a21ab1ccce3250c8fe",
+      "client/src/pages/property/property-analytics.tsx": "c97df62948286cebd78695604e0b0239e2866de2eda8da33586100a538e2f45e",
+      "client/src/pages/property/tenant-directory.tsx": "742ab8af2f86737812338cd54d4e2f0fcee90d6b83e08a4216825039b16370fc",
+      "client/src/pages/property/tenant-profile.tsx": "1e5773d4bd7203d2f55cf102fec6809a2b00abf6420126df12e06564ded3f532",
+      "client/src/pages/receipt.tsx": "0eafd0adee3dd8d2f63a7a431f347a399d2f1d647087b16daf3451b4bc4bf774",
+      "client/src/pages/settings.tsx": "fb1ba5734280b85b1aa77cd1554d5ad7b35e17f0897b9dd6a5069ebe981ee5b8",
+      "client/src/pages/stock-management.tsx": "09fa9aec458c8479a31520cd85f9fbdcd787bb9c7c79f5600211132f15ea77b6",
+      "client/src/pages/trades/client-directory.tsx": "5b979d7cf30940fe4ddee167330bcc7968fa69a77c32fd5ee7b7c63bcdff4324",
+      "client/src/pages/trades/client-profile.tsx": "dac76223d4ed5105803bd75b402c10be701f1ad5deb40bd37285a334b902e91f",
+      "client/src/pages/trades/recurring-schedules.tsx": "4692c79d98f0e3da53af8c6a29fa178baf8fbb704f476c8cdc9085893dad6c98",
+      "client/src/pages/trades/trades-analytics.tsx": "748b30fa347d8af3cf9050ddad28d74a1586998a9790543824c2c1f1a359bf27",
+      "client/src/pages/transactions.tsx": "96bdc12f216c640bbe0871415234a47b8414841fde1daf51e60367c1bf2b480b"
+    },
+    "harnessFilesSHA256": {
+      "scripts/accessibility-audit.mjs": "77ff62ad758006c3cdcd6937aa6d8379bf2216065ccab311f956fedcdcb4af7b",
+      "scripts/alert-audit.mjs": "457ec62732189b0d7f670670b93aed3cdb38573160042a83db73bfaee5e30506",
+      "scripts/device-geometry.mjs": "f1a7a5a939bff7f5907f78800f02ee4b980dfce736fe5b8aca2a9ef1306df891",
+      "scripts/dialog-audit.mjs": "ef3c7eb7975f3b6d4f12280f72f4e631231b59eb7962441c42332b0a2bfc52c3",
+      "scripts/keyboard-audit.mjs": "879cdb10ce48214a9124c49dbdc09b9dd6c7e7f4cf52fd27eeb81009070ca746",
+      "scripts/motion-audit.mjs": "630098c88e051ff0180fb2906ed93c97ab2d8177a41e06ab9c6f84a07167f839",
+      "scripts/scroll-audit.mjs": "06cc695e3efa063ded7419b06fed7f1e84639252ae0c51fd3578b7cdc78ca907",
+      "scripts/summarize-r1-t10-accessibility.mjs": "f55e8304c781d35ccf96cf16a2fc6b062645d74f5c429c04500698519552dba5",
+      "scripts/summarize-tutorial-contrast.mjs": "5c383a4593f3a5027cddf0bfc10f25ca1a52601cdc23b0d5400b9850007a87a9",
+      "scripts/tutorial-contrast.mjs": "7d9c03678f3a2aba34265ce0f51bcc1d1fe92e73e2f43b0050b54cd0c0337e00",
+      "scripts/tutorial-geometry.mjs": "f7a2aa7e305cb8b304f0bd161d5750aaa73a493932a08bde22da1dcd149a5c6c",
+      "scripts/verify-accessibility-audit.mjs": "9acc06f24c75bf03183dcd9482c9f7b642fd1696d45df224ba2ec39daff7973a",
+      "scripts/verify-device-geometry.mjs": "f77318bd67469d9533e95ee307582399a4f146042c934a08ef679c61eaaf87fa",
+      "scripts/verify-dialog-audit.mjs": "be42b70db0be60534c623be74294fa98172773af6e38284aa9d527c99be55452",
+      "scripts/verify-keyboard-audit.mjs": "a4be48b0712988145d09d88949eb5e629075c8514affc5a67b506daa06a889a7",
+      "scripts/verify-motion-audit.mjs": "3e00b324bab92773391969493c2c8af1a2aa60e35aacaa580271edf15cc99691",
+      "scripts/verify-r1-t10-device-matrix.ts": "268b858c3bdeebad149ae4ad3a2bdcdde973ef4665afc7a79f83feb403b48a51",
+      "scripts/verify-r1-t10-fixture-surfaces.mjs": "f8d6cde5498f23bf11923698fd3f761c01ad10b0e1f37547e8e480dac572bb0b",
+      "scripts/verify-r1-t10-tutorial-accessibility.ts": "c30a60e5b0c992b82a09e574845dab1399217a4418bfb78e2f19767753bdd5af",
+      "scripts/verify-r1-t10-tutorials.ts": "34b0df75f34b257f2bb217224c7d4520a8fc3abfd3e1a8d4398787604d6dcfcd",
+      "scripts/verify-scroll-audit.mjs": "34074031b5b725fc6ef0c81d6c2b9954b82899786066658f428ed65c834c3f35",
+      "scripts/verify-tutorial-contrast.mjs": "21d91357e7928c544fc36df72946ca4cd5d0b649efc1aaaddb5f3c9a88772d2a",
+      "scripts/verify-tutorial-geometry.mjs": "f18a4121da42394a243baea8cc4747bcde4619a66f8f51c1fa1683f1ae67df8b"
+    },
+    "normalZoomHarnessFilesSHA256": {
+      "scripts/accessibility-audit.mjs": "77ff62ad758006c3cdcd6937aa6d8379bf2216065ccab311f956fedcdcb4af7b",
+      "scripts/alert-audit.mjs": "457ec62732189b0d7f670670b93aed3cdb38573160042a83db73bfaee5e30506",
+      "scripts/device-geometry.mjs": "f1a7a5a939bff7f5907f78800f02ee4b980dfce736fe5b8aca2a9ef1306df891",
+      "scripts/dialog-audit.mjs": "ef3c7eb7975f3b6d4f12280f72f4e631231b59eb7962441c42332b0a2bfc52c3",
+      "scripts/keyboard-audit.mjs": "879cdb10ce48214a9124c49dbdc09b9dd6c7e7f4cf52fd27eeb81009070ca746",
+      "scripts/motion-audit.mjs": "5f2dbaed622b7e7cc70a4e5d46b3e141334a571f147ddf202ba51a9a728b6499",
+      "scripts/scroll-audit.mjs": "06cc695e3efa063ded7419b06fed7f1e84639252ae0c51fd3578b7cdc78ca907",
+      "scripts/summarize-r1-t10-accessibility.mjs": "f55e8304c781d35ccf96cf16a2fc6b062645d74f5c429c04500698519552dba5",
+      "scripts/summarize-tutorial-contrast.mjs": "5c383a4593f3a5027cddf0bfc10f25ca1a52601cdc23b0d5400b9850007a87a9",
+      "scripts/tutorial-contrast.mjs": "7d9c03678f3a2aba34265ce0f51bcc1d1fe92e73e2f43b0050b54cd0c0337e00",
+      "scripts/tutorial-geometry.mjs": "f7a2aa7e305cb8b304f0bd161d5750aaa73a493932a08bde22da1dcd149a5c6c",
+      "scripts/verify-accessibility-audit.mjs": "9acc06f24c75bf03183dcd9482c9f7b642fd1696d45df224ba2ec39daff7973a",
+      "scripts/verify-device-geometry.mjs": "f77318bd67469d9533e95ee307582399a4f146042c934a08ef679c61eaaf87fa",
+      "scripts/verify-dialog-audit.mjs": "be42b70db0be60534c623be74294fa98172773af6e38284aa9d527c99be55452",
+      "scripts/verify-keyboard-audit.mjs": "a4be48b0712988145d09d88949eb5e629075c8514affc5a67b506daa06a889a7",
+      "scripts/verify-motion-audit.mjs": "ffb036476c2f7af6cb9e711e3d3eae80577243ea3c35dd94262ff338c9d5ca4f",
+      "scripts/verify-r1-t10-device-matrix.ts": "7e71175d095868780eef6b76b2fcc9160e381c1c1ec35da0465675fc4ce4a75e",
+      "scripts/verify-r1-t10-fixture-surfaces.mjs": "f8d6cde5498f23bf11923698fd3f761c01ad10b0e1f37547e8e480dac572bb0b",
+      "scripts/verify-r1-t10-tutorial-accessibility.ts": "c30a60e5b0c992b82a09e574845dab1399217a4418bfb78e2f19767753bdd5af",
+      "scripts/verify-r1-t10-tutorials.ts": "34b0df75f34b257f2bb217224c7d4520a8fc3abfd3e1a8d4398787604d6dcfcd",
+      "scripts/verify-scroll-audit.mjs": "34074031b5b725fc6ef0c81d6c2b9954b82899786066658f428ed65c834c3f35",
+      "scripts/verify-tutorial-contrast.mjs": "21d91357e7928c544fc36df72946ca4cd5d0b649efc1aaaddb5f3c9a88772d2a",
+      "scripts/verify-tutorial-geometry.mjs": "f18a4121da42394a243baea8cc4747bcde4619a66f8f51c1fa1683f1ae67df8b"
+    },
+    "normalZoomReuseProof": {
+      "normalAndZoomDriverUnchanged": true,
+      "existingMotionProbeAndAuditUnchanged": true,
+      "onlyDriverChange": "REDUCED_MOTION environment sampling inside its existing conditional; no application, normal/zoom branch, geometry, axe, keyboard, dialog or tutorial code changes",
+      "boundMilliseconds": 1000,
+      "policyThresholdMilliseconds": 150,
+      "oldDriverSHA256": "7e71175d095868780eef6b76b2fcc9160e381c1c1ec35da0465675fc4ce4a75e",
+      "oldMotionModuleSHA256": "5f2dbaed622b7e7cc70a4e5d46b3e141334a571f147ddf202ba51a9a728b6499"
+    },
+    "sourceChangedAfterFreeze": [],
+    "harnessChangedAfterFreeze": []
+  },
+  "completeAutomatedMatrix": true,
+  "seededTerminalRowContractPassed": true,
+  "terminalRowObservations": [
+    {
+      "variant": "normal",
+      "context": "phone",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 10,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "phone",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 2,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "phone",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 6,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "tablet",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "tablet",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "tablet",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "desktop",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "desktop",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "desktop",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "desktop-short",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "desktop-short",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "normal",
+      "context": "desktop-short",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "zoom",
+      "context": "phone",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 10,
+      "initialVisible": 0,
+      "seen": 10
+    },
+    {
+      "variant": "zoom",
+      "context": "phone",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 0,
+      "seen": 10
+    },
+    {
+      "variant": "zoom",
+      "context": "phone",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 6,
+      "initialVisible": 0,
+      "seen": 6
+    },
+    {
+      "variant": "zoom",
+      "context": "tablet",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 0,
+      "seen": 13
+    },
+    {
+      "variant": "zoom",
+      "context": "tablet",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 0,
+      "seen": 10
+    },
+    {
+      "variant": "zoom",
+      "context": "tablet",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 0,
+      "seen": 3
+    },
+    {
+      "variant": "zoom",
+      "context": "desktop",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 0,
+      "seen": 13
+    },
+    {
+      "variant": "zoom",
+      "context": "desktop",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 0,
+      "seen": 10
+    },
+    {
+      "variant": "zoom",
+      "context": "desktop",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 0,
+      "seen": 3
+    },
+    {
+      "variant": "zoom",
+      "context": "desktop-short",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 0,
+      "seen": 13
+    },
+    {
+      "variant": "zoom",
+      "context": "desktop-short",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 0,
+      "seen": 10
+    },
+    {
+      "variant": "zoom",
+      "context": "desktop-short",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 0,
+      "seen": 3
+    },
+    {
+      "variant": "reduced",
+      "context": "phone",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 10,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "phone",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 2,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "phone",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 6,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "tablet",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "tablet",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "tablet",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "desktop",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "desktop",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "desktop",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 3,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "desktop-short",
+      "mode": "retail",
+      "path": "/terminal",
+      "total": 13,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "desktop-short",
+      "mode": "property",
+      "path": "/property/terminal",
+      "total": 10,
+      "initialVisible": 4,
+      "seen": null
+    },
+    {
+      "variant": "reduced",
+      "context": "desktop-short",
+      "mode": "trades",
+      "path": "/trades/terminal",
+      "total": 3,
+      "initialVisible": 3,
+      "seen": null
+    }
+  ],
+  "expectedFinalCells": 876,
+  "finalCells": 876,
+  "passedFinalCells": 876,
+  "failedFinalCells": 0,
+  "missingRuns": [],
+  "finalRuns": [
+    {
+      "run": "final-normal-phone",
+      "variant": "normal",
+      "context": "phone",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:34:54.507213+00:00",
+      "finished": "2026-10-11T09:41:30.897326+00:00",
+      "reportSHA256": "650f5578f3609bd261381e35c5c7fc724828ff26f2ca5f96a82b9a116089c89b",
+      "statusSHA256": "19deee4ea785a1d660e622ee1127304b694df19332e8709539367e6047f10e15",
+      "audits": 62,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 25,
+        "aria-hidden-focus": 3,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 397,
+        "aria-hidden-focus": 9,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 373,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-normal-tablet",
+      "variant": "normal",
+      "context": "tablet",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:34:54.594318+00:00",
+      "finished": "2026-10-11T09:41:47.505752+00:00",
+      "reportSHA256": "7df694b893989e11b98ac936374c6eefcfb107c26f1d30f7c9440c5a6f5923cb",
+      "statusSHA256": "3d0f7e9e7de10eb733ec27cf513fd91f00a9cb354ef369244373e417376701b8",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 28,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 555,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 591,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-normal-desktop",
+      "variant": "normal",
+      "context": "desktop",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:34:54.577802+00:00",
+      "finished": "2026-10-11T09:42:13.593419+00:00",
+      "reportSHA256": "4615678f706edbb78c77687d03f0fe7f47a78e8a75ac317579e781c585958b17",
+      "statusSHA256": "36fd178397d4123022289699fb01db17dcaaf61b52406874d61576b5fd999958",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 28,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 542,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 591,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-normal-desktop-short",
+      "variant": "normal",
+      "context": "desktop-short",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:34:54.487914+00:00",
+      "finished": "2026-10-11T09:41:39.473357+00:00",
+      "reportSHA256": "9d3230685b6e0da3ed1a13f3349fbffe5f5673b62d3bd44cdf310e489f11cf67",
+      "statusSHA256": "2a50a07099d4f0ffc9a2dcbf74a69b3b3a9c214254dad5c6f0bba576b63cd9c0",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 28,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 539,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 591,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-zoom-phone",
+      "variant": "zoom",
+      "context": "phone",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:41:31.379698+00:00",
+      "finished": "2026-10-11T09:49:39.961091+00:00",
+      "reportSHA256": "f7c48b808fb6790bfa782420b577f7ae050de1473fce30c70aae458b20810f70",
+      "statusSHA256": "cad466162c40cf426294b05cbc69c51559d4c2719a6bb99d65ede041edd6472f",
+      "audits": 62,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 30,
+        "aria-hidden-focus": 3,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 345,
+        "aria-hidden-focus": 9,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 370,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-zoom-tablet",
+      "variant": "zoom",
+      "context": "tablet",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:41:47.807018+00:00",
+      "finished": "2026-10-11T09:50:47.881579+00:00",
+      "reportSHA256": "2953ae17dee7f0c802c9dbbb7a36ef425519d8e550d8283461a64585abdd716c",
+      "statusSHA256": "ed1317876096f56e53786005ad90d7ac3064439938115ef76f33651154fb26d2",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 26,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 231,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 602,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-zoom-desktop",
+      "variant": "zoom",
+      "context": "desktop",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:42:13.763543+00:00",
+      "finished": "2026-10-11T09:50:49.299194+00:00",
+      "reportSHA256": "b4c170e2b0a950cefb508c914ae2189c903b9ab45d50d17a94d94e9e15b5e95f",
+      "statusSHA256": "2cc41dde4c72d529ba04913960d68c80887cbbca597b83f4639cc4c6996c3fe4",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 26,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 294,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 602,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-zoom-desktop-short",
+      "variant": "zoom",
+      "context": "desktop-short",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:41:39.656663+00:00",
+      "finished": "2026-10-11T09:50:10.277134+00:00",
+      "reportSHA256": "5fc56353ec9fd5e70a0889be04f6cc9108678d320651c73215049cbbdb4d978d",
+      "statusSHA256": "b16bf025f758b1ac1d1ac563dce6cebdf8264a998075475d59800bf1776aa3f8",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 26,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 193,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 602,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "verified-reduced-phone",
+      "variant": "reduced",
+      "context": "phone",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:12:13.374725+00:00",
+      "finished": "2026-10-11T10:18:34.608046+00:00",
+      "reportSHA256": "5ae484b07db5bed9e50a2a6eeedb8ed15805badea4eb7b2d5d888c31d767a387",
+      "statusSHA256": "201cf5834a9fabc6e201146c6ec0d3298e6e415284ce21ebcb4c8ed96aa87e74",
+      "audits": 62,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 25,
+        "aria-hidden-focus": 3,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 395,
+        "aria-hidden-focus": 9,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 373,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "verified-reduced-tablet",
+      "variant": "reduced",
+      "context": "tablet",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:14:27.616810+00:00",
+      "finished": "2026-10-11T10:20:22.402171+00:00",
+      "reportSHA256": "6cb09d4ca90ebab41231c6fd032a513202cc9fec06ebbac0488975f7d18c501a",
+      "statusSHA256": "2031901201b0a583b7b3f5453a0bd7dd13503b4e51b4f3bc098648309d5ce14e",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 19,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 224,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 591,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "verified-reduced-desktop",
+      "variant": "reduced",
+      "context": "desktop",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:14:39.571108+00:00",
+      "finished": "2026-10-11T10:20:29.313349+00:00",
+      "reportSHA256": "fbae192b5419a07b1247d2608bad687305669a194fe7f3bc26338dcd38720f94",
+      "statusSHA256": "1150b068320e5c90a3e224df3f67de2379013261729ef56e4ca0d8998f7d3cd4",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 19,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 223,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 591,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "verified-reduced-desktop-short",
+      "variant": "reduced",
+      "context": "desktop-short",
+      "expectedCells": 51,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:13:29.754755+00:00",
+      "finished": "2026-10-11T10:19:35.867462+00:00",
+      "reportSHA256": "7b13d07e832faa37183f8759da3aab78b7c6c835bb86e04acc593a5636a0da27",
+      "statusSHA256": "6273a73bcfee83395ca77f7a177947ed146de9b19811cb55b38696edb4e4e35d",
+      "audits": 55,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 19,
+        "aria-prohibited-attr": 1
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 226,
+        "aria-prohibited-attr": 1
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 591,
+      "tutorialContrastSamples": 0,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-normal-phone",
+      "variant": "tutorial-normal",
+      "context": "phone",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:56:18.081646+00:00",
+      "finished": "2026-10-11T10:02:06.215574+00:00",
+      "reportSHA256": "06ef5dd5b2e1d9218cd88c6f9bbf04e94224d1863c7b559c12a70cebef192cf1",
+      "statusSHA256": "2664a3be52055465cd80397409b2bff26243ea00b90f0fa572d348eec3fbdc75",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 18
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 107
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 91,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-normal-tablet",
+      "variant": "tutorial-normal",
+      "context": "tablet",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:57:52.320571+00:00",
+      "finished": "2026-10-11T10:04:17.906598+00:00",
+      "reportSHA256": "dea2f4659b2d5163ad62922f17eabea3c492d3162bdd3a0d8065ed110df1b9b5",
+      "statusSHA256": "6e6e4add615d9ab3ffd2fbbd94510ca17fc9958154241dc0a9fe6908aac92fa0",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 22
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 432
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-normal-desktop",
+      "variant": "tutorial-normal",
+      "context": "desktop",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:57:52.140123+00:00",
+      "finished": "2026-10-11T10:04:34.881966+00:00",
+      "reportSHA256": "f1d0b605b0ae893cce3e85bb74c25057a1219d174dc64f7772b321530bd44c6f",
+      "statusSHA256": "6219155d9aba8a86a45a96851eb41daf56ccde8001277be6a29e8b51cd617c48",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 22
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 435
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-normal-desktop-short",
+      "variant": "tutorial-normal",
+      "context": "desktop-short",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T09:56:55.767399+00:00",
+      "finished": "2026-10-11T10:03:25.668296+00:00",
+      "reportSHA256": "ed38e9b130888fef64c5c07b3a7a7695c18022238423e0f54027acd7387738c5",
+      "statusSHA256": "2669821b912b4246ac03022e61672c28213ba36d4454e3ef92c38c5eb7ed17e1",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 22
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 440
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-zoom-phone",
+      "variant": "tutorial-zoom",
+      "context": "phone",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:02:06.764104+00:00",
+      "finished": "2026-10-11T10:07:54.196479+00:00",
+      "reportSHA256": "c0f8756d96e07cf9b97851dece395cfbd682c4e30c7f3846b99aba1511933601",
+      "statusSHA256": "61396a04f9c601d478aff0b6bff3c9769d0e42ab6d40f36546ddb4be66e88901",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 20
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 74
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 91,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-zoom-tablet",
+      "variant": "tutorial-zoom",
+      "context": "tablet",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:04:18.260924+00:00",
+      "finished": "2026-10-11T10:10:22.581383+00:00",
+      "reportSHA256": "2646366bd73f645213ad3c5ee8b4bedbd33ff3a108e05caaffc93e421795fb55",
+      "statusSHA256": "fea638bed23f85092bc8864e731ff01758d7c32103aaf0841edd27377befcaa0",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 20
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 124
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-zoom-desktop",
+      "variant": "tutorial-zoom",
+      "context": "desktop",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:04:35.092509+00:00",
+      "finished": "2026-10-11T10:10:36.708048+00:00",
+      "reportSHA256": "b74b111364fe8842e220461d3fb0f71522daf715176a637d99d1085517657093",
+      "statusSHA256": "357a305b363eaf79e01461567f726d8d8a60a3785e0d996c6190c401d67566c1",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 20
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 163
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-zoom-desktop-short",
+      "variant": "tutorial-zoom",
+      "context": "desktop-short",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:03:25.890082+00:00",
+      "finished": "2026-10-11T10:09:15.540232+00:00",
+      "reportSHA256": "a69ce3baaa509ac1cfe17df1bb3444cbe9b977823855c70dd7e4641882a4da23",
+      "statusSHA256": "010c5b968a18997bc8c90be467c7b808be296def67431b1750c1753b0e032ea9",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 20
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 110
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-reduced-phone",
+      "variant": "tutorial-reduced",
+      "context": "phone",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:07:54.558273+00:00",
+      "finished": "2026-10-11T10:12:11.265359+00:00",
+      "reportSHA256": "93b524ebd10fc0c0e56d80dfad94047fbd6740bfd42e3abeca6275a49853f101",
+      "statusSHA256": "2812364ca35ef5b24b0929eafd4d2f5a1831c6ad74b8c8c576e658e5677c64be",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 18
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 107
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 91,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-reduced-tablet",
+      "variant": "tutorial-reduced",
+      "context": "tablet",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:10:22.862351+00:00",
+      "finished": "2026-10-11T10:14:27.147598+00:00",
+      "reportSHA256": "cb19b727fce69f98ca77ba35f26932bc46589a227fc64f6c81b53a3eb1bcff77",
+      "statusSHA256": "741cac2c23b80196077e3eaeea1d1a4f2e29c009aad3600d53fc5eeb8ed786ad",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 18
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 119
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-reduced-desktop",
+      "variant": "tutorial-reduced",
+      "context": "desktop",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:10:36.956752+00:00",
+      "finished": "2026-10-11T10:14:38.882551+00:00",
+      "reportSHA256": "655bc5f54ec5231caa85eed25eaf664147f920a29082faf1e3424d166a140ced",
+      "statusSHA256": "a74a7299da6141b683afec82d5b382b0f8bb12cf99e33cab4be017a8b84d99c8",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 18
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 119
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    },
+    {
+      "run": "final-tutorial-reduced-desktop-short",
+      "variant": "tutorial-reduced",
+      "context": "desktop-short",
+      "expectedCells": 22,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "harnessMatchesFrozen": true,
+      "started": "2026-10-11T10:09:15.729324+00:00",
+      "finished": "2026-10-11T10:13:28.356523+00:00",
+      "reportSHA256": "66bda4b1e14b6b8646c12e3584a3ccff29acfdf7affbb9eb445062022819d43e",
+      "statusSHA256": "10ab288365a87224befa5d65f211e878e584517b7393c93c0b17388aa30b58c6",
+      "audits": 22,
+      "violationsByRule": {},
+      "violationNodesByRule": {},
+      "incompleteByRule": {
+        "color-contrast": 21
+      },
+      "incompleteNodesByRule": {
+        "color-contrast": 127
+      },
+      "experimentalRuleIds": [
+        "css-orientation-lock",
+        "label-content-name-mismatch",
+        "p-as-heading",
+        "table-fake-caption",
+        "td-has-header"
+      ],
+      "keyboardObservations": 44,
+      "tutorialContrastSamples": 97,
+      "failedSurfaces": []
+    }
+  ],
+  "checks": [
+    {
+      "log": "typecheck-publication.log",
+      "exitCode": 0,
+      "logSHA256": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3"
+    },
+    {
+      "log": "build-final.log",
+      "exitCode": 0,
+      "logSHA256": "ab80ed62adbd8f851e2219e0f6ac38987d290122e39a40f948d486d02d97a2b4"
+    },
+    {
+      "log": "server-build-final.log",
+      "exitCode": 0,
+      "logSHA256": "dbad0bff2a634df69d74312781b93fc22fbed2e16848f799e26ec2bee8dfb30b"
+    },
+    {
+      "log": "client-suite-final-third.log",
+      "exitCode": 0,
+      "logSHA256": "dc1f7dcc8eb3ea346296a6d864fbd677c9b87e8ce1785ac4f7a13b54ee7053b4"
+    },
+    {
+      "log": "geometry-edge-green.log",
+      "exitCode": 0,
+      "logSHA256": "3df73dcd2175337b6e0a8efaca218092c202d4292aebe8a9bd827b60facb98f1"
+    },
+    {
+      "log": "scroll-horizontal-green.log",
+      "exitCode": 0,
+      "logSHA256": "c6f66d47aa047d20e73850f38f7d90120b9029a1c29d4da22d6ae6f454793d37"
+    },
+    {
+      "log": "motion-settled-controls.log",
+      "exitCode": 0,
+      "logSHA256": "d66a08311d1ff395e8b0f80d7409d9c6c9eedaa84fc7b5ab816a19827c324492"
+    },
+    {
+      "log": "final-verify-accessibility-audit.mjs.log",
+      "exitCode": 0,
+      "logSHA256": "794492467dcf7a3ee4e44a15e85baf752d197a94623185775fb8b5cdc936a1dd"
+    },
+    {
+      "log": "final-verify-keyboard-audit.mjs.log",
+      "exitCode": 0,
+      "logSHA256": "37fe9e232449e5403738b4e575d03a1fffa21f2f0b8ca5d000c7089e72633238"
+    },
+    {
+      "log": "final-verify-dialog-audit.mjs.log",
+      "exitCode": 0,
+      "logSHA256": "d9892a53c159bad538c13cee3fd68951920911e296609bab08d8086b0b5be80a"
+    }
+  ],
+  "retainedChecks": [
+    {
+      "log": "client-suite-first.log",
+      "logSHA256": "061adb4a8ea11bc7fd5f75ab14312a28e038dcd7552c5e320644b8a86f93cd04"
+    },
+    {
+      "log": "client-suite-final.log",
+      "logSHA256": "cbdcce7a708cdfcbd6f57d0e01c5617e6177172260ca2298f5e078c514bc684a"
+    },
+    {
+      "log": "client-suite-final-second.log",
+      "logSHA256": "4c24415af85317ab60f8c5123cd4b73bd8fb0734c50493a0d9ab8d37950121d8"
+    },
+    {
+      "log": "typecheck-final.log",
+      "logSHA256": "15f45bbc99b695ca3e00b5d5ba817e6cd1bcc95f4447e9e0ce1171e1b1be5f9d"
+    },
+    {
+      "log": "geometry-edge-red.log",
+      "logSHA256": "156f8e594a8cdd848c147c64d4e71c61ad1ff2f0a4f4b09e65ff785701073f68"
+    },
+    {
+      "log": "geometry-edge-red-second.log",
+      "logSHA256": "4c101ef530edf9418cd4795d61df99a8e7a20e4f4dfb053fab9c0523d28c0648"
+    },
+    {
+      "log": "scroll-horizontal-red.log",
+      "logSHA256": "fe72535d60f477204fe38a4cc05b4ecfa0342888e886bb135438dc34969b663d"
+    }
+  ],
+  "priorRuns": [
+    {
+      "run": "active-fifth-phone",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "candidate": "candidate-5",
+      "statusSHA256": "42d87882eb281b1fab8d49e6a57f89ccf3fcf738ab02a44ebdfb1aab1b07236b",
+      "reportSHA256": "768308195a5cfc0e212c75a3de2d1964529577994b1c451aef7b86369e270a99"
+    },
+    {
+      "run": "active-zoom-tenth-desktop",
+      "exitCode": 0,
+      "harnessUnchanged": false,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "candidate": "candidate-10",
+      "statusSHA256": "e375a71cdbeda3daf6695f5fe82a92daf77f9007f6ca1ad60b9b20b0e027c354",
+      "reportSHA256": "62ec8bca44080a6aebbcbe2711f5a458490d5e079f4b87abb6eff7c036f9f9f6"
+    },
+    {
+      "run": "active-zoom-tenth-phone",
+      "exitCode": 0,
+      "harnessUnchanged": false,
+      "cells": 22,
+      "passed": 22,
+      "failed": 0,
+      "candidate": "candidate-10",
+      "statusSHA256": "35868123433593378d852b9c8faf9b7b018413ad7fb69770a91aacc2b1c75ebb",
+      "reportSHA256": "afa0d83a700682e2be9ff1e68e66e8659060923e86ac17fec1c977cab479d6a5"
+    },
+    {
+      "run": "alerts-baseline",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-3",
+      "statusSHA256": "916fba878bfaca6ffa052662e0b6d30a41960153eeda4f4573b61f056f07bd12",
+      "reportSHA256": "f66f0267dba78b254efee2dfee3917fd5b6d617603d4026a893832084c980afb"
+    },
+    {
+      "run": "diag-home-tablet",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-13",
+      "statusSHA256": "151070a8bf79a581d6586d673228a6fe0673a2e6e078c2e9d8fda5638b37171d",
+      "reportSHA256": "60fb5c11ca4d00737da31356cb4d1bee77b312f40eefcb1b73a8f5c6086e581c"
+    },
+    {
+      "run": "expanded-stock-red",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-7",
+      "statusSHA256": "630632808b4ac48d24da890ae27b76fc7e86c1e10eff1be767f39f4386862a6f",
+      "reportSHA256": "020d49d35dd69dd7499c3488968c0a3da4b2b6705a58e7c051b924b8f638ee99"
+    },
+    {
+      "run": "final-reduced-desktop-short",
+      "exitCode": 0,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "candidate": "candidate-14",
+      "statusSHA256": "37b84bd8c8e18ba0e26e3777c34ed854999df7dde38b1f9fa2b449f891d79496",
+      "reportSHA256": "8b00239eacb52d8978b7fc0491bcface288bfd7dd0438472c2584a703db2b4f0"
+    },
+    {
+      "run": "final-reduced-desktop",
+      "exitCode": 0,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "candidate": "candidate-14",
+      "statusSHA256": "ef602b4b60bdafcf8c2df16e2dcc151a302c8fa08e95b0573150519cd3bde9e6",
+      "reportSHA256": "650d26d8bfe7cff1133d8a12f9d89781a8e9e8112111eed5420d715f38edaded"
+    },
+    {
+      "run": "final-reduced-phone",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 50,
+      "failed": 1,
+      "candidate": "candidate-14",
+      "statusSHA256": "99b9738797ad2b118e8eca7bdc7f5ee7ddb3e5e8559bfca3b1031b06d87a4068",
+      "reportSHA256": "49e0aaa0ee24c732313132c43fbb44726353076c92feffce897b0bcbd0e02ca2"
+    },
+    {
+      "run": "final-reduced-tablet",
+      "exitCode": 0,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "candidate": "candidate-14",
+      "statusSHA256": "71779753d61a5261eb64477918fe16946b8a2ae801f7863f3cf673766454ba7f",
+      "reportSHA256": "55324ddd6eeb043d3190073354af73bb6d565bb48177476518df1a99feb2e423"
+    },
+    {
+      "run": "focus-third-property",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 1,
+      "failed": 0,
+      "candidate": "candidate-3",
+      "statusSHA256": "7b43f384d36e2b26fbeb856e8a97edeb4ecca65ab58b87d3c9ee1dca81fac579",
+      "reportSHA256": "6f8cb896b530852bb3f6eb43b4969512de2e425923a15838cb11f7fadae5507a"
+    },
+    {
+      "run": "focus-third-settings",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 3,
+      "passed": 1,
+      "failed": 2,
+      "candidate": "candidate-3",
+      "statusSHA256": "ee0a2b7bb0de28e25599ae1afea66d4e84d4ad00a87fb2baa1ef304d246caadd",
+      "reportSHA256": "c6affb550c1ec2fc93af44c80dd244da5117784bfc1f32c6a5cdedcdb6ffad07"
+    },
+    {
+      "run": "focus-third-stock",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 1,
+      "failed": 0,
+      "candidate": "candidate-3",
+      "statusSHA256": "82f457132a74554c7ad7c2e67fce99cfc6b4a86eb00766351f30e698689c5bd5",
+      "reportSHA256": "a552eafdaaa01558f4477dde4895cf6db9badd5995f1a0f962b9c78e1a536407"
+    },
+    {
+      "run": "money-baseline-normal",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 1,
+      "failed": 0,
+      "candidate": "candidate-5",
+      "statusSHA256": "e94e033ca40331e96547f1906891160579860b5a4e171a06ca1dc1074f266fe0",
+      "reportSHA256": "2a8fc7c5ee4a96cfa2b62b66dfeaf13ff9a62c46fd09f7316bf04a71e185e19d"
+    },
+    {
+      "run": "money-baseline-zoom",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-5",
+      "statusSHA256": "66af5f24f91ade73467b9558341f430bfb4164df320f13ed903c6d09d8fcec6e",
+      "reportSHA256": "137856149e0f6ddaf18a16c4d0a08d13f10c7187b51940a039f6b70fe3162c09"
+    },
+    {
+      "run": "motion-fifth-tablet",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 49,
+      "failed": 2,
+      "candidate": "candidate-5",
+      "statusSHA256": "b62b900643ca24ce589c13f708e6a72161ebd5db6079846ed3f9863b7b718472",
+      "reportSHA256": "8f3d422889fe6e1b92df0d5e58849e392827d8986945671e88b5db5f136f5c25"
+    },
+    {
+      "run": "motion-fourth-tablet",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 44,
+      "failed": 7,
+      "candidate": "candidate-4",
+      "statusSHA256": "6ccdbc83f03ed0183ba594f6c367391d78cfbb1ce440916951e8f002ec9f1405",
+      "reportSHA256": "79412ef25b69a9a32ec4d13b41aabd6e2d88554cb6aa4a449db620a08a5aed6a"
+    },
+    {
+      "run": "motion-sixth-tablet",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 51,
+      "failed": 0,
+      "candidate": "candidate-6",
+      "statusSHA256": "635c15a0ad5eefff3643dd7e903ce98affb9ee3c989e2c10ceef5228cfcc1b06",
+      "reportSHA256": "a56c4e42f4f256414100ebd19dd4c11d907f394da8894b4dc581cf686104f46b"
+    },
+    {
+      "run": "normal-eleventh-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 49,
+      "failed": 2,
+      "candidate": "candidate-11",
+      "statusSHA256": "63152d3036d46003546c9e01a71f85632cfba38fb17dec0a4e66b87521860325",
+      "reportSHA256": "d2504036a39597e2b41885a4f2a9c2289a3399d3cb47aea26d713260b6e8a708"
+    },
+    {
+      "run": "normal-fourth-desktop",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 50,
+      "failed": 1,
+      "candidate": "candidate-4",
+      "statusSHA256": "213471ca34d373c7b81ae9e114a49e4dc21a8c953c5848dee311cc7fbe22b710",
+      "reportSHA256": "db2e28e4ab43da9025ad1b8368b239fd645847043cc2aedf2b0fe135d28bfe2b"
+    },
+    {
+      "run": "normal-fourth-phone",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 50,
+      "failed": 1,
+      "candidate": "candidate-4",
+      "statusSHA256": "f408943b23a4f5e574986c0928b9ddd071245f635f93a06b7380a7804263d051",
+      "reportSHA256": "c9e8f4d383ebd43c808ff7357c31d47efe73e74d46e75defb8ab6822282ff125"
+    },
+    {
+      "run": "normal-sixth-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 50,
+      "failed": 1,
+      "candidate": "candidate-6",
+      "statusSHA256": "0cb9fa3c4dafb27e9952b9f2d1edd8cb7d9b76536630eb11345ccbafa390db93",
+      "reportSHA256": "c10dfdc879b2d2943eea1d35ae640363738fd6e00584258e98b39f97d4f7e13c"
+    },
+    {
+      "run": "scroll-trace-property",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-7",
+      "statusSHA256": "d2fc0ba9cac13bc81652df0406cbd77519d16f79bb3e2843fa62f43cb4fdddb7",
+      "reportSHA256": "b84864cec5b6fde6273c28bba5df11ec0cd65a7f2d706bca7ccf724484691916"
+    },
+    {
+      "run": "zoom-active-third-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 0,
+      "passed": 0,
+      "failed": 0,
+      "candidate": "candidate-3",
+      "statusSHA256": "562b8901509eaf78713c927d8e93b74153a2c5d2507b8fa950fdebb240bcf3df",
+      "reportSHA256": null
+    },
+    {
+      "run": "zoom-eighth-desktop-terminal",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 1,
+      "failed": 0,
+      "candidate": "candidate-8",
+      "statusSHA256": "9e06f91d13d04ae353044f0204185e2782898e0900dcaa6ca74fa518c49c5490",
+      "reportSHA256": "4b5ee254af19f596dbeccae6c19048b78560f4b86429b65bccaca01f52d97829"
+    },
+    {
+      "run": "zoom-eighth-phone-terminal",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-8",
+      "statusSHA256": "e8ae83f5c9676669eb8bc4b860ac42ab7b7631598ccfb16ccb75f1b8b14e1f02",
+      "reportSHA256": "c743f4582ebfbfb5d3af110dd452f82e690f91365ccb10e0883a980caff3fc51"
+    },
+    {
+      "run": "zoom-eighth-property-terminal",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-8",
+      "statusSHA256": "66df0abdf0877deeb3da5a687339601568a2a9d796f3321b8ed4a4c046686407",
+      "reportSHA256": "5cfe46cd9159c8c479226e0e30c79c0c8293b2e953dd16ad452ff6559caba68e"
+    },
+    {
+      "run": "zoom-eleventh-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 50,
+      "failed": 1,
+      "candidate": "candidate-11",
+      "statusSHA256": "9e0d8367f78dc43d410b593f50a4dda35c10c237aa2d7c5fc32d55d795b0b8ba",
+      "reportSHA256": "152c54395b0c6cbe6335073361c6c9f1cafb498ea1532b73a96d7f14fe5699ea"
+    },
+    {
+      "run": "zoom-eleventh-tablet",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 48,
+      "failed": 3,
+      "candidate": "candidate-11",
+      "statusSHA256": "ea59f61aa89154e5d4d15c91dc1989e3db89ef736284635c25e8c81af443ee4e",
+      "reportSHA256": "7e87e45c303d798576e4e87effabc9135d9c504ad6b7114d5ef03347824e8f63"
+    },
+    {
+      "run": "zoom-fifth-desktop",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 46,
+      "failed": 5,
+      "candidate": "candidate-5",
+      "statusSHA256": "bba176cb07a3a8aa5952c91fbcbc97a84504c94a7b3cbc25ecd98e64f3512c59",
+      "reportSHA256": "972d5a207e9f093dd1e54a8292ceaa97bfe59d743508b7ee398cb4769a9fdd0b"
+    },
+    {
+      "run": "zoom-fifth-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 25,
+      "failed": 26,
+      "candidate": "candidate-5",
+      "statusSHA256": "4ab7d0de64465ec7aeee02c14d9ee56cb971d2a3ac8dc117d7f08e576c74a262",
+      "reportSHA256": "c07e72ab795b1cfd8d5d6b213aeaccc656e1e919c9dcf38bc9acf460b2ad02a0"
+    },
+    {
+      "run": "zoom-font-baseline",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-2",
+      "statusSHA256": "0b8293cdb570ad6e317161ca3782556daa0886ecb1ae134b62dd80824aa7daa8",
+      "reportSHA256": "30f5931d09f9154967713d1c085c94c2fec5b6bb6cc2f3543ea1675d08cefde3"
+    },
+    {
+      "run": "zoom-fourth-phone",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 23,
+      "failed": 28,
+      "candidate": "candidate-4",
+      "statusSHA256": "1574fe77d04965e9413f1f1dd61842f68b823d862c7f9331907a0eaec39437b7",
+      "reportSHA256": "a9a22cc425a2753fa02673c10c2a150c55c319f09215ed543dc9da5e6fe14e7b"
+    },
+    {
+      "run": "zoom-ninth-analytics",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 1,
+      "failed": 0,
+      "candidate": "candidate-9",
+      "statusSHA256": "ba2ee29b9bbea15e87bfe841510575f9c21e6045b023e8412dd1642e1c7fc8ec",
+      "reportSHA256": "6b28c8ea7d72ad20e5aaccd998dee2920acc2104516a47b529f8e6555b1cd79f"
+    },
+    {
+      "run": "zoom-ninth-property",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-9",
+      "statusSHA256": "eecd23d4db5f0104ce5e3c4e308c4f91a17b83da0417afd3e19e25e53bba51db",
+      "reportSHA256": "800f7b856847fae05ad4aab8510d18d8646d851709629f6a655af6ecdba40c6f"
+    },
+    {
+      "run": "zoom-ninth-stock",
+      "exitCode": 0,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 1,
+      "failed": 0,
+      "candidate": "candidate-9",
+      "statusSHA256": "a9a5e35b46a8fd64f5cc3d355e727e38407ae3925f63b1a9052795ec4569fb49",
+      "reportSHA256": "c5da0f7c4758c5e4ad256b63c8c6f34a82136a0c53940a240e925d17ed0ff243"
+    },
+    {
+      "run": "zoom-seventh-phone",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 44,
+      "failed": 7,
+      "candidate": "candidate-7",
+      "statusSHA256": "1d6247c2088be73a733de89357a0f594fe90a7c172e75c8005c82dbaca19a10d",
+      "reportSHA256": "4c89a9e52e29dec267add4424c7025c192c7016d5606c91843695d35bed4a918"
+    },
+    {
+      "run": "zoom-sixth-desktop",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 48,
+      "failed": 3,
+      "candidate": "candidate-6",
+      "statusSHA256": "5e4e3f3a6982919bb5a1eb60fd1cb506226f508881264957bcffd75cf2c75ad9",
+      "reportSHA256": "0d9ff4fe75175e91bdc387297cb1dd1f0f0b86df578381a9f530e058ee0caa99"
+    },
+    {
+      "run": "zoom-sixth-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 51,
+      "passed": 37,
+      "failed": 14,
+      "candidate": "candidate-6",
+      "statusSHA256": "91792ead8492684142618de230332e482db61a44cc3172f60cb1a10b6fda0f52",
+      "reportSHA256": "8597a5bae7ea023122bc360240c8acb6360794366353c4266d6d2d657923b80a"
+    },
+    {
+      "run": "zoom-tenth-phone",
+      "exitCode": 1,
+      "harnessUnchanged": false,
+      "cells": 51,
+      "passed": 46,
+      "failed": 5,
+      "candidate": "candidate-10",
+      "statusSHA256": "ceb656d911f7c6333ffa8540b44023bfce41af7f21a6e279b9928a3537822649",
+      "reportSHA256": "4a1374d94da8f9bf434befc19184f42d3ead86504d031f04e038a9395cddc99d"
+    },
+    {
+      "run": "zoom-third-phone",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 0,
+      "passed": 0,
+      "failed": 0,
+      "candidate": "candidate-3",
+      "statusSHA256": "5be75c3bd99ed8ba3844cc8144f4b214bcc48ea4f28efb2efa6fa588a109790f",
+      "reportSHA256": null
+    },
+    {
+      "run": "zoom-third-terminal",
+      "exitCode": 1,
+      "harnessUnchanged": true,
+      "cells": 1,
+      "passed": 0,
+      "failed": 1,
+      "candidate": "candidate-3",
+      "statusSHA256": "4120ee5cac86fbeddc7051cbd955e28a096db52bd20ebfd4109a66dd10f8f7a0",
+      "reportSHA256": "6c95849c5297b947b39ab436744354157c61bcb8d9a623ece8135b778baffc5b"
+    }
+  ],
+  "manualStatus": "Pending: actual iPhone/iPad/Safari, screen readers, incomplete/experimental candidates, owner visual/golden approval, final independent review, T10f/R1/release; no deployment",
+  "privacy": "Counts, hashes, structural fault kinds and known synthetic route paths only; no HTML, text, names, input values, secrets, cookies, headers or screenshots."
+}

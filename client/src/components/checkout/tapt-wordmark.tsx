@@ -20,6 +20,7 @@ export function TaptWordmark({ customLogoUrl, size = 34 }: TaptWordmarkProps) {
   }
   return (
     <span
+      role="img"
       aria-label="taptpay"
       style={{
         fontFamily: FONT_WORDMARK,

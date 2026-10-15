@@ -4,8 +4,9 @@ import "./support/push-test-env";
 import crypto from "crypto";
 import request from "supertest";
 import {
-  VALID_PASSWORD, bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
+  VALID_PASSWORD, signedIn, type SignedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
 } from "./support/http-harness";
+import { businessSessionBegunBy } from "./support/session-browser";
 
 /**
  * R1-T4 phase D follow-up (owner decision 2026-09-22). Push subscriptions
@@ -27,10 +28,10 @@ const web = (name: string) => ({
   endpoint: `https://fcm.googleapis.com/fcm/send/${name}`,
   keys: { p256dh: `p256dh-${name}`, auth: `auth-${name}` },
 });
-const subscribeWeb = (app: App, who: Principal | { token: string }, name: string) =>
-  request(app).post("/api/push/subscribe").set(bearer(who)).send({ subscription: web(name) });
+const subscribeWeb = (app: App, who: SignedIn, name: string) =>
+  request(app).post("/api/push/subscribe").set(signedIn(who)).send({ subscription: web(name) });
 const subscribeNative = (app: App, who: Principal, deviceToken: string) =>
-  request(app).post("/api/push/native-subscribe").set(bearer(who)).send({ deviceToken });
+  request(app).post("/api/push/native-subscribe").set(signedIn(who)).send({ deviceToken });
 const activeEndpoints = async (merchantId: number) =>
   (await storage.getPushSubscriptionsByMerchant(merchantId)).map((s) => s.endpoint).sort();
 const loginOf = async (merchantId: number, endpoint: string) =>
@@ -61,7 +62,7 @@ describe("push subscriptions belong to a login", () => {
       merchantId: owner.merchantId, endpoint: "https://fcm.googleapis.com/fcm/send/from-before", p256dh: "p", auth: "a", userId: null,
     });
 
-    expect((await request(app).post("/api/auth/sign-out-everywhere").set(bearer(owner))).status).toBe(204);
+    expect((await request(app).post("/api/auth/sign-out-everywhere").set(signedIn(owner))).status).toBe(204);
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("member-laptop").endpoint]);
   });
 
@@ -87,13 +88,13 @@ describe("push subscriptions belong to a login", () => {
     await subscribeWeb(app, owner, "this-laptop");
     await subscribeWeb(app, owner, "lost-phone");
 
-    const change = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(bearer(owner))
+    const change = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(signedIn(owner))
       .send({ currentPassword: VALID_PASSWORD, newPassword: "Changed789", confirmPassword: "Changed789" });
     expect(change.status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual([]);
 
     expect((await subscribeWeb(app, owner, "lost-phone")).status).toBe(401);
-    expect((await subscribeWeb(app, { token: change.body.token }, "this-laptop")).status).toBe(200);
+    expect((await subscribeWeb(app, businessSessionBegunBy(change), "this-laptop")).status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("this-laptop").endpoint]);
   });
 
@@ -102,7 +103,7 @@ describe("push subscriptions belong to a login", () => {
     const owner = await createOwnerPrincipal();
     await subscribeWeb(app, owner, "a");
     await subscribeWeb(app, owner, "b");
-    const off = await request(app).post("/api/push/unsubscribe").set(bearer(owner)).send({ endpoint: web("a").endpoint });
+    const off = await request(app).post("/api/push/unsubscribe").set(signedIn(owner)).send({ endpoint: web("a").endpoint });
     expect(off.status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("b").endpoint]);
   });
@@ -115,12 +116,12 @@ describe("push subscriptions belong to a login", () => {
     await subscribeNative(app, owner, "owner-phone-2");
     await subscribeNative(app, member, "member-phone");
 
-    const off = await request(app).post("/api/push/native-unsubscribe").set(bearer(owner)).send({ deviceToken: "owner-phone-1" });
+    const off = await request(app).post("/api/push/native-unsubscribe").set(signedIn(owner)).send({ deviceToken: "owner-phone-1" });
     expect(off.status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual(["apns://member-phone", "apns://owner-phone-2"]);
 
     // Without a device token (registered before tokens were remembered): that login's iPhones only.
-    expect((await request(app).post("/api/push/native-unsubscribe").set(bearer(owner)).send({})).status).toBe(200);
+    expect((await request(app).post("/api/push/native-unsubscribe").set(signedIn(owner)).send({})).status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual(["apns://member-phone"]);
   });
 
@@ -131,7 +132,7 @@ describe("push subscriptions belong to a login", () => {
     await subscribeWeb(app, owner, "owner-laptop");
     await subscribeNative(app, member, "member-phone");
 
-    expect((await request(app).delete(`/api/team/${member.user.id}`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).delete(`/api/team/${member.user.id}`).set(signedIn(owner))).status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("owner-laptop").endpoint]);
   });
 
@@ -144,7 +145,7 @@ describe("push subscriptions belong to a login", () => {
     await subscribeWeb(app, member, "member-laptop");
     await subscribeNative(app, member, "member-phone");
 
-    const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(bearer(owner))
+    const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(signedIn(owner))
       .send({ status: "disabled" });
     expect(disabled.status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("owner-laptop").endpoint]);
@@ -156,7 +157,7 @@ describe("push subscriptions belong to a login", () => {
     const stranger = await createOwnerPrincipal();
     await subscribeNative(app, owner, "owner-phone");
 
-    const off = await request(app).post("/api/push/native-unsubscribe").set(bearer(stranger)).send({ deviceToken: "owner-phone" });
+    const off = await request(app).post("/api/push/native-unsubscribe").set(signedIn(stranger)).send({ deviceToken: "owner-phone" });
     expect(off.status).toBe(403);
     expect(await activeEndpoints(owner.merchantId)).toEqual(["apns://owner-phone"]);
   });
@@ -181,7 +182,7 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     const owner = await createOwnerPrincipal();
     const logged = failStopping();
 
-    expect((await request(app).post("/api/auth/sign-out-everywhere").set(bearer(owner))).status).toBe(204);
+    expect((await request(app).post("/api/auth/sign-out-everywhere").set(signedIn(owner))).status).toBe(204);
     expect((await subscribeWeb(app, owner, "after")).status).toBe(401);
     expect(loggedTags(logged)).toContain("[SIGN_OUT_EVERYWHERE_PUSH_STOP]");
   });
@@ -192,7 +193,7 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     const member = await createMemberPrincipal(owner.merchantId);
     const logged = failStopping();
 
-    const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(bearer(owner))
+    const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(signedIn(owner))
       .send({ status: "disabled" });
     expect(disabled.status).toBe(200);
     expect((await subscribeWeb(app, member, "after")).status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
@@ -214,16 +215,16 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     expect(loggedTags(logged)).toContain("[RESET_PUSH_STOP]");
   });
 
-  it("a password change still succeeds and hands this device its fresh token", async () => {
+  it("a password change still succeeds and this device carries on under its new session", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const logged = failStopping();
 
-    const change = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(bearer(owner))
+    const change = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(signedIn(owner))
       .send({ currentPassword: VALID_PASSWORD, newPassword: "Changed789", confirmPassword: "Changed789" });
     expect(change.status).toBe(200);
     expect((await subscribeWeb(app, owner, "after")).status).toBe(401);
-    expect((await subscribeWeb(app, { token: change.body.token }, "after")).status).toBe(200);
+    expect((await subscribeWeb(app, businessSessionBegunBy(change), "after")).status).toBe(200);
     expect(loggedTags(logged)).toContain("[PASSWORD_CHANGE_PUSH_STOP]");
   });
 });

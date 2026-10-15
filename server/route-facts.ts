@@ -92,9 +92,20 @@ const AUTH_CHECK_CALLS = new Set([
   "loadTokenReceipt",
   "prepareTokenCompletion",
   "paymentAttempts.resolveReturnState",
+  "attempts.resolveReturnState",
+  "subscriptionPayments.card.resolveReturnState",
+  "deps.getCheckoutInvoiceByToken",
   "validateResetToken",
   "resetPassword",
   "verifyGoogleSignInState",
+  // R1-T5b: Sign in with Apple: this browser's state, then Apple's signed identity token.
+  "verifyAppleSignInState",
+  "verifyAppleIdentityToken",
+  // R1-T5c: a connect's return: its starting cookie under the connect key, the state Apple returned,
+  // and the session that asked, read by its id.
+  "readAppleConnectStart",
+  "appleStateMatches",
+  "liveBusinessSessionLogin",
   "storage.getMerchantByToken",
   "storage.getQuoteByToken",
   "storage.getUserByInviteToken",
@@ -109,10 +120,12 @@ const AUTH_CHECK_CALLS = new Set([
 const SIDE_EFFECT_CALLS: Record<string, string> = {
   sendEmail: "email",
   sendTeamInviteEmail: "email",
-  resendInvoiceEmail: "email",
+  resendInvoiceEmailForMerchant: "email",
   resendTradeInvoice: "email/SMS",
+  resendTradeInvoiceForMerchant: "email/SMS",
   sendTradePaymentInvoice: "email/SMS",
-  sendTradeQuote: "email/SMS",
+  sendTradePaymentInvoiceForMerchant: "email",
+  sendTradeQuoteForMerchant: "email/SMS",
   tellBusinessQuoteAcceptanceBlocked: "email",
   sendGstInvoices: "email",
   sendPushToMerchant: "push",
@@ -125,6 +138,10 @@ const SIDE_EFFECT_CALLS: Record<string, string> = {
   createCardStorageSession: "provider",
   queryStoredCardSession: "provider",
   chargeStoredCard: "provider",
+  "runtime.reconcile":"provider reconciliation",
+  "runtime.client.createSession":"provider",
+  "runtime.client.querySession":"provider",
+  "checkout.open":"provider through durable attempt coordinator",
   fetch: "outbound http",
   logSecurityEvent: "audit log",
 };
@@ -755,5 +772,65 @@ export function currentRouteFacts(repoRoot = process.cwd()): Map<string, RouteFa
   for (const file of REGISTRATION_FILES) {
     for (const [key, facts] of extractRouteFacts(read(file), file, { importedStatuses })) all.set(key, facts);
   }
+  // The retained payment factories live in separate modules. Follow their
+  // actual nested handlers so moving code cannot erase its validation/effects
+  // from the policy. Only the reviewed factory bindings are recognized.
+  const routes=read('server/routes.ts'),tree=ts.createSourceFile('server/routes.ts',routes,ts.ScriptTarget.Latest,true);
+  const modules:Record<string,{factory:string;file:string}>={
+    retailCheckoutHandlers:{factory:'createRetailCheckoutHandlers',file:'server/payment-checkout-handlers.ts'},
+    invoiceCheckoutHandlers:{factory:'createInvoiceCheckoutHandlers',file:'server/invoice-checkout-handlers.ts'},
+    durableNotificationHandlers:{factory:'createDurablePaymentNotificationHandlers',file:'server/durable-payment-notification.ts'},
+  };
+  const bindings=new Set<string>();
+  const dependencies=new Map<string,RouteFacts>();
+  const inspect=(node:ts.Node)=>{
+    if(ts.isVariableDeclaration(node)&&ts.isIdentifier(node.name)&&modules[node.name.text]&&node.initializer&&ts.isCallExpression(node.initializer)&&
+      node.initializer.expression.getText(tree)===modules[node.name.text].factory){
+      bindings.add(node.name.text);
+      const collector=new FactCollector(tree,importedStatuses);
+      const argument=node.initializer.arguments[0];
+      if(argument && ts.isObjectLiteralExpression(argument))for(const property of argument.properties){
+        if(ts.isPropertyAssignment(property) && property.name.getText(tree)==='checkRateLimit'){
+          if(isFunctionLike(property.initializer))collector.readFunction(property.initializer);
+          else if(ts.isIdentifier(property.initializer)){
+            const helper=resolveLocalFunction(property.initializer);if(helper)collector.readFunction(helper);
+          }
+        }
+      }
+      dependencies.set(node.name.text,collector.result([]));
+    }
+    ts.forEachChild(node,inspect);
+  };inspect(tree);
+  const follow=(module:{file:string},names:string[],middleware:string[])=>{
+    const source=ts.createSourceFile(module.file,read(module.file),ts.ScriptTarget.Latest,true);
+    const collector=new FactCollector(source,importedStatuses),found=new Set<string>();
+    const visit=(node:ts.Node)=>{
+      if(ts.isVariableDeclaration(node)&&ts.isIdentifier(node.name)&&names.includes(node.name.text)&&node.initializer&&isFunctionLike(node.initializer)){
+        found.add(node.name.text);collector.helpers.add(`${module.file}:${node.name.text}`);collector.readFunction(node.initializer);
+      }
+      ts.forEachChild(node,visit);
+    };visit(source);
+    if(names.some(name=>!found.has(name)))throw new Error('retained_payment_handler_missing');
+    return collector.result(middleware);
+  };
+  const visit=(node:ts.Node)=>{
+    if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&node.expression.expression.getText(tree)==='app' &&
+      node.expression.name.text in ROUTE_METHODS && ts.isStringLiteralLike(node.arguments[0])){
+      const key=`${ROUTE_METHODS[node.expression.name.text]} ${(node.arguments[0] as ts.StringLiteralLike).text}`;
+      const handler=node.arguments[node.arguments.length-1],text=handler.getText(tree);
+      const match=/^(retailCheckoutHandlers|invoiceCheckoutHandlers)\.(session|complete|returnState|numericReturn|callback|split)(?:\([^)]*\))?$/.exec(text);
+      if(match){
+        if(!bindings.has(match[1]))throw new Error('retained_payment_factory_drift');
+        const facts=follow(modules[match[1]],[match[2]],all.get(key)?.middleware??[]),dependency=dependencies.get(match[1]);
+        if(dependency)for(const field of FACT_FIELDS)(facts[field] as Array<string|number>)=[...new Set<string|number>([...facts[field],...dependency[field]])].sort((a,b)=>typeof a==='number' && typeof b==='number'?a-b:String(a).localeCompare(String(b)));
+        all.set(key,facts);
+      }
+      if(text==='...durableNotificationHandlers'){
+        if(!bindings.has('durableNotificationHandlers'))throw new Error('retained_receipt_factory_drift');
+        all.set(key,follow(modules.durableNotificationHandlers,['validate','receive','errorHandler'],all.get(key)?.middleware??[]));
+      }
+    }
+    ts.forEachChild(node,visit);
+  };visit(tree);
   return all;
 }

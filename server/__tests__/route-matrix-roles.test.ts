@@ -4,14 +4,17 @@ import "./support/test-env";
 // teammate's refusal is the one observed. A capability flag needs enforce mode (config.ts).
 process.env.FEATURE_REFUND_INITIATION = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
+// A connect's start checks that Sign in with Apple is set up before the owner, likewise (R1-T5c).
+import "./support/apple-sign-in-test-env";
 
 import crypto from "crypto";
+import { observeRefusalEffects } from "./support/refusal-effects";
 import request from "supertest";
 import { ROUTE_MATRIX } from "../route-matrix";
 import * as windcave from "../windcave";
 import {
   VALID_PASSWORD,
-  bearer,
+  signedIn,
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -42,6 +45,7 @@ interface Req {
   method: "get" | "post" | "put" | "delete";
   path: string;
   body?: Record<string, unknown>;
+  headers?:Record<string,string>;
   png?: boolean;
 }
 
@@ -55,17 +59,17 @@ const ONBOARDING = {
 const email = (who: string) => `${who}.${crypto.randomBytes(4).toString("hex")}@harness.test`;
 
 async function invited(ctx: Ctx): Promise<number> {
-  const res = await request(ctx.app).post("/api/team/invite").set(bearer(ctx.owner)).send({ email: email("invitee") });
+  const res = await request(ctx.app).post("/api/team/invite").set(signedIn(ctx.owner)).send({ email: email("invitee") });
   if (res.status >= 300) throw new Error(`fixture: invite failed ${res.status} ${JSON.stringify(res.body)}`);
   return res.body.member.id;
 }
 async function board(ctx: Ctx): Promise<number> {
-  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/tapt-stones`).set(bearer(ctx.owner)).send({ name: "Front till" });
+  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/tapt-stones`).set(signedIn(ctx.owner)).send({ name: "Front till" });
   if (res.status >= 300) throw new Error(`fixture: board failed ${res.status}`);
   return res.body.id;
 }
 async function item(ctx: Ctx): Promise<number> {
-  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/stock-items`).set(bearer(ctx.owner)).send({ name: "Seed", cost: "1.00" });
+  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/stock-items`).set(signedIn(ctx.owner)).send({ name: "Seed", cost: "1.00" });
   if (res.status >= 300) throw new Error(`fixture: stock item failed ${res.status}`);
   return res.body.id;
 }
@@ -83,6 +87,10 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
   "POST /api/subscription/cancel": () => ({ method: "post", path: "/api/subscription/cancel", body: { reason: "Too dear" } }),
   "POST /api/subscription/resume": () => ({ method: "post", path: "/api/subscription/resume", body: {} }),
   "GET /api/team": () => ({ method: "get", path: "/api/team" }),
+  // The caller's own login, owner-only: connecting Apple (R1-T5c).
+  "GET /api/auth/apple/connection": () => ({ method: "get", path: "/api/auth/apple/connection" }),
+  "POST /api/auth/apple/connect": () => ({ method: "post", path: "/api/auth/apple/connect", body: { currentPassword: VALID_PASSWORD } }),
+  "POST /api/auth/apple/disconnect": () => ({ method: "post", path: "/api/auth/apple/disconnect", body: { currentPassword: VALID_PASSWORD } }),
   "POST /api/team/invite": () => ({ method: "post", path: "/api/team/invite", body: { email: email("invitee") } }),
   "GET /api/subscription/billing-history": () => ({ method: "get", path: "/api/subscription/billing-history" }),
   "GET /api/billing/card": () => ({ method: "get", path: "/api/billing/card" }),
@@ -118,7 +126,7 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
   "GET /api/merchants/:merchantId/refunds": (ctx) => ({ method: "get", path: `/api/merchants/${ctx.merchantId}/refunds` }),
   "POST /api/transactions": (ctx) => ({ method: "post", path: "/api/transactions", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } }),
   "POST /api/transactions/cash-sale": (ctx) => ({
-    method: "post", path: "/api/transactions/cash-sale", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" },
+    method: "post", path: "/api/transactions/cash-sale", headers:{"Idempotency-Key":crypto.randomUUID()}, body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" },
   }),
   "POST /api/transactions/tap-to-pay": (ctx) => ({ method: "post", path: "/api/transactions/tap-to-pay", body: { merchantId: ctx.merchantId, amount: "5.50" } }),
   "GET /api/merchants/:id/export/pdf": (ctx) => ({ method: "get", path: `/api/merchants/${ctx.merchantId}/export/pdf` }),
@@ -148,7 +156,8 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
 };
 
 async function send(ctx: Ctx, who: Principal, req: Req) {
-  let pending = request(ctx.app)[req.method](req.path).set(bearer(who));
+  let pending = request(ctx.app)[req.method](req.path).set(signedIn(who));
+  for(const [name,value] of Object.entries(req.headers??{})) pending=pending.set(name,value);
   if (req.png) return pending.attach("logo", PNG, { filename: "logo.png", contentType: "image/png" });
   if (req.body) pending = pending.send(req.body);
   return pending;
@@ -180,9 +189,12 @@ describe("R1-T3 — a teammate on an owner-only route, and another business's ow
       const expected = row.answers[caller];
       if (typeof expected !== "number") continue;
       const before = storageSnapshot();
+    const effects = observeRefusalEffects();
       const res = await send(ctx, who, req);
       expect({ caller, status: res.status }).toEqual({ caller, status: expected });
       expect({ caller, changed: storageSnapshot() !== before }).toEqual({ caller, changed: false });
+      effects.assertNone();
+      effects.restore();
     }
 
     // The positive control: the owner's same request passes the role and tenant checks.

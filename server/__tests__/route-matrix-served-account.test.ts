@@ -1,5 +1,7 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 import "./support/push-test-env";
+import { APPLE_TEST_SERVICES_ID } from "./support/apple-sign-in-test-env";
 
 import crypto from "crypto";
 import request from "supertest";
@@ -16,14 +18,14 @@ import * as emailService from "../email-service-multi";
 import { subscriptionCardSessionState } from "../storage";
 import * as windcave from "../windcave";
 import { TUTORIAL_PAGE_KEYS } from "@shared/tutorial";
-import { bearer, resetTestStorage, storage, type Principal } from "./support/http-harness";
+import { VALID_PASSWORD, createTestApp, signedIn, resetTestStorage, storage, type Principal } from "./support/http-harness";
 import {
   CARD,
   as,
   expectServed,
+  familyRows,
   paidMonth,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx as Ctx,
   type ServedRecipe as Recipe,
@@ -32,7 +34,7 @@ import {
 
 /**
  * R1-T3 (plan C10): the allowed callers succeed — the account family (the session, the tutorials,
- * notifications, the plan, the team, the payment card, Send to Print, invoice documents). For every
+ * notifications, connecting Apple, the plan, the team, the payment card, Send to Print, invoice documents). For every
  * route of the family and every caller the matrix answers "allowed" (the owner; a teammate where the
  * route's review admits one; the platform admin where it is admitted), a real request is served: the
  * route's success status, and what the success did or returned (its review's success DTO, the record
@@ -50,6 +52,14 @@ const web = (name: string) => ({
   keys: { p256dh: `p256dh-${name}`, auth: `auth-${name}` },
 });
 const DEVICE = "matrix-device-0001";
+const APPLE_OAUTH_COOKIE = "__Host-taptpay-apple-oauth";
+/** An Apple identity connected to a login, as Apple's return leaves it (R1-T5c). */
+async function appleConnected(who: Principal) {
+  const key = { issuer: "https://appleid.apple.com", clientId: APPLE_TEST_SERVICES_ID, subject: `001234.${crypto.randomBytes(16).toString("hex")}.0123` };
+  const outcome = await storage.connectAppleIdentity(who.user.userId!, key, { email: "owner.apple@example.test", isPrivateEmail: false });
+  if (outcome !== "connected") throw new Error(`fixture: connect answered ${outcome}`);
+  return key;
+}
 const SWITCHES = { paymentReceived: false, dailyPayoutSummary: true, failedPaymentAlerts: false };
 
 async function invited(ctx: Ctx): Promise<number> {
@@ -64,13 +74,13 @@ async function board(ctx: Ctx): Promise<number> {
 }
 const PDF = Buffer.from("%PDF-1.4\n%matrix\n");
 async function document(ctx: Ctx): Promise<string> {
-  const res = await request(ctx.app).post("/api/property/invoices/document").set(bearer(ctx.owner))
+  const res = await request(ctx.app).post("/api/property/invoices/document").set(signedIn(ctx.owner))
     .attach("document", PDF, { filename: "bill.pdf", contentType: "application/pdf" });
   if (res.status >= 300) throw new Error(`fixture: upload failed ${res.status}`);
   return String(res.body.documentUrl).split("/").pop()!;
 }
 const pushStatus = async (ctx: Ctx, who: Principal) => (await as(ctx, who).get("/api/push/status")).body;
-const signedIn = async (ctx: Ctx, who: Principal) => (await as(ctx, who).get("/api/auth/me")).status;
+const meStatus = async (ctx: Ctx, who: Principal) => (await as(ctx, who).get("/api/auth/me")).status;
 const teamIds = async (ctx: Ctx) => ((await as(ctx, ctx.owner).get("/api/team")).body.members as Array<{ id: number }>).map((m) => m.id);
 
 /** Per route: a request each allowed caller is served, and what that success looks like. */
@@ -91,14 +101,61 @@ const RECIPES: Record<string, Recipe> = {
       }
     },
   }),
+  // Log Out ends the cookie session that signed the request in; the other login's session stays live.
+  "POST /api/auth/logout": (ctx, who) => ({
+    req: { method: "post", path: "/api/auth/logout" }, status: 204,
+    check: async (res) => {
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect(await meStatus(ctx, who)).toBe(401);
+      expect(await meStatus(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
+    },
+  }),
   "POST /api/auth/sign-out-everywhere": (ctx, who) => ({
     req: { method: "post", path: "/api/auth/sign-out-everywhere" }, status: 204,
     check: async () => {
       // Every session of this login has ended, this one's included; the other login's has not.
-      expect(await signedIn(ctx, who)).toBe(401);
-      expect(await signedIn(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
+      expect(await meStatus(ctx, who)).toBe(401);
+      expect(await meStatus(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
     },
   }),
+  // Connecting Apple to the owner's own login (R1-T5c). Apple is never reached: a start only answers
+  // with Apple's address, and the connection is made here as Apple's return would leave it.
+  "GET /api/auth/apple/connection": async (_ctx, who) => {
+    const key = await appleConnected(who);
+    return {
+      req: get("/api/auth/apple/connection"), status: 200,
+      check: (res) => {
+        expect(res.headers["cache-control"]).toBe("no-store");
+        expect(res.body).toEqual({ available: true, connected: true, email: "owner.apple@example.test", isPrivateEmail: false, connectedAt: expect.any(String) });
+        // Nothing that identifies the Apple account.
+        expect(JSON.stringify(res.body)).not.toContain(key.subject);
+      },
+    };
+  },
+  "POST /api/auth/apple/connect": (_ctx, who) => ({
+    req: { method: "post", path: "/api/auth/apple/connect", body: { currentPassword: VALID_PASSWORD } }, status: 200,
+    check: async (res) => {
+      const target = new URL(res.body.url);
+      expect(target.origin + target.pathname).toBe("https://appleid.apple.com/auth/authorize");
+      expect(target.searchParams.get("client_id")).toBe(APPLE_TEST_SERVICES_ID);
+      // The starting cookie names this login and this session; nothing is connected until Apple returns.
+      const cookie = ([] as string[]).concat(res.headers["set-cookie"] ?? []).find((line) => line.startsWith(`${APPLE_OAUTH_COOKIE}=`)) ?? "";
+      expect(cookie.split(";")[0].split("=")[1].split(".").slice(3, 5)).toEqual([String(who.user.userId), who.sessionId]);
+      expect(await storage.getAppleIdentityForLogin(who.user.userId!)).toBeUndefined();
+    },
+  }),
+  "POST /api/auth/apple/disconnect": async (ctx, who) => {
+    const key = await appleConnected(who);
+    return {
+      req: { method: "post", path: "/api/auth/apple/disconnect", body: { currentPassword: VALID_PASSWORD } }, status: 200,
+      check: async (res) => {
+        expect(res.body).toEqual({ connected: false });
+        expect(await storage.getAppleIdentity(key)).toBeUndefined();
+        // It ends no session: the owner carries on.
+        expect(await meStatus(ctx, who)).toBe(200);
+      },
+    };
+  },
   // The tutorials.
   "GET /api/tutorial/state": () => ({
     req: get("/api/tutorial/state"), status: 200,
@@ -202,7 +259,7 @@ const RECIPES: Record<string, Recipe> = {
   },
   "PUT /api/subscription/plan": () => ({
     // Nothing paid yet (a new business), so the move is free and immediate.
-    req: { method: "put", path: "/api/subscription/plan", body: { planId: "crew" } }, status: 200,
+    req: { method: "put", path: "/api/subscription/plan", headers: {"Idempotency-Key":requestCommandKey()}, body: { planId: "crew" } }, status: 200,
     check: (res) => {
       expect(res.body).toMatchObject({ applied: "immediate", message: "Your new plan is active." });
       expect(res.body.subscription).toMatchObject({ planId: "crew" });
@@ -211,7 +268,7 @@ const RECIPES: Record<string, Recipe> = {
   "POST /api/subscription/cancel": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "post", path: "/api/subscription/cancel", body: { reason: "Too dear" } }, status: 200,
+      req: { method: "post", path: "/api/subscription/cancel", headers: {"Idempotency-Key":requestCommandKey()}, body: { reason: "Too dear" } }, status: 200,
       check: (res) => {
         // A paid month runs out first.
         expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: true, status: "active" });
@@ -224,7 +281,7 @@ const RECIPES: Record<string, Recipe> = {
     const cancelled = await storage.cancelSubscription(ctx.merchantId, "Too dear");
     if (!cancelled.ok) throw new Error("fixture: cancel failed");
     return {
-      req: { method: "post", path: "/api/subscription/resume" }, status: 200,
+      req: { method: "post", path: "/api/subscription/resume",headers: {"Idempotency-Key":requestCommandKey()} }, status: 200,
       check: (res) => {
         expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: false, status: "active" });
         expect(res.body.message).toBe("Your subscription will renew as normal.");
@@ -274,14 +331,14 @@ const RECIPES: Record<string, Recipe> = {
     req: { method: "put", path: `/api/team/${ctx.member.user.id}/status`, body: { status: "disabled" } }, status: 200,
     check: async (res) => {
       expect(res.body.member).toMatchObject({ id: ctx.member.user.id, status: "disabled" });
-      expect(await signedIn(ctx, ctx.member)).toBe(401);
+      expect(await meStatus(ctx, ctx.member)).toBe(401);
     },
   }),
   "DELETE /api/team/:userId": (ctx) => ({
     req: { method: "delete", path: `/api/team/${ctx.member.user.id}` }, status: 200,
     check: async (res) => {
       expect(res.body).toEqual({ message: "Login removed" });
-      expect(await signedIn(ctx, ctx.member)).toBe(401);
+      expect(await meStatus(ctx, ctx.member)).toBe(401);
       expect(await teamIds(ctx)).not.toContain(ctx.member.user.id);
     },
   }),
@@ -293,40 +350,36 @@ const RECIPES: Record<string, Recipe> = {
       check: (res) => expect(res.body).toEqual({ ready: true, card: { last4: CARD.last4, brand: CARD.brand, expiry: CARD.expiry } }),
     };
   },
-  "POST /api/billing/card/session": (ctx) => {
-    jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
-    jest.spyOn(windcave, "createCardStorageSession")
-      .mockResolvedValue({ success: true, sessionId: "matrix-card-session", hppUrl: "https://uat.windcave.com/hpp/matrix" } as any);
+  "POST /api/billing/card/session": async(ctx) => {
+    const key=requestCommandKey(),start=jest.fn(async()=>({kind:'ready',sessionId:'matrix-card-session',redirectUrl:'https://uat.windcave.com/pxmi3/matrix'}));
+    const configured=await createTestApp({subscriptionPayments:{card:{canStart:()=>true,start},billing:{canInitiate:()=>false}} as any});ctx.app=configured.app;
     return {
-      req: { method: "post", path: "/api/billing/card/session" }, status: 200,
-      check: async (res) => {
-        expect(res.body).toEqual({ sessionId: "matrix-card-session", redirectUrl: "https://uat.windcave.com/hpp/matrix" });
-        // The session is bound to this business: only it can read the result back.
-        expect(subscriptionCardSessionState(await storage.getSubscription(ctx.merchantId), "matrix-card-session")).toBe("pending");
+      req:{method:'post',path:'/api/billing/card/session',headers:{'Idempotency-Key':key}},status:200,
+      check:res=>{
+        expect(res.body).toEqual({sessionId:'matrix-card-session',redirectUrl:'https://uat.windcave.com/pxmi3/matrix'});
+        expect(start).toHaveBeenCalledWith(expect.objectContaining({merchantId:ctx.merchantId,idempotencyKey:key,actor:expect.objectContaining({userId:ctx.owner.user.id,role:'owner'})}));
+        expect(res.body).not.toHaveProperty('returnState');
       },
     };
   },
-  "POST /api/billing/card/confirm": async (ctx) => {
-    await storage.getOrCreateSubscription(ctx.merchantId);
-    await storage.bindSubscriptionCardSession(ctx.merchantId, "matrix-card-session");
-    jest.spyOn(windcave, "queryStoredCardSession")
-      .mockResolvedValue({ success: true, complete: true, approved: true, card: CARD } as any);
-    jest.spyOn(windcave, "chargeStoredCard")
-      .mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "matrix-first-month" } as any);
+  "POST /api/billing/card/confirm": async(ctx) => {
+    await paidMonth(ctx);
+    const confirm=jest.fn(async()=>({state:'approved',activation_state:'approved',activation_applied_at:new Date()}));
+    const configured=await createTestApp({subscriptionPayments:{card:{confirm},billing:{canInitiate:()=>false}} as any});ctx.app=configured.app;
     return {
-      req: { method: "post", path: "/api/billing/card/confirm", body: { sessionId: "matrix-card-session" } }, status: 200,
-      check: (res) => {
-        expect(res.body).toMatchObject({
-          success: true, ready: true, charged: true, card: { last4: CARD.last4, brand: CARD.brand, expiry: CARD.expiry },
-        });
-        expect(res.body.subscription).toMatchObject({ status: "active" });
+      req:{method:'post',path:'/api/billing/card/confirm',body:{sessionId:'matrix-card-session'}},status:200,
+      check:res=>{
+        expect(confirm).toHaveBeenCalledWith(ctx.merchantId,'matrix-card-session');
+        expect(res.body).toMatchObject({success:true,ready:true,charged:true,card:{last4:CARD.last4,brand:CARD.brand,expiry:CARD.expiry}});
+        expect(res.body.subscription).toMatchObject({status:'active'});
+        expect(res.body.card).not.toHaveProperty('windcaveCardId');
       },
     };
   },
   "DELETE /api/billing/card": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "delete", path: "/api/billing/card" }, status: 200,
+      req: { method: "delete", path: "/api/billing/card",headers: {"Idempotency-Key":requestCommandKey()} }, status: 200,
       check: async (res) => {
         expect(res.body).toEqual({ success: true });
         expect((await as(ctx, ctx.owner).get("/api/billing/card")).body.card).toBeNull();
@@ -360,8 +413,7 @@ const RECIPES: Record<string, Recipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(auth\/(me|sign-out-everywhere)$|tutorial\/|push\/|subscription|team|billing\/|board-builder\/|invoice-documents\/)/;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("account");
 const SERVED = servedPairs(ROWS);
 
 /**
@@ -370,7 +422,7 @@ const SERVED = servedPairs(ROWS);
  * quietly drop or add a case here.
  */
 const TEAMMATE_SERVED = [
-  "GET /api/auth/me", "POST /api/auth/sign-out-everywhere",
+  "GET /api/auth/me", "POST /api/auth/logout", "POST /api/auth/sign-out-everywhere",
   "GET /api/tutorial/state", "PATCH /api/tutorial/pages/:pageKey", "POST /api/tutorial/restart",
   "POST /api/push/subscribe", "POST /api/push/unsubscribe", "POST /api/push/native-subscribe",
   "POST /api/push/native-unsubscribe", "GET /api/push/status", "GET /api/push/preferences", "PUT /api/push/preferences",

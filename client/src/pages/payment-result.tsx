@@ -4,20 +4,35 @@ import { useEffect } from "react";
 import { CheckCircle, XCircle, AlertCircle, ArrowLeft, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
+import { TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
+import {useTokenPagePrivacy} from '@/hooks/use-token-page-privacy';
 
 export default function PaymentResult() {
+  useTokenPagePrivacy();
   const { transactionId } = useParams<{ transactionId: string }>();
   const [, setLocation] = useLocation();
   const search = useSearch();
 
   const params = new URLSearchParams(search);
-  const status = params.get("status") || "unknown";
-  const txnId = parseInt(transactionId);
+  const state = params.get("state");
+  const txnId = /^[1-9]\d*$/.test(transactionId??'') ? Number(transactionId) : NaN;
+  const {data: confirmation} = useQuery({
+    queryKey:['payment-return',state],
+    queryFn:async()=>{
+      const response=await fetch(apiPath('GET /api/pay/return/:state',{state:state!}));
+      if(!response.ok)throw new Error('Payment confirmation unavailable');
+      return response.json();
+    },
+    enabled:!!state && /^[A-Za-z0-9_-]{43}$/.test(state),
+    refetchInterval:query=>['approved','declined','cancelled'].includes(query.state.data?.outcome) ? false : 1500,
+  });
+  const status = confirmation?.transactionId===txnId && ['approved','declined','cancelled'].includes(confirmation?.outcome)
+    ? confirmation.outcome : 'processing';
 
   const { data: transaction } = useQuery({
-    queryKey: ["/api/transactions", txnId],
+    queryKey: [TRANSACTIONS_KEY, txnId],
     queryFn: async () => {
-      const response = await fetch(`/api/transactions/${txnId}`);
+      const response = await fetch(apiPath("GET /api/transactions/:id", { id: txnId }));
       if (!response.ok) throw new Error("Transaction not found");
       return response.json();
     },
@@ -35,14 +50,16 @@ export default function PaymentResult() {
     ? `/pay/${transaction.merchantId}/stone/${transaction.taptStoneId}`
     : "/";
 
-  const receiptUrl = `/receipt/${txnId}`;
+  const splitId=Number.isInteger(confirmation?.receiptSplitId) && confirmation.receiptSplitId>0 ? confirmation.receiptSplitId : null;
+  const receiptUrl = `/receipt/${txnId}${splitId?`?splitId=${splitId}`:''}`;
+  const receiptReady=status==='approved' && (!confirmation?.receiptShare || !!splitId);
 
   // Auto-redirect to receipt after 2 seconds on approval
   useEffect(() => {
-    if (status !== "approved" || !txnId) return;
+    if (!receiptReady || !txnId) return;
     const timer = setTimeout(() => setLocation(receiptUrl), 2000);
     return () => clearTimeout(timer);
-  }, [status, txnId]);
+  }, [receiptReady, txnId,receiptUrl,setLocation]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -115,8 +132,8 @@ export default function PaymentResult() {
             {status !== "approved" && status !== "declined" && status !== "cancelled" && (
               <div className="text-center">
                 <AlertCircle className="w-20 h-20 text-white/60 mx-auto mb-4" />
-                <h1 className="text-2xl font-bold text-white mb-2">Payment Status Unknown</h1>
-                <p className="text-white/60 text-sm">Please check with staff.</p>
+                <h1 className="text-2xl font-bold text-white mb-2">Checking your payment</h1>
+                <p className="text-white/60 text-sm" role="status">We’re confirming the result. Keep this page open and avoid paying again. Ask staff for help if this takes longer than expected.</p>
               </div>
             )}
           </div>
@@ -133,13 +150,14 @@ export default function PaymentResult() {
                 <Button
                   className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white rounded-[20px] py-6 text-lg font-medium mb-3"
                   onClick={() => setLocation(receiptUrl)}
+                  disabled={!receiptReady}
                 >
                   <Receipt className="w-5 h-5 mr-2" />
                   View Receipt
                 </Button>
                 <p className="text-[#0055FF]/60 text-xs">Redirecting to receipt…</p>
               </div>
-            ) : (
+            ) : status!=='processing' ? (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white rounded-[20px] py-6 text-lg font-medium"
                 onClick={() => setLocation(paymentUrl)}
@@ -148,7 +166,7 @@ export default function PaymentResult() {
                 <ArrowLeft className="w-5 h-5 mr-2" />
                 Try Again
               </Button>
-            )}
+            ) : <p className="text-center text-sm text-gray-700">Your payment is being confirmed.</p>}
           </div>
         </div>
       </div>

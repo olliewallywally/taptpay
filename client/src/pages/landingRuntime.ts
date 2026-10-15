@@ -11,6 +11,7 @@ import * as THREE from 'three';
 export class LandingRuntime {
   props;
   constructor(props = {}) { this.props = props; }
+  prefersReducedMotion() { return this.props.reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
   init() {
     this._raf = null;
@@ -43,7 +44,7 @@ export class LandingRuntime {
         const t = document.getElementById(href.slice(1));
         if (!t) return;
         e.preventDefault();
-        window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY, behavior: 'smooth' });
+        window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY, behavior: this.prefersReducedMotion() ? 'auto' : 'smooth' });
         this.closeMenu && this.closeMenu();
       });
     });
@@ -53,15 +54,11 @@ export class LandingRuntime {
     const burger = $('#tp-burger');
     this.closeMenu = () => {
       if (!menu) return;
-      menu.style.opacity = '0';
-      menu.style.pointerEvents = 'none';
-      document.body.style.overflow = '';
+      this.props.onMenuChange?.(false);
     };
     if (burger && menu) {
       burger.addEventListener('click', () => {
-        menu.style.opacity = '1';
-        menu.style.pointerEvents = 'auto';
-        document.body.style.overflow = 'hidden';
+        this.props.onMenuChange?.(true);
       });
       const mc = $('#tp-menu-close');
       if (mc) mc.addEventListener('click', this.closeMenu);
@@ -95,6 +92,19 @@ export class LandingRuntime {
       });
     }, { threshold: 0.18 });
     revs.forEach((el) => io.observe(el));
+    // A keyboard scroll can land within a tall reveal before its observer's
+    // threshold is reached. Reveal the focused content immediately.
+    const root = $('#tp-root');
+    root?.addEventListener('focusin', (event) => {
+      for (let el = event.target; el && el !== root; el = el.parentElement) {
+        if (el.classList.contains('tp-rev')) {
+          el.style.transition = 'none';
+          el.style.opacity = '1';
+          el.style.transform = 'none';
+          io.unobserve(el);
+        }
+      }
+    });
 
     // measurements
     const M = { vh: window.innerHeight, vw: window.innerWidth, doc: 1, storyTop: 0, storyLen: 1, wordsTop: 0, wordsLen: 1 };
@@ -135,15 +145,15 @@ export class LandingRuntime {
 
       // nav disappears on scroll
       if (nav) {
-        const hidden = y > 90;
+        const hidden = y > 90 && !nav.contains(document.activeElement);
         nav.style.opacity = hidden ? '0' : '1';
         nav.style.transform = hidden ? 'translateY(-16px)' : 'translateY(0)';
         nav.style.pointerEvents = hidden ? 'none' : 'auto';
       }
 
       if (heroContent && y < M.vh * 1.3) {
-        heroContent.style.transform = 'translateY(' + (y * 0.16) + 'px)';
-        heroContent.style.opacity = String(clamp(1 - y / (M.vh * 0.85), 0, 1));
+        heroContent.style.transform = 'translateY(' + (this.prefersReducedMotion() ? 0 : y * 0.16) + 'px)';
+        heroContent.style.opacity = heroContent.contains(document.activeElement) ? '1' : String(clamp(1 - y / (M.vh * 0.85), 0, 1));
       }
 
       // hero coins fade smoothly instead of hard cut
@@ -156,7 +166,7 @@ export class LandingRuntime {
 
       // cinema progress
       const p = clamp((y - M.storyTop) / M.storyLen, 0, 1);
-      if (this._cine && y > M.storyTop - M.vh && y < M.storyTop + M.storyLen + M.vh * 2) this._cine(p, t);
+      if (this._cine && y > M.storyTop - M.vh && y < M.storyTop + M.storyLen + M.vh * 2) this._cine(p, this.prefersReducedMotion() ? 0 : t);
 
       // manifesto words
       const wp = clamp((y - M.wordsTop) / M.wordsLen, 0, 1);
@@ -175,7 +185,7 @@ export class LandingRuntime {
         }
         if (last && local > 1) { op = 1; ty = 0; }
         w.style.opacity = String(op);
-        w.style.transform = 'translateY(' + ty + 'px) scale(' + sc + ')';
+        w.style.transform = this.prefersReducedMotion() ? 'none' : 'translateY(' + ty + 'px) scale(' + sc + ')';
         const line = w.querySelector('.tp-wline');
         if (line) line.style.width = (strike * 104) + '%';
       });
@@ -889,6 +899,11 @@ export class LandingRuntime {
     let open = false;
     head.addEventListener('click', () => {
       open = !open;
+      head.setAttribute('aria-expanded', String(open));
+      if (body) {
+        if (!open && body.contains(document.activeElement)) head.focus();
+        body.inert = !open; body.setAttribute('aria-hidden', String(!open));
+      }
       if (open) {
         shell.style.transition = 'width .42s ' + EASE + ', height .55s ' + EASE + ' .34s, border-radius .42s ease, background .4s ease';
         if (body) body.style.transition = 'opacity .35s ease .82s';
@@ -909,6 +924,7 @@ export class LandingRuntime {
         if (plus) plus.style.transform = 'rotate(0deg)';
       }
     });
+    body?.addEventListener('keydown', (event) => { if (event.key === 'Escape' && open) { event.preventDefault(); head.click(); } });
     const send = $('#tpc-send');
     if (send) send.addEventListener('click', () => {
       const f = $('#tpc-fields'); const t = $('#tpc-thanks');
@@ -1185,6 +1201,7 @@ export class LandingRuntime {
 
     let rot = -540, anim = null;
     const setRot = (deg, ms) => {
+      if (this.prefersReducedMotion()) ms = 0;
       if (!ms) { rot = deg; anim = null; return; }
       anim = { from: rot, to: deg, start: performance.now(), dur: ms };
     };
@@ -1202,7 +1219,7 @@ export class LandingRuntime {
       }
       const r = wrapEl ? wrapEl.getBoundingClientRect() : null;
       if (r && (r.bottom < -window.innerHeight * 0.6 || r.top > window.innerHeight * 1.6)) return;
-      const rx = Math.sin(now * 0.00055) * 1.1;
+      const rx = this.prefersReducedMotion() ? 0 : Math.sin(now * 0.00055) * 1.1;
       group.rotation.x = -rx * Math.PI / 180;
       group.rotation.y = rot * Math.PI / 180;
       sweep.position.set(Math.sin(rot * Math.PI / 180 + 0.9) * 800, 260, Math.cos(rot * Math.PI / 180 + 0.9) * 800);
@@ -1220,7 +1237,6 @@ export class LandingRuntime {
     const canvas = document.querySelector('#tp-coins');
     const hero = document.querySelector('#tp-hero');
     if (!canvas || !hero || !THREE) return;
-    const reduced = this.props.reducedMotion ?? false;
     const density = this.props.coinDensity ?? 1.4;
     const isMobile = window.innerWidth < 768;
 
@@ -1361,13 +1377,14 @@ export class LandingRuntime {
     const loop = () => {
       requestAnimationFrame(loop);
       const now = performance.now();
+      const reduced = this.prefersReducedMotion();
       const dt = Math.min((now - t0) / 16.6, 3); t0 = now;
       if (document.hidden || this._coinsOpacity <= 0.001) return;
       const t = now / 1000;
       sm.x += (this._mx - sm.x) * 0.05;
       sm.y += (this._my - sm.y) * 0.05;
-      camera.position.x = sm.x * 1.6;
-      camera.position.y = -sm.y * 1.2;
+      camera.position.x = reduced ? 0 : sm.x * 1.6;
+      camera.position.y = reduced ? 0 : -sm.y * 1.2;
       camera.lookAt(0, 0, 0);
       const sv = Math.max(-30, Math.min(30, this._scrollVel || 0));
       coins.forEach((c) => {

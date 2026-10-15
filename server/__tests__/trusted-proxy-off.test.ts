@@ -2,7 +2,7 @@ import "./support/test-env";
 import "./support/google-oauth-test-env";
 
 import request from "supertest";
-import { bearer, createAdminPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
+import { signedIn, createAdminPrincipal, createTestApp, resetTestStorage } from "./support/http-harness";
 
 /**
  * R1-T4 phase B, with the setting off (TRUST_PROXY_HOPS unset: the default until the
@@ -32,7 +32,7 @@ const FORGED = { "X-Forwarded-For": "203.0.113.9", "X-Forwarded-Proto": "https" 
 it("takes the connection's own address and protocol, whatever the visitor writes", async () => {
   const { app } = await createTestApp();
 
-  const seen = await request(app).get("/api/admin/request-origin").set(bearer(createAdminPrincipal())).set(FORGED);
+  const seen = await request(app).get("/api/admin/request-origin").set(signedIn(await createAdminPrincipal())).set(FORGED);
 
   expect(seen.status).toBe(200);
   expect(seen.body).toEqual(expect.objectContaining({

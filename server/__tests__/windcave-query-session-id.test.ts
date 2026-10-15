@@ -1,3 +1,18 @@
+// R2-T1: the session client never calls the provider while payments are disabled,
+// which the test environment's default is. Configure UAT so the query is made.
+jest.mock("../config", () => {
+  const actual = jest.requireActual("../config");
+  return {
+    ...actual,
+    config: {
+      ...actual.config,
+      paymentMode: "uat",
+      publicOrigin: "https://app.example.test",
+      windcave: { ...actual.config.windcave, endpoint: actual.UAT_WINDCAVE_ENDPOINT, username: "SyntheticUser", apiKey: "synthetic-key" },
+    },
+  };
+});
+
 import { queryWindcaveSession } from "../windcave";
 
 /**
@@ -8,12 +23,13 @@ import { queryWindcaveSession } from "../windcave";
  * now one encoded path segment, as queryStoredCardSession already does.
  */
 
+// R2-T5: a query names what it expects; this suite only checks the address it asks.
+function expectedFor(sessionId: string) {
+  return { sessionId, amountCents: 100, currency: "NZD", merchantReference: "r", providerEnvironment: "uat" as const };
+}
+
 function providerReply(): Response {
-  return {
-    status: 200,
-    ok: true,
-    json: async () => ({ transactions: [{ authorised: false, id: "provider-tx" }] }),
-  } as unknown as Response;
+  return new Response(JSON.stringify({ transactions: [{ authorised: false, id: "provider-tx" }] }), { status: 200 });
 }
 
 beforeEach(() => {
@@ -27,7 +43,7 @@ it.each([
 ])("keeps %s inside the one session it names", async (_label, sessionId, encoded) => {
   const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(providerReply());
 
-  await queryWindcaveSession(sessionId);
+  await queryWindcaveSession(sessionId, expectedFor(sessionId));
 
   expect(fetchSpy).toHaveBeenCalledTimes(1);
   expect(String(fetchSpy.mock.calls[0][0])).toMatch(new RegExp(`/sessions/${encoded.replace(/[.%]/g, "\\$&")}$`));
@@ -36,7 +52,7 @@ it.each([
 it("asks for an ordinary session id unchanged", async () => {
   const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(providerReply());
 
-  await queryWindcaveSession("00001200030255390bbd02ba0dbcf0e7");
+  await queryWindcaveSession("00001200030255390bbd02ba0dbcf0e7", expectedFor("00001200030255390bbd02ba0dbcf0e7"));
 
   expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/sessions\/00001200030255390bbd02ba0dbcf0e7$/);
 });
