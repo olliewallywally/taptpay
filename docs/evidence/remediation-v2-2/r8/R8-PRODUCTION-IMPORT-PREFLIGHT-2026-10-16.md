@@ -73,3 +73,22 @@ approved by this review. Separate independent reread checked the actual esbuild
 external-package setting, Vite configuration imports, static route, production
 configuration refusal and fixed owner port. Same scoped Approve; actual new
 runtime findings return to review.
+
+### Development shutdown finding and scoped rereview
+
+The new actual middleware probe exposed an existing Vite5 lifecycle problem.
+The old340e284b implementation serves the source entry but fails to close within
+its owned25/45-second diagnostic deadlines. Its HTTP listener closes; Vite keeps
+six speculative optimized-dependency transforms pending (React/query/motion/router
+modules). This is reproduced on the old source, not assumed to be caused by
+moving imports. Increasing timeouts or claiming a clean exit is not acceptable.
+
+Approve a narrow development-only experiment: disable Vite's speculative
+preTransformRequests in the existing middleware server options. Actual requested
+module transformation/HMR stay enabled; compiled production assets are unaffected.
+Require the real cold-cache HTML/source-module probe, unchanged10-second request
+budget and complete owned shutdown to pass before accepting it. This is a
+routine development-tool lifecycle choice, not payment/security enablement or a
+customer layout change. Independent reread checked Vite's pending-request close
+loop and confirmed no product/provider/state-machine or frozen SQL change.
+If it does not resolve the reproduced pending work, do not retain it as a fix.

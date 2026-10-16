@@ -1,12 +1,7 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
-import { nanoid } from "nanoid";
-
-const viteLogger = createLogger();
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -20,8 +15,20 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  // Production serves static files without installing the development toolchain.
+  // Keep the config URL dynamic: bundling a literal local import can hoist its
+  // external plugin imports into the production entry point.
+  const [{ createServer: createViteServer, createLogger }, { default: viteConfig }, { nanoid }] = await Promise.all([
+    import("vite"),
+    import(new URL("../vite.config.ts", import.meta.url).href),
+    import("nanoid"),
+  ]);
+  const viteLogger = createLogger();
   const serverOptions = {
     middlewareMode: true,
+    // Speculative dependency transforms can outlive middleware requests and
+    // prevent Vite5 from closing. Transform modules when they are requested.
+    preTransformRequests: false,
     hmr: { server },
     allowedHosts: true as const,
   };

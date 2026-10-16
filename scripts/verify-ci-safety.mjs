@@ -59,8 +59,9 @@ async function waitForOwnedGroup(pgid){
     await new Promise(resolve=>setTimeout(resolve,20));
   }
 }
-export async function runOwnedCommand(command,{cwd=process.cwd(),env=process.env,logFile,timeoutMs=20*60*1000,signal}={}){
+export async function runOwnedCommand(command,{cwd=process.cwd(),env=process.env,logFile,timeoutMs=20*60*1000,signal,killGraceMs=1500}={}){
   if(!Array.isArray(command)||!command.length)throw Error('INVALID_COMMAND');
+  if(!Number.isInteger(killGraceMs)||killGraceMs<0||killGraceMs>1500)throw Error('INVALID_KILL_GRACE');
   if(process.platform==='win32')throw Error('OWNED_VERIFIER_REQUIRES_POSIX');
   const file=await open(logFile,'w',0o600);
   const detached=process.platform!=='win32';
@@ -70,7 +71,8 @@ export async function runOwnedCommand(command,{cwd=process.cwd(),env=process.env
     if(!child?.pid||forceDone)return;
     const kill=sig=>{try{if(detached)process.kill(-child.pid,sig);else child.kill(sig);return true;}catch(e){if(e.code!=='ESRCH')throw e;return false;}};
     if(!kill('SIGTERM'))return;
-    forceDone=new Promise(resolve=>setTimeout(()=>{kill('SIGKILL');resolve();},1500));
+    if(killGraceMs===0){kill('SIGKILL');forceDone=Promise.resolve();}
+    else forceDone=new Promise(resolve=>setTimeout(()=>{kill('SIGKILL');resolve();},killGraceMs));
   }
   const onAbort=()=>{aborted=true;stop();};
   let timer;

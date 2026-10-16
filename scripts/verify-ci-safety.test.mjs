@@ -59,12 +59,12 @@ test('owned process completion preserves status and private output',async()=>{
     assert.equal(timeout.exitCode,1);assert.equal(timeout.timedOut,true);
   }finally{await rm(dir,{recursive:true,force:true});}
 });
-test('timeout teardown waits until stubborn descendants are stopped',async()=>{
+test('immediate timeout teardown stops stubborn descendants before an enclosing runner exits',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'r8-descendant-')),pidFile=join(dir,'pid');
   let pid;
   try{
     const code=`const cp=require('child_process'),fs=require('fs');const c=cp.spawn(process.execPath,['-e','process.on("SIGTERM",()=>{});setInterval(()=>{},1000)'],{stdio:'ignore'});fs.writeFileSync(${JSON.stringify(pidFile)},String(c.pid));setInterval(()=>{},1000);`;
-    const result=await runOwnedCommand([process.execPath,'-e',code],{logFile:join(dir,'private.log'),timeoutMs:800});
+    const result=await runOwnedCommand([process.execPath,'-e',code],{logFile:join(dir,'private.log'),timeoutMs:800,killGraceMs:0});
     assert.equal(result.timedOut,true);
     pid=Number(await readFile(pidFile,'utf8'));
     let alive=false;
@@ -74,4 +74,12 @@ test('timeout teardown waits until stubborn descendants are stopped',async()=>{
     if(Number.isInteger(pid)&&pid>1){try{process.kill(pid,'SIGKILL');}catch{/* already gone */}}
     await rm(dir,{recursive:true,force:true});
   }
+});
+test('invalid kill grace is refused before spawning a command',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'r8-invalid-grace-')),logFile=join(dir,'not-created');
+  try{
+    for(const killGraceMs of [-1,1501,NaN,0.5])
+      await assert.rejects(runOwnedCommand([process.execPath,'-e','process.exit(0)'],{logFile,killGraceMs}),/INVALID_KILL_GRACE/);
+    await assert.rejects(readFile(logFile),{code:'ENOENT'});
+  }finally{await rm(dir,{recursive:true,force:true});}
 });

@@ -62,6 +62,8 @@ try {
   if (wants('build')) {
     await run('build-without-db', ['npm','run','verify:build']);
     await run('web-snapshot-parity', ['npm','run','verify:r7:artifacts']);
+    await run('production-install', ['npm','run','verify:production-install']);
+    await run('development-middleware', ['npm','run','verify:development-vite']);
   }
   if (wants('postgres')) await run('postgres', ['npm','run','verify:postgres'], {
     R8_CI_ADMIN_URL: process.env.R8_CI_ADMIN_URL ?? '',

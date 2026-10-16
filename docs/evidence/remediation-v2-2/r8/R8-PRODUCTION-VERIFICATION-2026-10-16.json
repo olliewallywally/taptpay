@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "baseCommit": "340e284b0f8ee1bd91337ca2a97bf09614e70eeb",
+  "scope": "Production import/development middleware verification; not production deployment acceptance",
+  "sourceManifest": "R8-PRODUCTION-SOURCE-2026-10-16.sha256",
+  "buildStage": {
+    "version": 1,
+    "stages": [
+      {
+        "name": "build-without-db",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "web-snapshot-parity",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "production-install",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "development-middleware",
+        "status": "pass",
+        "exitCode": 0
+      }
+    ]
+  },
+  "productionInstallAfterCancellationHardening": {
+    "productionInstall": "pass",
+    "lockUnchanged": true,
+    "entryConfigRefusal": "pass",
+    "entryNetworkAttempts": 0,
+    "staticServing": "pass"
+  },
+  "cancellation": {
+    "exitCode": 1,
+    "timedOut": false,
+    "aborted": true
+  },
+  "applicationTypecheck": "pass",
+  "R8Typecheck": "pass",
+  "toolingTests": {
+    "passed": 39,
+    "failed": 0,
+    "skipped": 0
+  },
+  "changedSourceLintErrors": 0,
+  "lockChanged": false,
+  "webAssetsChanged": false,
+  "requestTimeoutIncreased": false,
+  "developmentColdStartAndShutdown": "pass",
+  "initialMissingViteReproduced": true,
+  "oldViteSpeculativeTransformShutdownStallReproduced": true,
+  "fullProductionDatabaseStartup": "not attempted",
+  "releaseApproved": false
+}

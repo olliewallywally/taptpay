@@ -93,10 +93,35 @@ pass or proof of branch-protection activation.
 ## Next dependency slice: production install
 
 A fresh Node22 `npm ci --omit=dev` installs successfully, but the frozen built
-server currently fails with ERR_MODULE_NOT_FOUND for Vite before opening a
+server previously failed with ERR_MODULE_NOT_FOUND for Vite before opening a
 network connection. server/vite.ts imports Vite and the build configuration at
-module load even when production uses only serveStatic. Keep this release gate
-open. Isolate the development-only dependency path and prove both production
-startup/static serving and development middleware before moving further tooling
-to devDependencies. A normal build with all dependencies cannot establish that
+module load even when production uses only serveStatic. The import-resolution and
+static/middleware proofs are now repaired below. Full target startup remains open.
+Further tool relocation still requires consumer and production-install proof. A normal build with all dependencies cannot establish that
 production-only installation works.
+
+## Production-only installation and development middleware proof
+
+The build stage now runs `verify:production-install` and
+`verify:development-vite` after the guarded build/parity checks. The production
+verifier creates a new private install, copies the lock/build, runs real npm ci
+--omit=dev and checks lock bytes. It executes the actual built entry with no
+DATABASE_URL under a connection-denying preload: module resolution must reach
+the existing configuration refusal with zero connections. It separately compiles
+the actual static-serving module and serves the frozen HTML/JS over an owned
+loopback ephemeral listener with digest checks. No production daemon/DB is started.
+
+Development proof starts the real middleware on an owned ephemeral listener,
+checks transformed HTML and the actual source entry, then closes HTTP and Vite.
+The request budget remains10 seconds. Vite5's old speculative pretransforms kept
+optimized dependency work pending during shutdown; middleware now transforms
+modules when requested. Cold-cache proof and full build-stage checks pass without
+changing production assets or increasing test timeouts.
+
+The installer clears runtime application/provider variables and forwards
+cancellation to its nested owned commands. Those groups stop immediately before
+an enclosing CI runner's termination grace; normal coordinators retain their
+existing grace. Invalid grace values fail before any command/file action. An
+actual canceled installer and39 tooling regressions passed. Raw logs stay private.
+These checks establish dependency resolution and local serving, not a production
+SQL/Neon boot, real-data restore or provider/professional release acceptance.

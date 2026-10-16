@@ -46,7 +46,9 @@
     "verify:lint": "node scripts/verify-lint.mjs",
     "lint": "eslint client/src server shared scripts",
     "verify:terminal": "node scripts/verify-ci.mjs --stage=browser --mode=terminal",
-    "check:r8": "tsc -p tsconfig.r8-scripts.json"
+    "check:r8": "tsc -p tsconfig.r8-scripts.json",
+    "verify:production-install": "node scripts/verify-production-install.mjs",
+    "verify:development-vite": "node --import tsx scripts/fixtures/r8-development-vite.mjs"
   },
   "dependencies": {
     "@babel/core": "^7.28.4",

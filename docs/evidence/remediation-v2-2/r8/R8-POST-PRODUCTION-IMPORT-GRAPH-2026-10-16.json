@@ -1,0 +1,832 @@
+{
+  "scope": "Conservative application import graph; build/test/native/script and nonliteral consumers require separate review",
+  "entries": [
+    "client/src/main.tsx",
+    "server/index.ts"
+  ],
+  "sourceFiles": 320,
+  "packages": [
+    "@capacitor/push-notifications",
+    "@google-analytics/data",
+    "@hookform/resolvers",
+    "@neondatabase/serverless",
+    "@radix-ui/react-dialog",
+    "@radix-ui/react-label",
+    "@radix-ui/react-progress",
+    "@radix-ui/react-select",
+    "@radix-ui/react-separator",
+    "@radix-ui/react-slot",
+    "@radix-ui/react-switch",
+    "@radix-ui/react-tabs",
+    "@radix-ui/react-toast",
+    "@radix-ui/react-tooltip",
+    "@react-pdf/renderer",
+    "@tanstack/react-query",
+    "bcrypt",
+    "class-variance-authority",
+    "clsx",
+    "compression",
+    "drizzle-orm",
+    "drizzle-zod",
+    "express",
+    "framer-motion",
+    "helmet",
+    "html2canvas",
+    "jsonwebtoken",
+    "jspdf",
+    "lucide-react",
+    "motion",
+    "multer",
+    "nanoid",
+    "nodemailer",
+    "pg",
+    "qrcode",
+    "react",
+    "react-dom",
+    "react-hook-form",
+    "react-simple-maps",
+    "recharts",
+    "resend",
+    "tailwind-merge",
+    "three",
+    "vite",
+    "web-push",
+    "wouter",
+    "ws",
+    "zod"
+  ],
+  "dynamicImports": [
+    {
+      "file": "client/src/pages/landing-page.tsx",
+      "line": 37,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 49,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 50,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
+      "line": 76,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 51,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 52,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 53,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 54,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 55,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 56,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 57,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/components/reports/RetailReportsButton.tsx",
+      "line": 44,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 58,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/hooks/use-push-notifications.ts",
+      "line": 142,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/hooks/use-push-notifications.ts",
+      "line": 303,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 59,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 60,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 61,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 62,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 63,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 64,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 65,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 66,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 67,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/pages/info.tsx",
+      "line": 27,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 68,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 69,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 70,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 71,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 72,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 73,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 74,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 75,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 76,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/pages/board-builder.tsx",
+      "line": 533,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 77,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/components/reports/PropertyReportsButton.tsx",
+      "line": 55,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 78,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 79,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 80,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 81,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 82,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/components/reports/TradesReportsButton.tsx",
+      "line": 69,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 83,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 84,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 85,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 86,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 87,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 88,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 95,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 118,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 119,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 120,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 121,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-analytics.tsx",
+      "line": 998,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 122,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 123,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 124,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 125,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 126,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/desktop/pages/property-analytics.tsx",
+      "line": 818,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 127,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 128,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 129,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 130,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 131,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-analytics.tsx",
+      "line": 878,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 132,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 133,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 142,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 143,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 144,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 145,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 146,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 147,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 148,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 149,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 150,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 151,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 152,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 153,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 154,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 155,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 156,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 157,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 158,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 159,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 160,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 164,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 165,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 166,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 167,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 168,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 169,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 170,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 171,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 172,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 173,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 174,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 175,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 176,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 177,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 178,
+      "kind": "literal"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "line": 179,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth-sessions.ts",
+      "line": 202,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth-sessions.ts",
+      "line": 238,
+      "kind": "literal"
+    },
+    {
+      "file": "server/storage.ts",
+      "line": 7230,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 187,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 214,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 232,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 338,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 430,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 525,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 534,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 550,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 574,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 604,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 633,
+      "kind": "literal"
+    },
+    {
+      "file": "server/auth.ts",
+      "line": 648,
+      "kind": "literal"
+    },
+    {
+      "file": "server/property-cron.ts",
+      "line": 43,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3533,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3598,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3732,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3733,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3771,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3862,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3945,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3946,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 3970,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 4058,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 4066,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 4102,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 5664,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7104,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7105,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7106,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7107,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7108,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7109,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7110,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7111,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7112,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7113,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7114,
+      "kind": "literal"
+    },
+    {
+      "file": "server/routes.ts",
+      "line": 7115,
+      "kind": "literal"
+    },
+    {
+      "file": "server/vite.ts",
+      "line": 21,
+      "kind": "literal"
+    },
+    {
+      "file": "server/vite.ts",
+      "line": 22,
+      "kind": "nonliteral"
+    },
+    {
+      "file": "server/vite.ts",
+      "line": 23,
+      "kind": "literal"
+    },
+    {
+      "file": "server/migrate.ts",
+      "line": 1368,
+      "kind": "literal"
+    },
+    {
+      "file": "server/migrate.ts",
+      "line": 1784,
+      "kind": "literal"
+    },
+    {
+      "file": "server/schema-readiness.ts",
+      "line": 19,
+      "kind": "literal"
+    },
+    {
+      "file": "server/index.ts",
+      "line": 159,
+      "kind": "literal"
+    }
+  ],
+  "removedAuthRuntimeImports": [],
+  "motionRetained": true,
+  "reactRuntime": true,
+  "knownComputedModules": [
+    {
+      "caller": "server/vite.ts",
+      "target": "vite.config.ts",
+      "mode": "development only",
+      "verification": "Actual cold middleware/source-entry/shutdown proof passed; production module graph excludes it"
+    }
+  ],
+  "uninstallApprovalFromThisGraphAlone": false
+}
