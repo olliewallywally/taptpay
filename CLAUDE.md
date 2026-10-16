@@ -1,17 +1,16 @@
 # Claude repository handoff
 
-**R8 first repository slice is on `remediation/r8-ci-20261016`.** Read
-`docs/HANDOFF-2026-10-16-r8-inflight.md` first, then the R8 verification and
-truthfulness runbooks. Node22.23.3/npm10.9.9, isolated CI/PG/browser tooling,
-critical dependency repairs, dead auth-package removal, zero-new-error lint and
-unsupported ecommerce/documentation corrections are implemented. Full isolated
-client/server regression passed 1507/5249 tests with zero open handles. Final
-browser/tooling evidence and the precise push state are in the handoff; verify
-Git rather than assuming a background task completed. R8 remains open for high
-advisories, unresolved history findings, production-install/dependency hygiene
-and real-target/professional release evidence. No deployment or phase exit.
-Claude retains R4. Preserve owner PID4196 and root node_modules; updated dependency
-validation uses a private isolated install. Keep D13 and all deferred gates.
+**R8 first repository slice and production-import follow-up are verified on
+`remediation/r8-ci-20261016`.** Code340e284b and1c7fdf2f include isolated CI,
+critical patches, truthful unsupported integrations, all328 browser cells and
+production-only installation/static/development shutdown proof. Read
+`docs/HANDOFF-2026-10-16-r8-production-import.md` first, then the final review and
+verification records. Full6756 unit tests passed on the first implementation;
+follow-up app/R8 types and39 tooling tests passed. R8 remains open for61 high
+packages,124 history candidates, further dependency/repository hygiene and actual
+release evidence. No deployment or phase exit. Claude retains R4. Preserve owner
+PID4196 and root node_modules; use the isolated Node22 install. D13 and all prior
+gates remain.
 
 **R7 repository implementation and available regression are complete on
 `remediation/r7-capabilities-20261015`.** Source `62a80d9c` is pushed:
