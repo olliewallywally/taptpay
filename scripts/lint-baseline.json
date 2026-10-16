@@ -1,0 +1,3519 @@
+{
+  "version": 1,
+  "reviewed": "2026-10-16",
+  "source": "c9f513c583573285bcc6c1aa7ddb480d2f1b8458 with reviewed R8 lint config; existing tracked files only",
+  "byRule": {
+    "@typescript-eslint/no-unused-vars": 475,
+    "react/no-unescaped-entities": 66,
+    "react/jsx-no-useless-fragment": 14,
+    "no-useless-escape": 11,
+    "object-shorthand": 8,
+    "react/no-unknown-property": 1,
+    "jsx-a11y/anchor-has-content": 1,
+    "prefer-arrow-callback": 1,
+    "no-unused-vars": 21,
+    "react/jsx-pascal-case": 2,
+    "react/self-closing-comp": 27,
+    "no-duplicate-imports": 18,
+    "no-empty": 26,
+    "no-redeclare": 1,
+    "no-unreachable": 11,
+    "prefer-const": 7,
+    "no-case-declarations": 3,
+    "no-control-regex": 2,
+    "no-irregular-whitespace": 2,
+    "no-regex-spaces": 1
+  },
+  "findings": [
+    {
+      "file": "client/src/App.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7c41d4e541ba7a90eec45fd2fd007c3d3887d8109f6106b18b1a6462a1a1e120"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4efac8849a7b6ada5f2df85686fe20651a3d3556aa267d3239c358cca24512e0"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "840f63973acac7d4efb379da630e47d6bad22281b405c9e9f9b630ae72432876"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "80457d30d1478384f59d8344edad3b04d74a2ad88a7e2c3bd1601d2e809e16cd"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "396b1a25df92ba59c36c652a4c292851ec21b9b799ad07824cf51b7b0e6f69bc"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "dce30bb5ca78e777386c78db98ff2ccf0decdb4ca8427f2a86c4df21f042a5f8"
+    },
+    {
+      "file": "client/src/__tests__/auth-outage-resilience.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "73a3b08feb653adc6c71c1526bf4ec89875106cde2690f1855d4ba6ab6c4c0a3"
+    },
+    {
+      "file": "client/src/__tests__/signup-schema.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "298f045a64f44d20c17ad3af057598228383678ae2793efe56427e7fdc91bcef"
+    },
+    {
+      "file": "client/src/__tests__/split-payment-view-boundary.test.tsx",
+      "rule": "no-useless-escape",
+      "digest": "b888b22fe3ece32ecd30d862af47ff3316cef3fb1d75bda46597cac7201c4a65"
+    },
+    {
+      "file": "client/src/__tests__/split-payment-view-boundary.test.tsx",
+      "rule": "no-useless-escape",
+      "digest": "b888b22fe3ece32ecd30d862af47ff3316cef3fb1d75bda46597cac7201c4a65"
+    },
+    {
+      "file": "client/src/__tests__/terminal-css-scoping.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8f7422677f8c2d8f292920b249ef569d533f6af2bf5e3c850b0d1632db289aeb"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-accessibility.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "00217417eeddf6a3794b6552a684ee6a538a15d295ee975d5280f9a2447cce48"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-accessibility.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cbef1f4a605523e0ddde7f1ddbb1d0daa1165f1d8af399c015cbf47bf8559437"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-accessibility.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "380f2a527e21712d7e337a888621c7539951a74783cd5d1a442813e4ca023e37"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-accessibility.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fd03d95aed87bcd620f93101f53b36af739af32e8fbe3455c08ad764ffb20497"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-lifecycle.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "789cf35d20950dc7f1c721fad80ef89e7a8c191fbe68bf8ce3a9d0b5f484131f"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-lifecycle.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fb815a1dae8c155024647714da711cb33710f5560d7aeccd81d65cc12e4cd7bb"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-lifecycle.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "78ff53ac01ea0d1997744cab2d5b0b5a29c6969b252e68ae3191fec935d07103"
+    },
+    {
+      "file": "client/src/__tests__/tutorial-lifecycle.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1a6a638c49db74656f6cdd8871278ed1947c3b66c8eaa9b44740853901810f41"
+    },
+    {
+      "file": "client/src/components/FeaturesSection.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "ec02a40ea139ab3fdb1e0b334ca7ea28e5ce4a6442c9641944ba2213c98481e5"
+    },
+    {
+      "file": "client/src/components/FinalCTASection.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "608cb1739e8462a6233d440639f20420464376ac2c8471f49b445639b6d13735"
+    },
+    {
+      "file": "client/src/components/chunk-boundary.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "2fbb9358da8ad5ac35772e9f98f30891ef01da540cd1ae86e9ffbd8007cd5939"
+    },
+    {
+      "file": "client/src/components/merchant-gate.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "2cd5d12b691c6f8a20736e81ecf15d8212a420f140616d94553ff394383e0c01"
+    },
+    {
+      "file": "client/src/components/merchant-url-display.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "45cbd4bc45cb4279c82b4ca5f3acd92389bfaceecda51c5d85c10ad8c019ef3e"
+    },
+    {
+      "file": "client/src/components/merchant-url-display.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "client/src/components/mobile-payment-interface.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "81238de4982dc0cfe51083d4cb4bb892009e07ffcc4c6119ffcdde958ff3b4bc"
+    },
+    {
+      "file": "client/src/components/notification-system.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ca212c5b45e8123ea94af5e7b8dc85d747d549c3bcbbc89fe2bf03054bb554fc"
+    },
+    {
+      "file": "client/src/components/notification-system.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "07ba791dfcbd733e18d2bad748a1a24c8f2589b902d96eff99e17de497790e17"
+    },
+    {
+      "file": "client/src/components/notification-system.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7464a12e1e5085cfaee10bbe45342d606abadbfc048fa71261d8f09f56a8da8b"
+    },
+    {
+      "file": "client/src/components/notification-system.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "71260b3baf776036aab65420e29c55030df0274c0c321dfa9977a97bb1a93d25"
+    },
+    {
+      "file": "client/src/components/ui/carousel.tsx",
+      "rule": "object-shorthand",
+      "digest": "c3873ceda38e1bf7a8271670f6276d1928e2e5eb29933a085e5959189ce72e43"
+    },
+    {
+      "file": "client/src/components/ui/command.tsx",
+      "rule": "react/no-unknown-property",
+      "digest": "d708aed6f0dd1f670fa2a4b658e6f46a22a0860b655171792b8da581a19353ef"
+    },
+    {
+      "file": "client/src/components/ui/pagination.tsx",
+      "rule": "jsx-a11y/anchor-has-content",
+      "digest": "2ac6c80c316a2793ee3aa05d4c0b4b546fd25b4f0e1a3a600c51462fd9f2ae3a"
+    },
+    {
+      "file": "client/src/components/ui/toaster.tsx",
+      "rule": "prefer-arrow-callback",
+      "digest": "e6c6c1cd1109675b5638aa167cad232744fb0b485895c1e812339c86b49ad0d2"
+    },
+    {
+      "file": "client/src/desktop/DesktopPageScaffold.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "77c0a91dbf0f954d8ee01e4b4fca6695dab150dbe9c0871b4f68bd36271b649e"
+    },
+    {
+      "file": "client/src/desktop/DesktopSettingsPage.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "252f48df765d2ed6e4c27b5bb945b3e6a74ce5b7f36a183ada4d53848581fd76"
+    },
+    {
+      "file": "client/src/desktop/DesktopSettingsPage.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "15e6c2238eaf98a04fe8d42c965db2c4cca09bf9a59c23d482ee94e9709fb0aa"
+    },
+    {
+      "file": "client/src/desktop/DesktopSettingsPage.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "842409af63e841a1014ac31ee4ce29c712ecc41c491234990c00f34d4086e361"
+    },
+    {
+      "file": "client/src/desktop/data/retail-reports.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "20061aacce075336be8f97af251c8e3878d9da8cc537734666772972ecb7a098"
+    },
+    {
+      "file": "client/src/desktop/desktop-keypad.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "40ea08470ecf9c9ffcc3e5c46dcf693a857de69b06b6a56a92bc2f5161eaa529"
+    },
+    {
+      "file": "client/src/desktop/pages/property-home.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "c82385bf2272b28f57ff2faa6bde5c43ef5bafeee04ce762f22a949dbfa6cbe8"
+    },
+    {
+      "file": "client/src/desktop/pages/property-home.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "ba0faee0f1da40658136d05bd055796ac2fcc20ad0f7030b8678434a1c9c5ee8"
+    },
+    {
+      "file": "client/src/desktop/pages/property-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "bdbe831f7577f06472b39653eb73d1876e7822b3d279ff3f61f3ff1946e3942f"
+    },
+    {
+      "file": "client/src/desktop/pages/property-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "ce467e8b6300b08871351afca206bef15cf264f8f8696c83e20673b3846b60d6"
+    },
+    {
+      "file": "client/src/desktop/pages/property-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "079a879675ff209b0c4169eb36ef311348d4849c2f3d3559906c61fbb78b4511"
+    },
+    {
+      "file": "client/src/desktop/pages/property-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "079a879675ff209b0c4169eb36ef311348d4849c2f3d3559906c61fbb78b4511"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-home.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "270cd00a6be5adfdc856cd86076f1e91d033a30341fb9c484938e29ec2322a5b"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-home.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "243d9eb78aacd51c45e6edf5642cfd0302386e06f61c54d4ee3ebeb4bdbbf92c"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-stock.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "548f13260197dbb63a2ed194eff0f8e097df6e3a9505128df2e46686e12f91e7"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-stock.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "f2a58170f201b4432a59d37715081fc448ba7da7b0059e589a31c3a9329f9ef4"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-stock.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "f2a58170f201b4432a59d37715081fc448ba7da7b0059e589a31c3a9329f9ef4"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-stock.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "6436f5e7440bfb6744c9c817875ce121e300e00c0e622676f1494f254d9ad6d4"
+    },
+    {
+      "file": "client/src/desktop/pages/retail-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "d6eaf97e3c06a7542d0f910cf2275342378d92f2b30a079c0da97628196ee46b"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "263a411adee0231842b71a4b30ddcf72c340349a71e644e7fe09bd13c79cd93e"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8d7879baef763445c45435b3aa3c9f8a62a67531e0e25bc81d784e6b39282a44"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-analytics.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "55f65d370338c86dc10aa5fbb7f68f0c8e59621d4f567ab7f9a6a2434f1c796a"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-home.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c489f7159676e1b60c17a6e7b8340f9252fde739c39b57d3c4119d78c46f3233"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-home.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "c7f8efb73e65fdc4b6f3ca2c506b77dd4156e96004a5be96fcea79c9f5c34703"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-home.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "808ccfec2f166f34599c55353d4da9ae3b79b689a5e21032735cf790d76b96e5"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "f73da6820e48eacd30e06a64a61b2685780965cfda85af011e472345ea747231"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "782abfa1f57042f9cdde6124d4f90189e7971f7723d228ffae945f3d21da94e9"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "806252e25ac6b2f2b196d40ec70ccb33f6945686eea8c7da59e0020d778cfbd8"
+    },
+    {
+      "file": "client/src/desktop/pages/trades-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "25a9934fb5c604d0b2bf25580c0055e96bae354b6900955ff44e17b832ad6be1"
+    },
+    {
+      "file": "client/src/features/checkout/CheckoutView.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "79590cc7dbb2ad51b1bc4f0e5d372501f91f132f82dff3433341147812eccfcd"
+    },
+    {
+      "file": "client/src/features/dashboard/RetailDashboardView.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "2e7b0ae6326ade196ad02b4e483053ee056d1c6221ff18e78879039ec31d9cb3"
+    },
+    {
+      "file": "client/src/features/dashboard/RetailDashboardView.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "2e7b0ae6326ade196ad02b4e483053ee056d1c6221ff18e78879039ec31d9cb3"
+    },
+    {
+      "file": "client/src/features/terminal/property/PropertyTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c31b5bb7ec000c36e2f0fe4e1dbe86b4a0177270df38456d6cd7ff8364ce25a8"
+    },
+    {
+      "file": "client/src/features/terminal/property/PropertyTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9a42ca71cdf28a84a83ea69055eff5b25b6cb0f8db06892e7554ec5aa9fa288e"
+    },
+    {
+      "file": "client/src/features/terminal/property/PropertyTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "378939ac67d476f2ad1f50b4557da2cb8814eabc24387f47002fdc0c0ef0f8a2"
+    },
+    {
+      "file": "client/src/features/terminal/property/PropertyTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5c76093271d09e257b07a890ede57d31235b7e667e79b16e344bcf16bb4d0208"
+    },
+    {
+      "file": "client/src/features/terminal/property/PropertyTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "70158e9ad25351b81b7ac619e2a0e86b1d45fbfd719b57ba6812cf1fa674e32c"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "32683c8b381c216f523cbd3992c9325d4deebaf3c506cc3c86a59cc08ad6b47f"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "11e07205d21cfa4c7ebd8e67c8ef8b973025f4db2926c2ff3301df0a328630a8"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "c5710b7e94c038718573cc312ddda6439d20def5eb98ae2130693805f4f5904b"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "4c7aa579f2e03ff18f2d34cfbce64dae2baad60b4981da00ccf4e6ad3064c05a"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "cf86b8ac60c2111ff1e84baaf929e4439d736e64f52a8326acf7220b3ae6a99f"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "react/jsx-pascal-case",
+      "digest": "0233cade680d9ac8e0456dea7e38e715e1b9870b248a8aff74c0738fe7727a2e"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "react/jsx-pascal-case",
+      "digest": "c44f1a233eb4d6ec40bb5ad4024403026c42a56b983e083e403776990c111f6d"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "6e82d648ad7a65bddce28abbb95dcc2ce997d5e3cd07e03b4468d09ecdcdcaea"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "6e82d648ad7a65bddce28abbb95dcc2ce997d5e3cd07e03b4468d09ecdcdcaea"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "6e82d648ad7a65bddce28abbb95dcc2ce997d5e3cd07e03b4468d09ecdcdcaea"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "ab1a2648788e4a34781019814a8600c9f305ea9efe736b965f22441322927d01"
+    },
+    {
+      "file": "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "rule": "no-unused-vars",
+      "digest": "2fd2f27cdb989abefce0edf04a9186b10e8adc1b09c78c17b2cccf6ae0679c85"
+    },
+    {
+      "file": "client/src/features/terminal/trades/MobileQuoteView.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "667f42296a47e4ff42377bd3ed33047200ea89477fe6ee88060b62619fdc3615"
+    },
+    {
+      "file": "client/src/features/terminal/trades/TradesTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a192ab132463b404be695f3f2c949dd6917d8cf81e23d8abf314bab7f484262a"
+    },
+    {
+      "file": "client/src/features/terminal/trades/TradesTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "89f8ad791fbbf6bc2aeafbf729d97e0665c23420d117b5172e531ea6aff4eb36"
+    },
+    {
+      "file": "client/src/features/terminal/trades/TradesTerminalView.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8f663d4faf30af88310fa0661914062183c27e11697aaccb675d622e8a9b9e7e"
+    },
+    {
+      "file": "client/src/features/tutorial/tutorial.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "77c0a91dbf0f954d8ee01e4b4fca6695dab150dbe9c0871b4f68bd36271b649e"
+    },
+    {
+      "file": "client/src/hooks/use-toast.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0b41e107ecca3e2f512669ffa44d6561c09bfdca2dda89bb204ede34f0f72984"
+    },
+    {
+      "file": "client/src/hooks/use-toast.ts",
+      "rule": "object-shorthand",
+      "digest": "8cc9831d62fb9deeee78cc1b4c27550953eab134eac64049de50fc349876bd96"
+    },
+    {
+      "file": "client/src/hooks/use-toast.ts",
+      "rule": "object-shorthand",
+      "digest": "51d3e6a7bfe735f014f100e08bc977e3de2e805598850aca83e7f5b816dc58d2"
+    },
+    {
+      "file": "client/src/lib/__tests__/creation-command.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1d74949482b90feedfea1695eb1171cf38b8d3cf695e122dcd84c53294453c30"
+    },
+    {
+      "file": "client/src/lib/report-pdf/reports/retail.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f7c4524f15b56b093da09a9db1ab74f1f68729c51ab78d2a30c484b9274fb643"
+    },
+    {
+      "file": "client/src/lib/report-pdf/reports/retail.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "98f92d296dbc71c3d895228f8228f3936a1f319abe085748260045667dea644a"
+    },
+    {
+      "file": "client/src/pages/__tests__/business-details-with-sale.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bb2fed8cc61ac9fd34bb931df2ad5c9b15ed85e31822fd81e804e976e9bdaf5c"
+    },
+    {
+      "file": "client/src/pages/__tests__/jsx-syntax-smoke.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2b554a6fbd0c55c6e40159708efa334b035aa72be319f14679a95276bc73c503"
+    },
+    {
+      "file": "client/src/pages/__tests__/payment-stack.test.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "ef792cfbc666654b726e7ee6972644d07f5a04b5d6cd7442f04224641b7da8e6"
+    },
+    {
+      "file": "client/src/pages/__tests__/smoke-tests.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ccaf4804eef4c1e42d4b4f4cfd1f58216e9418f5174b46186f27939f231bf002"
+    },
+    {
+      "file": "client/src/pages/accept-invite.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4ef4542eb43d9851cdf8d71c629cdcedfe0ac4db63ae78c9d680a6dafdd7203e"
+    },
+    {
+      "file": "client/src/pages/accept-invite.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "2dfed90baa8969600690524994c5da64d84237ea38f37d8c127cd87eee4de740"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e1635dfc3089ee17c57ead9e6fded1803c87f78cd3cb9b19cf42677af7496a17"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "419beeb995cd78732f34870c8a2cc95074722fc21271b50dda4288ad71ea7b8a"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a6a7f8d9cea6dd32007b05d10afdd33285794eff4c1e42d017165a83e35ca0c5"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "411a32d3f0ad2441bb98b86173bd41ec06ba15eeb171d0a534d04e7a41903a02"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "85ffe32b51ef2fa18f2d018645865dc995d324f32ec906c977005969455967d6"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2fc4ecc24b0cc45d0a7a83a7bee44c41dbc22ed629371077d1d436884aa85afb"
+    },
+    {
+      "file": "client/src/pages/admin/Analytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8aa02e3342a5d78a779f6893a857a0c88ef2ed2c46fe037f1ddb8d5cc0197a3e"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "0563ac370df90f6774fc14ba4af982bf2c59b8aa75553ea1242ea67e8bf6aa78"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "7c752fa3b284169bd08650607a9e06d9fe065dc65b170f6b496eee0a6a933aa8"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "2ab3fa0d6d58503d54c4eb8eb11b9f1eac8a05a8d07315ac4a53289ecf3f81dc"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "a89096fa4745603d0b8168c80a1ee793ca3050af8753b90ee7774e583578fb66"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "0288bca30c220b111d332553d6634ccb83793f32df0270cab2c04b4eb15b95dc"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "95cc3cfd55cbbea2fb4952d2382667583d0136e23fd56843fa99ecc518d1c56c"
+    },
+    {
+      "file": "client/src/pages/admin/GridDashboard.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "bbf352f05309a1b301056c76bcc967f2054a83e9181be0203ae0aa1ffd85e73b"
+    },
+    {
+      "file": "client/src/pages/admin/MerchantDetail.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c9d78088adac6378e9a5a8566f81619f4e72926984954fe961c35e40db0f36ec"
+    },
+    {
+      "file": "client/src/pages/admin/MerchantDetail.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "382d2575f535e270a02daadd1b8ab1a0c57ca6fa949a6bb2916fbd72963068c5"
+    },
+    {
+      "file": "client/src/pages/admin/MerchantsPage.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "78b52cd1fd7e7fc310f20110c66efbd66a6cb69898d79d1480a82cef857ec570"
+    },
+    {
+      "file": "client/src/pages/admin/ProtectedAdminRoute.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "bbebc1dc62688cfd6c2dd783bc2675a3ef25a9bb2ea0db5f85f66552987fade1"
+    },
+    {
+      "file": "client/src/pages/admin/WebsiteAnalytics.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "411a32d3f0ad2441bb98b86173bd41ec06ba15eeb171d0a534d04e7a41903a02"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ecfb59ad133c3c592fe8e76a3b4c0feb904c008221955f8d23129ebe1ab617a8"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "53e225d84372f68b32ccc04c140b7f3562c0d19dd241b4a204ade3693cc5e00a"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fdb72c123140e8242527ee9002dd3a728863debc432698e7faa008859f5b3597"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f57ccb0b87d53520c81970eb49113108b94820ddb7bfa2b888d20ccfa9f4a5e0"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2132b403bcbb609222a4e305bfd556733a01412fc7aec998028b7def8c517c5a"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b590d191ac707752d281778048b1cf549798471e8ed48740a56376e0dc5ff6ec"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ba40fba2c5300965042ec6827afd5fd38c9d1caf85ee6d96f4ad974c2aca6db9"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "12b9379260abc432dc0fd517af20e488a615d27c9b7d06f1b551a2b8d5129186"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fdbddc64d316b3e1dab0e18b73e6d14ec8e58ca74a0f2f875d1d77ffb218cbd2"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "902f3da5499c45220d128a8b3bf7819228e897cde9191467acb2547a7db507a2"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "954af8e99b186b9656f66b28fbd1cae71e41f8a788656a6a2b186bcbbd8cf967"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "035ec4ef689e67c461fd91018e81c59b313e91ba54ee03a2ce7a6f671fd6d741"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "28dcd0c7b1523b149f810c5dc8feca82bcb8f3901c26fd4cf99717677561cf1f"
+    },
+    {
+      "file": "client/src/pages/admin-api.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "75528816359ee87b4bbb74f4a3d9198bf637777c2f234c4fc95525164a5bedb9"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "56927e4029b25aa461d967eb8113b40c359498c9aff9fae55a40799420d8e973"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0c606c716093448b64a7aab01ebd6cc62fa986da85132c83b79fe5ff4e35c5d5"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "no-duplicate-imports",
+      "digest": "c8fdeca9b988b27cc34977d7884f07854325087d86b0a382bac22143acd3166f"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5d5da188a32d665bb08fe701e520737d1d975835a795370f2cf3731d3a8c56cc"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "285206b23db1554d7a6c898861baa7af6a44a63cd9ceaa889ce8b8f5ba7dc0e0"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "224d179551b9b80110316ba188bb9502bc63b4aa2d8d199e44538ac4a3c7b731"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "58e048d0c30bf1bc435d46961ceaa374ad120f67c40e28800bd022f2b7dea63f"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "f9b4b3f56be01052d298c838e52bff7a034143fed0fa9033ad8db9525567f222"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "6abecba9dcc385715fadb60ed658f4cdfd8c9819ec78ae0cf512032142a4e89b"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "785967e06ba8dafbb67e0c03a1b4441a6ec96dea3c84ae627c3ec6d4ba7d49ce"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "0a52593f22dd932302315b67232d60bbe01af42df433a0a60929802ae1fc2fa3"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "365af3f080908b5cf882a7a36149203db93d2c5822f4d39942de7a17fd10f725"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "115c333afe7a38774b3b8015ddfe56dc930b0cbe4b530fd7f28ffcae9742fd51"
+    },
+    {
+      "file": "client/src/pages/admin-dashboard.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "1c9757e485da8c5c858ced009ae1277120ba1da0a5dd726336d6dc71c3ec0270"
+    },
+    {
+      "file": "client/src/pages/admin-login.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "45cbd4bc45cb4279c82b4ca5f3acd92389bfaceecda51c5d85c10ad8c019ef3e"
+    },
+    {
+      "file": "client/src/pages/admin-login.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7cc0390464f3ad12cda52a96c1028e2c350d0a93169949fbe8a80782ec3e3af0"
+    },
+    {
+      "file": "client/src/pages/admin-login.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a2bcec8081628ce9ba0464292cd3044d33ecfd21e76aceeb9ee4582e78c0fcbb"
+    },
+    {
+      "file": "client/src/pages/admin-login.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "b1647c89f9360ffa683d1a9348e0dccfe6e63b2c6d75ca04fc9851829800d5c0"
+    },
+    {
+      "file": "client/src/pages/admin-login.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "a75e0ddebdfb2b10ca355b462600280efd61a792c4e51cc6d6327db10427bb9d"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3022c86d2bcffe183153abf206a10b2ebdf2b2b92123f4da416b83d0d5f91464"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6c68669a36aae4938c06723cce3449b15ab4592b723ea7d9806ee9ff91838266"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d5f556b493b18b14337ae4a85ce47a1fbe86dc82624558ecd80f335e89d0398e"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "no-duplicate-imports",
+      "digest": "924b57ef4b6a9548499e45dade2c3486295d67ddca7d162ff71dd4987f77b10a"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "no-duplicate-imports",
+      "digest": "c8fdeca9b988b27cc34977d7884f07854325087d86b0a382bac22143acd3166f"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "02dee967dd395ac9b8d0e124676644a284058d757bb17879b3e6f3fa95eb5a42"
+    },
+    {
+      "file": "client/src/pages/admin-merchant-broken.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "1569af9fbaca0753edd82a42f5d905ae22a93a2db965a3a1d2281cd7cbe3c48d"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ecfb59ad133c3c592fe8e76a3b4c0feb904c008221955f8d23129ebe1ab617a8"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3dad4928f255c1f8b2c34701d00234329b07bce0790c913da3f77c52c0f5c072"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3bf66d9297cb9c773dd3aa917f375445faadf575c0fe4cf4f5d7e1878cdc64d2"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5b197b11ddaa14f5db3df9861fe7638e90e38385f3d691dc3c5b9df6c732e0e3"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b9dabad7b2f84efc24146647bf86882a874e71cb50bec9564b355a83c05144b3"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5076d48c7d671cf85ec49e8bc30d2aca5b0107d83447d8a42abc6badf2046890"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fe51f60e311e5b8eb4d628b2928da825e8f5f37b8ef7a826de69f77465180420"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fa38767db1dbdc710197cb34dae13d1271df798e4f25fad113630fb494e9db92"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7eba5dd6c5fadc076cdea3eebcce9fb87486417e4dbebd6824790c78154b25d8"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "41f81a54d4b9b2e6906d232df8b4418a1798fd420a8d1d2b6eca9f8d5dca54ee"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "631111c181d0faae7b7fc73b75f4132bc8051f295196491877458309f1b35792"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "396068bee7c46477b19dbec53626e48f8cef80d6a4ce39da7bed6b44984b8cbe"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "34e8329fd22a109977fa496956aa2497e7c1a91ffcfae24c689c39b5b64a35a9"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b8c22fe5613001f7341208cc0e3150fb405e41f185e7771f782b0d87797d7d0f"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "76076e3acba696b90fc1be60d34c973caf3cdbce52929fe124b1f892aa7202ec"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "491a46b6564a4679c6e6139bf867a13c51d3ebfaa2dd72f1f42460d3fb0acd41"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6c68669a36aae4938c06723cce3449b15ab4592b723ea7d9806ee9ff91838266"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "02771ac3a107e625e360aa17a099a93c9fee2f0d515041fec1802502fd28a444"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c8656fcdcd625dd095b1cd22c3ef44ff60b0a46c2d785d4c66b5aa87005de493"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "no-duplicate-imports",
+      "digest": "c8fdeca9b988b27cc34977d7884f07854325087d86b0a382bac22143acd3166f"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d659640c803e35393d15a75360801ae66629f5e31a59e2283775074248fdb990"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "73237c43d6e2e06239b624c76285bfcae4f325a7f7cc3d9dc520fc1b5036e8ed"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8ba56a16cf8aee71d2e95b8c1b35e8e72d4fda4dace142716fa0e69b59df4a02"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5d50dfa5d72ec925b8566c41928d664265409fbe5e38bec0d7cf7873fc344932"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "0642ba898e1a693aa5a3c3eb08b6fa54b60dbeba5a34b0c496008622cc145624"
+    },
+    {
+      "file": "client/src/pages/admin-merchant.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "0642ba898e1a693aa5a3c3eb08b6fa54b60dbeba5a34b0c496008622cc145624"
+    },
+    {
+      "file": "client/src/pages/board-builder.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "73e16b3d93ddf84191ec1ac12ff371983b8f1760e723f50c7d4d2ed030826593"
+    },
+    {
+      "file": "client/src/pages/board-builder.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "215fa85ab48a19e2debdee542240a990b5df125c2194c761d05e82180e261ca3"
+    },
+    {
+      "file": "client/src/pages/board-builder.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "b3371bfbbba14da10945c799bd2680005d6925d025d758ba0d830b29eed36796"
+    },
+    {
+      "file": "client/src/pages/board-builder.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "33cbb8b22bda9e5fe583eaf7b43a854d0338f87a56aa13346a50da76ba4ec1c8"
+    },
+    {
+      "file": "client/src/pages/board-builder.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "bc948b0dafea54b8d7f78ab43b890231af4f67a79587c93022372b707e0de1a6"
+    },
+    {
+      "file": "client/src/pages/check-email.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "f69ebc37f353e8bc0d478637d77792694556d62a0a0e7425ca821ed26641fdd6"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0532930aee8a30f822edb32896dc57d9e1a53133855d68f0c2ab95a852cc8a96"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "00b9c9f9effcebad50dff9520d4174dffd693636b770081a84df795ffe96d2af"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5f3b3ad175f2fdf893bb622228ec2fc53e97adeacdf40b7bef60de57e4956acb"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "495e6ca07d5286f07e90d9434882c2d0b6071167463cf3abde25a480b2bc96fb"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c4d5f31d008c7f99b8b61977c274e13fc2133cbdac602e46ce253d5e70669be5"
+    },
+    {
+      "file": "client/src/pages/checkout.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3969df744719b00c921d11b356e4cd5d72c7f3f78c46c8b29c60a5f9ed8763ec"
+    },
+    {
+      "file": "client/src/pages/confirm-email.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "b2aa416fa437f76d6a868f307acd4f4e3ebffe3dc29e047f891715fec2c3be55"
+    },
+    {
+      "file": "client/src/pages/create-merchant.tsx",
+      "rule": "no-redeclare",
+      "digest": "3cc00dde3eb65480343cdd1ca1412708cf4ca2bf1a54c88aff814234c18a7331"
+    },
+    {
+      "file": "client/src/pages/create-merchant.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "a16463cddeaaf68a57a7bb7194b9a2e46c557116c1a70bb9f07eb0d42cbe617a"
+    },
+    {
+      "file": "client/src/pages/customer-payment.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "390a4dd54123f296b9317baa11d26c528413a4d559cd8088858f59ac6d30e1fd"
+    },
+    {
+      "file": "client/src/pages/customer-payment.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "5582adf31439defdd5808f12e51ae8bfc6bd8e2126ea650b391fe99e4d901ad7"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "44e0737f0ccaded3f85e75d383c3403bf1a6127f9a55780cd2647218d654c6e4"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "421b294043f214c71ccc3023d07976dd4c661baf6dbd4773d62b2bc7dc719794"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "47c7931bfd7b29e66d70def6c9b0ce80c7d5dc5fa3603a52cfefda5d15787e90"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b2dbc842ff90203b755e1e8db5d7caa7a5a5f7639a308b7245ce582b354f27ff"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3c742971837037d41612efaef8b2aba593373fc80a434081585b9cadaecfef67"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fd6260ee9224648fceaab8c40fbf94bd4f364a81c6ca3962eecaa641b1ea5a03"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3d3bb40d5632618f1d5311ad6cb96194bc4a6864e67ef711d41e1f508dcbad3c"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5076d48c7d671cf85ec49e8bc30d2aca5b0107d83447d8a42abc6badf2046890"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "683c229eecafd3c58f37905cecb5d6db7fad2aa88e3607440a4de862741e1996"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "66637b55d50c8d1bac16c1359f6ebc49f3489b322b96581d74aafa986cbbccd7"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d884efbc5d58e6647bc2d7ef099c1ad3ed237aa4cd8343025a914c18a19b6a63"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f5780d44113775c1c63c76668803f7f2cc384c50c74bf3df8cee1cd761b79b88"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "79a5e9247917f998ffde777827f2fc2a96343e73ed9df16fb2fec9c8e5b3c73e"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "object-shorthand",
+      "digest": "2347a9ee8fe10afa43a08aaef6fc4573f7fe74a6c829d1684b4a759db454e814"
+    },
+    {
+      "file": "client/src/pages/demo-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5c824ba1188014893bf0d2fc274c1c39206989c3b06c7a298b3b50b221b2faeb"
+    },
+    {
+      "file": "client/src/pages/exports.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bda589d0a6bd3072f7461a4422e5717c13e186b5cff26e43a7d225f712ac147b"
+    },
+    {
+      "file": "client/src/pages/exports.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "888663cbe9edca292d4daa3ecd3a3cdc7908eb34c72e3d22206dd966f893f190"
+    },
+    {
+      "file": "client/src/pages/exports.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "888663cbe9edca292d4daa3ecd3a3cdc7908eb34c72e3d22206dd966f893f190"
+    },
+    {
+      "file": "client/src/pages/forgot-password.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "491a46b6564a4679c6e6139bf867a13c51d3ebfaa2dd72f1f42460d3fb0acd41"
+    },
+    {
+      "file": "client/src/pages/forgot-password.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "261d20da46c1c0a9f7230eca5d31ebdd64fdbf142ad1ffa385d27b08f93b711b"
+    },
+    {
+      "file": "client/src/pages/forgot-password.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "b486e62577843400c92694c2cc9a4d1eadfee905114fb10d80ba71e778bf5cf6"
+    },
+    {
+      "file": "client/src/pages/forgot-password.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "38b23f1de8c9d727878a91c10576b53e8837b0c809c7c2977a0a505c5721611f"
+    },
+    {
+      "file": "client/src/pages/info.tsx",
+      "rule": "no-empty",
+      "digest": "4b06677479d5bbc93a39d3709224ab42bbed8097da8ee4d08ad144a1073eb896"
+    },
+    {
+      "file": "client/src/pages/info.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "514a8362d36cedb5c75c7910c984dd2f5bd90631ebb5770ad5f0a8236e403969"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "20dfce972b51cd06275d8c1bf46014bf499cf7d981e4232d1e8c9b388f5c8aa1"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "ca323da24b754183f28179362b503212c8059480fb811fea15de2a878f254bd7"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ae113b644bbd5c2459a31d5c541fd30d22503dd21265d159ea6f401d1c6af45b"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "5ea4c1e80c3cfe44ec4fca359e3668a163e7f12c0c04368f73aa2399af1f9f8b"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4c8b10006665879490c0b34b5a64d961faa727e00e7255f443cfaca81cae85a1"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "338e37b10c4ab3b3fefc28d8c763e53dc17607391b6fe58adbdf6a3b484893db"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e2cfeba9145ae6e0197c8014ab9fd8e3f9ffd135f9c5d7513a1bdf9b6a4ea15a"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "18e4c5a531a44c7b4cadcdd9e999dd7fba422b88c9e7b54b32b8c3d84d4f7c78"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "091642a4b9a28ed5baaa79bc1bafd32f151b7ceb8b35d2cbac2510bd1e4e1495"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "3e6fe58cec7df34fb4bc81eb470661f77a6f9489cc0cf0d01e163639004fd5c3"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0d34d13ae681b2254906666fb8fdc798a034205c8e72f6619f681e593d2b513d"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "b612029b9bbf754731836a93ab04b8ea9ebf840bf78df6bf53b490c12edb4bc2"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0d34d13ae681b2254906666fb8fdc798a034205c8e72f6619f681e593d2b513d"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "b612029b9bbf754731836a93ab04b8ea9ebf840bf78df6bf53b490c12edb4bc2"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4c8b10006665879490c0b34b5a64d961faa727e00e7255f443cfaca81cae85a1"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "338e37b10c4ab3b3fefc28d8c763e53dc17607391b6fe58adbdf6a3b484893db"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "f24d19d587f79e5ef10b71d3f3e44c28ff615704cdb5a31939e7b499f9ee643f"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "21ff2d385754f61ac1761016a843bd4530a1730fbf811e77590be0fa7c5d1720"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "9f642564a759c948b926689c34f3b474eeffcf2f580fca7892166aaa80b8c193"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0d34d13ae681b2254906666fb8fdc798a034205c8e72f6619f681e593d2b513d"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "b612029b9bbf754731836a93ab04b8ea9ebf840bf78df6bf53b490c12edb4bc2"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "388f09f35f798cba4c857a1e766712be10270f38aeddfcc8fab85825eddb8c28"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0d34d13ae681b2254906666fb8fdc798a034205c8e72f6619f681e593d2b513d"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "b612029b9bbf754731836a93ab04b8ea9ebf840bf78df6bf53b490c12edb4bc2"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "9ab0986441d2068cab45cc0a223a0980d0792ce8de90029e2a1f1d1d0422e83f"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "prefer-const",
+      "digest": "52a05eebe9cb8469fb86d45180ade1edc2ced7d8c56c454b8d4b5d7691d9f424"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "091642a4b9a28ed5baaa79bc1bafd32f151b7ceb8b35d2cbac2510bd1e4e1495"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "3e6fe58cec7df34fb4bc81eb470661f77a6f9489cc0cf0d01e163639004fd5c3"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "b81b463a0c4ebf6ed1806776eda22739e6f4e6111ef3f6458618621ee3bba95c"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "4eb05474849086feab949a75e011a161892f06f28586af8bdbc8de15a70237fa"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "5197aac9f2e2f1037779c28e1c68f90bba95ff0e1da90f66b0245fdbafa2bd1d"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "354b467644e98f17364a3eb1b1ab7d8acf2554fb27925624f6db963d016dd1eb"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "8f8f39abd1e1de84b24a0d8cba4c909e6f81e89fc68cee41eb065e15749bebd2"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-unreachable",
+      "digest": "b2aa5b1947d9c060057f99bb4f29ff715cbd0d0a752cedfa1cda16c1b47d148c"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f59ac2b10264e788d37d166b3ccdda0df101e028f3704a218709c98653432959"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "16e71b39c5742948bc14f4b98c733ba4e31a119d1b88ff9a1f8db5849c48ec5c"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "42c00ab18ca583bb449f63cadc51eef81af2d106facdf74b5c01b726262848a7"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "f14143f6ee1975b35dc30fc445edb9d98aab8a633018ef26cd9b1d59ff3a4b86"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cb1f50fba500e88715ffca682fcfb1a46e9dbe8fbd4354a0934e3ca2036852ea"
+    },
+    {
+      "file": "client/src/pages/landingRuntime.ts",
+      "rule": "no-empty",
+      "digest": "67eb6fbd013c134987a07b4ad6bc2adb802ee3454dd15b56bead06bfb5e9b861"
+    },
+    {
+      "file": "client/src/pages/legal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "b875cc2c860e1ee5e818073fdbadd781a4f0dbfe376883524883cae1ce9963f0"
+    },
+    {
+      "file": "client/src/pages/legal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "e10433c581fa8860296b5eec2c8cb0b4eddbe2f4eda75c72063a758d327e88ae"
+    },
+    {
+      "file": "client/src/pages/login.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ac5db24180d9cb2c7f52bd652c325fcf544b64565823f6f3aaa84a4e59edb027"
+    },
+    {
+      "file": "client/src/pages/login.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bf71999bee688b437175b9c2f9ca5707277cacf3775a6170b4b179edc4f845c2"
+    },
+    {
+      "file": "client/src/pages/login.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "12e6fcdc68603c275df6309dc78c4b34d1446e5fd779e3fe18124554db4f13b1"
+    },
+    {
+      "file": "client/src/pages/merchant-onboarding.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "f5ed56c245b7bea2c053a1b0939d4cc9a437dcebb133cfbc195fb69d3bc8be7f"
+    },
+    {
+      "file": "client/src/pages/merchant-onboarding.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "0a73f916013fa90acf0c9e69180e4463e816f5a3a9865c2a74c1b6d14805c823"
+    },
+    {
+      "file": "client/src/pages/merchant-signup.test.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "797f3a7b9548e658127501f2843fba6463cf472979f19737e5a332f7cfed7bcd"
+    },
+    {
+      "file": "client/src/pages/merchant-signup.test.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "5ffe52c4dc86ed1b1ef7c2d7896ab3f81b1b1a9bf410cdc94ae0a2c61e31b2f4"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c4eb4492735487a9992bc8a54360f3bfa7deb593b6b4195bf4f0614861e55457"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "556028aa01b23c56078db4aab3802b72eff8cae3aa6cd08405f9b1207391ab12"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4da14e18eb9624f106f759c4c596c579509a0be0046d1474943bf1a0818c43df"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5655ef2fd18239b89b9d8ed16b4c8a371f8ed3d63663caa7c510191674d94464"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cf35b2ff4cc70726a05f9fba84cdae49e1df12c2527ef52694d97ca9d7705f34"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2edc84cf174d67f37d34f26bd4c85213cbcf7b11998e902ed6ce014662492fad"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bf61636ceaf9a842ba3a3a3629fb0917da32d73a5d0f238e14c3bc8301f9862d"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c5dd753b5df166e02926d256db0b16d14e048f1f55ab203fc125f044f79620df"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ac86ebd48176377e9a18af1adb84f407db229f9af080012edf843aa56e0c2646"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1a2e4fb769aefb0a1433436eef36186688dcde9c6c7bda5df41a1789f11ce7ff"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "369b24a33630b003f7add7fd3a3b37409a2e819eced7d1dc90ff2deff8627423"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "717a5749800b09bc08d0959af1e5c2a88b8409b2841419f5012d82ef946fc682"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "780f2cd8d6dab2e8a904699b647a9f48f526b06c486ef6e52c1358cf5107e0eb"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "6fc36e065df1ace88b0cac30a819e2026e5b149ae36088c3e7c711196f2b199e"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "2b7d47becbddc5e679f1c3a29210329ffbe044c7813ae578003aed108effdaf3"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal-mobile.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "555d3cbed9f9425592f1a8ced961b972b3fe9230cff3ba983761d5ed0597029d"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7cc0390464f3ad12cda52a96c1028e2c350d0a93169949fbe8a80782ec3e3af0"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a2bcec8081628ce9ba0464292cd3044d33ecfd21e76aceeb9ee4582e78c0fcbb"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8aa3d8228172673ea7d81a07d022de43de40a4a9c8829ce399169d318f9253dc"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "78e55ea9b0f93831bb7ee2ae081dba81ed82fad574ab204088df43b42b31ebe3"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7f9bd2b0ca5951dc007c4871a04dbf0996164f4e1e77068cb39a6294270414db"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "67b1efc28b3f5e7eae5320e8b3bf8540535d4a33554717e2c938b4d185a92c18"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a59aebc6d0a6e6d2924d5fa5f6fa23ae83c9a493e89e71672ce721ea257190b8"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "547f319188213bf938d4fdce3fafc97e594e86f5e563da3c83e68e36d219ff8e"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fbf90a3157c2a4eb19027e8b9cbb5def6bc76d05afa6c9646f1d2bfd9e587f03"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "35e33cf47c334b053fade02c7ac5c5ea71745b6e08d5de79a1726f4fcd870ee4"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a8fb90ed9f6f8ffff8fa7dadabd3f2c907175661d9505c9e68665145914dd154"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "63ef2e596cb61f79563fa934884d80a4858e5f26e23d7f0c2b07dd23763aede4"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f52ed14e06be84bfe042e954c7df365da06e816d924ad5c4eb5bbb7e4c7d0b88"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "354301c1ad940ef8f6c298a747bb450c045a68356a7e164cac669cd1f5824845"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5655ef2fd18239b89b9d8ed16b4c8a371f8ed3d63663caa7c510191674d94464"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "55522ced3b43b08eef428596e64a29a8fa298fe5dc18f06923e1b4b495fcb365"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f3c10957ff64f5f0443c71f774072bae2a1d975238e5be1436ba7226946cdba8"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7635b77f65444d8fcd2c134f68bca727de19e3d092a50f628ff2eb1e23743ffd"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0011f0906b3a824521839ffe654ccbcf7a4551426cbab4831e834927261f08fc"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f6fe48856d68601c5888596e4f7374d19a9f4ec6a098df13dd0653185789c3d5"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9ddca385f5142ecb1446d021aa825c9f70ac46849f7faaf3bdedc8d8d78bd498"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cf35b2ff4cc70726a05f9fba84cdae49e1df12c2527ef52694d97ca9d7705f34"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ac86ebd48176377e9a18af1adb84f407db229f9af080012edf843aa56e0c2646"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "92aa860cb157fa161176793afbc7a148c8790dbe87067794eba4f3adf2f5d582"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7b4674bc6330c275f01ad2e86737ed135c95cad750711a8b270e8057e64cc3ce"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "no-case-declarations",
+      "digest": "acb58c945b862365f61c06f273b29512407a08fe5ae249971b8cea5179a4074e"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "no-case-declarations",
+      "digest": "fdd69932bff01c3ce40368a03b367653e60d0155a4479fd1b20c0bbf7bab0a56"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "no-case-declarations",
+      "digest": "776b97452a4f71414a138e56ecf483162b5cce98d9a12ae555070ef726f605cb"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "176a8165072d20a723f962cf94f1f02d1f65f0912ed1098bdad121edbcc0e052"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "object-shorthand",
+      "digest": "2347a9ee8fe10afa43a08aaef6fc4573f7fe74a6c829d1684b4a759db454e814"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "2be4703112e770f279194e8c1f1c12ea193b792a418f8d914ef32d378f6883c3"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1af6e8d71082e8f44dfbc272885e41a681132bba60a029e1f942c6af74a3330e"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "bce1fececc0efac1aa979a269ae17251f06b736b7e4a0c6ec4869972e0849ed4"
+    },
+    {
+      "file": "client/src/pages/merchant-terminal.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "bce1fececc0efac1aa979a269ae17251f06b736b7e4a0c6ec4869972e0849ed4"
+    },
+    {
+      "file": "client/src/pages/password-rule-forms.test.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "7546d7c5b0328da7a5746f0b63b4c9af58e27e1dab51077e577b95820a184cfe"
+    },
+    {
+      "file": "client/src/pages/payment-result.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "538287d209a0b3377bd84662727320e90b6ca55b0322fd2291edc276060e577d"
+    },
+    {
+      "file": "client/src/pages/payment-stack.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fe47387de2bbc890c8482badaef726114f5dbc8424d48033edead1a97ad250fb"
+    },
+    {
+      "file": "client/src/pages/property/tenant-profile.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d5843e0dfc6eaf9ecc3d640ef862972b997da7eb3c5bfe2928eefb6945816991"
+    },
+    {
+      "file": "client/src/pages/reset-password-check.test.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "7546d7c5b0328da7a5746f0b63b4c9af58e27e1dab51077e577b95820a184cfe"
+    },
+    {
+      "file": "client/src/pages/reset-password.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ff57cafcda54631393017f9d13bfd91c09136564b1d1e9cf041076b072d35346"
+    },
+    {
+      "file": "client/src/pages/reset-password.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "491a46b6564a4679c6e6139bf867a13c51d3ebfaa2dd72f1f42460d3fb0acd41"
+    },
+    {
+      "file": "client/src/pages/reset-password.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "232ff378435df3b93ee44fcfb5a214efb4e227a397d3e264df4089c7582ba3f8"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fccc5886818484e8462b01d9345907642c0b7135c3a05a38b555ea6f5d6542b4"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "43b63442ac351ab21203f035afebc483e79d50eedcf5e00e195ff5b8024a0f05"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2d640df101b737e842ecb775b22f3fdaa58f4bec65efc4a70fa6e2671840c4a4"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6f16f1df4285a653e9df47e32815bd7eabcf8aa6c9c6d0e9f0dd25a52db726ff"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0a57dae359b94ccad2454ef82670f5e8e7db80106d864e0cc6e5f4c10167ed00"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "202a9a2055a4986cd049b2e060c3b71fbe65f89bc0389a0efda70ae9016caeca"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7ea3daf4f9b1a6b6b303d44fc518b8223ce42a633cced02b03b4736ed57bf386"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "46b0479f5bb9c78b5bf9dec96d7b2ea04ba7c6f059d2b51a431ca7251f07539a"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "510d3ebca6b6563b098cfacbda7e73f486c48c1c400428fdcfe00d82add3ddd8"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c89ed85a7e08eb125a101db121874e192b10c48c429e95c0c7cc83106af8c98b"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c8818c281fe0f3a669d1a146e6090340f61d8c7aedb9064263d342182f37ce08"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e2302dc920cbb5df8f287559a155614b136672bce563d51f05ce5bfc96c7f7dd"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/self-closing-comp",
+      "digest": "787bf1f8974915dbe8d21f2511059d9412dbbcab3dcdc5456c34c9e189221706"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "457591ce572b42df929147a8c781e7ddd42da2853dcd59bfa12bce6db8d10aad"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "457591ce572b42df929147a8c781e7ddd42da2853dcd59bfa12bce6db8d10aad"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/jsx-no-useless-fragment",
+      "digest": "3da907d0ac23fae182d363008eb806d2ff7cc43cddffce8f313fcfd6d8a0c8c0"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "c8c8da12639f26e919b56040bf8f77bb4795d4cc467ddde800bae57c1a9b7bde"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "205b46d649ea1f3c6ca1e697d161fd0c6aaa9f39b4a99a01878b043a9ec605a2"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "a28e043164b813ddbb83461ed230ba50f1bc4b3fca9a3ea4c79145e26a89f670"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "d6c2c17e1ded05b413544b561b71ce9d159c684dd61a15deef0e6c18bb8521e7"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "d889e1de18e6395e894462ccc82668c063b076d3f275ad72646e8897845afebd"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "1120de098afcf26a7457470dbc27b9036793af7850237752c8375886baabda03"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "aa27cda1978733aac7869d40ee6a8ed75b64be83d754ca5bd30ec6fa2b8884e5"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "rule": "react/no-unescaped-entities",
+      "digest": "004d058116155a28cc9029af71f47f5112d0e073a5a921b7a3780a3c5a4d8480"
+    },
+    {
+      "file": "client/src/pages/split-payment.tsx",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "client/src/pages/stock-management.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6ce800d9e65926c7ad987e9c3f3511590206ab512bdb0fe1e204b9598b351b93"
+    },
+    {
+      "file": "client/src/pages/trades/trades-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d39ef6c0566d027fa610c376fb46708649ae71b66c32ebdc9777d54239aa03ba"
+    },
+    {
+      "file": "client/src/pages/trades/trades-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "eabeb12f014f7f59acceadee13b5cf0ed959cf8f2e4525cbd8e25fd287ff45ca"
+    },
+    {
+      "file": "client/src/pages/trades/trades-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ea8970f8ca1cfeeba5996cb746b5d6ff88d0549bff8de588e2b7f92173d5a168"
+    },
+    {
+      "file": "client/src/pages/trades/trades-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5454d714576cb4b924086c63b65735f035997996cd0d5128c7e5f12c36734283"
+    },
+    {
+      "file": "client/src/pages/trades/trades-terminal.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b5e61f42238487489d63e130a2d394a34a17ebecc0d9c91d6b28b0c4c8fea378"
+    },
+    {
+      "file": "client/src/pages/transactions.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "client/src/pages/transactions.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9d764dc83eae3055403f05514d6d013479f00805000e3d11d40a05e8a6ef3b93"
+    },
+    {
+      "file": "server/__tests__/api-route-contract.test.ts",
+      "rule": "no-useless-escape",
+      "digest": "ec472b258242a4953b13830af9cafcb0be2587352c3342552b43a463a1953027"
+    },
+    {
+      "file": "server/__tests__/api-route-contract.test.ts",
+      "rule": "no-useless-escape",
+      "digest": "55255c70d7c43c6f9e674268808a1960ff5a2dc672594d324110e2ebd296861b"
+    },
+    {
+      "file": "server/__tests__/api-route-contract.test.ts",
+      "rule": "no-useless-escape",
+      "digest": "bf450b5f5600d19949a979c0f55f8634fa4fbfe2c189cd3a3639ce7e75f50b48"
+    },
+    {
+      "file": "server/__tests__/api-route-contract.test.ts",
+      "rule": "no-useless-escape",
+      "digest": "c00df691dc60213ce6dfc2222001d9c93670b4e843f828c6a6f4605b95fb18b3"
+    },
+    {
+      "file": "server/__tests__/api-route-contract.test.ts",
+      "rule": "no-useless-escape",
+      "digest": "c4f9626b397799d83f5989cdb4c66afe29c33809f0fdd1bc27d415d20da0578b"
+    },
+    {
+      "file": "server/__tests__/apple-connect-http.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "78bfda1e0c8eaf6b2c92391dcdc9befd0e822d2b1d30bf233ae0caa0dc88142e"
+    },
+    {
+      "file": "server/__tests__/apple-sign-in-http.test.ts",
+      "rule": "no-control-regex",
+      "digest": "2678cbfcca71a883a44f85df078a400ae920167be5707eb63c0124dbf5d952c0"
+    },
+    {
+      "file": "server/__tests__/apple-sign-in-http.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "78bfda1e0c8eaf6b2c92391dcdc9befd0e822d2b1d30bf233ae0caa0dc88142e"
+    },
+    {
+      "file": "server/__tests__/apple-sign-in.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "37b14061cbb2a8b6d19c75d1340a012620f2a1450e0b878c40d939ecfced992e"
+    },
+    {
+      "file": "server/__tests__/apple-sign-in.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "14892fc9d93adde06628b0813cd145bdf80f8c057f6bed5bc4f056a1157348ee"
+    },
+    {
+      "file": "server/__tests__/async-route-guard.test.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "06b0244dd7c3d47f5757359cb13d6bea6d9df699f1b98b0b94146fc81431b901"
+    },
+    {
+      "file": "server/__tests__/encryption-preflight.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "113b15c95d190fd1a5b9be17a613e900790a576394a106790b6d3e9f52e1bf60"
+    },
+    {
+      "file": "server/__tests__/migrate.test.ts",
+      "rule": "no-irregular-whitespace",
+      "digest": "c4e7cfff9f9729594ddd54a2ad0da5e2e24d4eabfb64d375d6339cf4eaed0369"
+    },
+    {
+      "file": "server/__tests__/migration-schema-parity.test.ts",
+      "rule": "no-irregular-whitespace",
+      "digest": "0b65a6118ccd4595bdc4a6e1e70d13dab78bb93787afa1168021199011a416bf"
+    },
+    {
+      "file": "server/__tests__/route-matrix-served-account.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "baca22e7d171ebd50335e224ed52dc867330f2ae5a603d53db6dd02c569565cd"
+    },
+    {
+      "file": "server/__tests__/route-matrix-served-account.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "de4cbf5e00b86f380b6f3df63c662fdc3f5b578b2ae7eb46c3bf71e6163c1bf6"
+    },
+    {
+      "file": "server/__tests__/route-matrix-served-business.test.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "2c0abdbfc3fd5624ceacb06edfc86fc633025f83affaad8e5b783fe1121a3fa4"
+    },
+    {
+      "file": "server/__tests__/route-matrix-served-checkout.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c977251649653657de922b9e6f68ed814a2e1c511cc9e73b50d7cc825a61a304"
+    },
+    {
+      "file": "server/__tests__/route-matrix-served-provider.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "de4cbf5e00b86f380b6f3df63c662fdc3f5b578b2ae7eb46c3bf71e6163c1bf6"
+    },
+    {
+      "file": "server/__tests__/route-matrix-served-provider.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f0dbf1d149dce06f57672bed8ae29fc6d0df935543dea5e7ed9f3c579390a0f8"
+    },
+    {
+      "file": "server/__tests__/support/invoice-http.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3051fb98e064b3bbdd9fbd075131b990dba7fa15eae81a8407b24b0b0cddc2bf"
+    },
+    {
+      "file": "server/__tests__/tenant-refund-write-http.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0915f94b9971ac705aa545d4f00cd780ba3cccfbf09d4599c91f91dcc538da32"
+    },
+    {
+      "file": "server/__tests__/tenant-refund-writes.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5d6e9901705ba6ec22f3d2a945497fcd5d16683863e2d467171b1e389c3f98b7"
+    },
+    {
+      "file": "server/__tests__/upload-ownership-inventory.test.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3b636a225911267edd03d4ac3db77298dbcdd6327c9ea5dbb59295fa17e6551c"
+    },
+    {
+      "file": "server/active-secret-workflow.ts",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "server/apple-sign-in.ts",
+      "rule": "no-control-regex",
+      "digest": "3785d8e67d3ba5bebb11a37531ee76d35e897ef7f7c4faff114a25295307b847"
+    },
+    {
+      "file": "server/auth.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/auth.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/durable-invoice-checkout.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "aeaa7b8774bd1b3ae69e4f498f9f673624667d82c21c2ab6fae1c12b6d5527dc"
+    },
+    {
+      "file": "server/durable-payment-delivery.ts",
+      "rule": "prefer-const",
+      "digest": "d20bce29de4ac2363dffb8d6d3fb0877e0b72565d386aa4b588ded4df04aba93"
+    },
+    {
+      "file": "server/durable-payment-storage.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "b099e5a3b873d03b1f2462aac9da08d6435b4bfef9b5307b7df0f298f8dfeda8"
+    },
+    {
+      "file": "server/google-sign-in.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bf6a59b18431f48b477a3d1f66537efe1bbe2d7b2f65aaee89b71529adf748b5"
+    },
+    {
+      "file": "server/index.ts",
+      "rule": "prefer-const",
+      "digest": "7255eb9e96f4f4ba121403b19ee45b805c399db35332505059c9c78e0f8ba163"
+    },
+    {
+      "file": "server/log-redaction.ts",
+      "rule": "no-useless-escape",
+      "digest": "9d42ca6466341d18701f4512ec32435fc5209f6ba2a84560fd6e5197473854ce"
+    },
+    {
+      "file": "server/payment-reconciliation.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "dc921f9dacc6150a214415b9b19d691fd214653811f3b78f7de40313fd84bca1"
+    },
+    {
+      "file": "server/public-link-token-compatibility.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4a17221ae72e63cd86726aaec281481160abb03b76be140bf9d432ac37be41d3"
+    },
+    {
+      "file": "server/public-link-token-compatibility.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c4835843f7df63879f01fc31cf4e4a76d7a5a6dbea68c8bc9b9d188ac4fe8b3e"
+    },
+    {
+      "file": "server/public-link-token-compatibility.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "116d78f547b3152afa598343766e9f5eb93ffcfc8214bc8359148b7ca5464d19"
+    },
+    {
+      "file": "server/route-review.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "df949a4ba1ac5decf916d1c9a2ab9e2de652ec997544b32ad406205014ab69aa"
+    },
+    {
+      "file": "server/route-review.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "855476236a6382de78d622d5dd30190c4a8b2986929e309d4ce67974b0de0419"
+    },
+    {
+      "file": "server/route-review.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0af192f27d7997cac08ccbf04bc1fa11fa31eb0c0cfc0797751a99313c209fc9"
+    },
+    {
+      "file": "server/route-review.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cb65da9933f3cb717ea5754a50d3955623209e2e0b80cdf44c66210eaa6be00d"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "67ebe82722acdd3fb9eb863b33bdf4f11e6b544faab0158ae4e990f3f5bea4f6"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "383f06445047043c5554578ae4c9f30904b11177db15278f2b059a5f78df45ee"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "541932dfa21a5cfbdeb34faf981e4f09c3b6150f9076bec00098c4d0065f22b8"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9ee9a95eaa9d4f0a502ab085dee71ec2df7fff50ac7a5259075dca07bbf02ff8"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1e7004cdc4dd846c7bde5363e8dacf8594cb9f6580ae3e2c19176ef30906dc9e"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "381574fe801f7dc63ad2a6ae41d5576052ff7d67585f235c8eb80ebf3c9bf879"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "99328405c2ae9f989a1410d84fcb487ec56debf5d5b32ae46a7421d71f63f18f"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "94ed48803e1d49a9423de2a69eda195593855578d6d35f3df5c1122a2ce35a49"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "67e42051dd14b315b223f70e0c5444c40094d14df619a9e604e183be9fe248b0"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "eb10bfcacb0c15ba84a97ee5e219209aa42b1e9a72b724c771a1169f4c11c2ff"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e6a4b62054b207e169ecd0f9f5c8ca62b8e18354bac2a97a91f41d688104f7e1"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4ad455fa5e9f5fb9a71d79fb6c35effce602dc8912944d25fb58d01e50fbcbb5"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8a32e7ea8d0c2000098445dbb8e170acabd015f220ef5cefdf566e46f3c1f45d"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1d027ed6aee4628378a74e896a74c2ea76a425a79cba2627f9b0a6e3b36a463b"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7421e96d5f7d319960288fc43d8352301188606d5f229ad576aa61c8e8033f8f"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9ea3fe691656147484b22876297e9c91fc2532a55a00074947b2f89f587bd659"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2fa896d50940b13078134801636eb1279cba7c3885ea037e38052ef247b441b3"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7c7b4a08f66cfca5462fa608af443e5cc63f53e03057a5b402bffab38479e01e"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a3702de1092ddf43c1f0aa0116fe30954a2d1443fdc8a54769bc80c449ad0622"
+    },
+    {
+      "file": "server/routes.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6a1328c315932036321b430c87050ad99c3fb76a4c90a0e97fbb0877e87e8154"
+    },
+    {
+      "file": "server/seed.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1b34d136f9862ee57de05db0a43dde79fd9d25e6244ec41df11c4713414b48b1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9a24349f48a189b29b9e1535b61e7c4cf8e7c1e0619f278c7c324763a56b0bb3"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "b9bd7f0ab86bb3200d13ac488ef08249ef729dfa8d490617958afaaa20a3d6a0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "0d52072ed2f41111ddc5e949ac13399ebd99b80ce4984967a75b2d184e785bb2"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "9cfd29ca3978f8255a02eb9d5ef0926b9197e18d1b37c61ce68c0e3106eb76da"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "31e1c84db693459ba9235878240c6657687c86e88127eadf5d5b0048947efde0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "90cffc305997595cdf7d8cc95a100b447c55b662b5c4af7da674e4def64cf256"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0ffe697873922a30abfb9195f6403c11c1c4ee5d6313aebebaa9d5ee562c7f52"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1af40db0d93e7eb87b4e619cb31db43d906700f4665575bb7ecac64ea07b6f25"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e7b7b255533144ff685ffcfaaf50b761711653f8d4372fb5ac24c72578405f89"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e267801bc6eabdcbb6264b6f44fe0e449409c7e1d1abedc3ccbcf63d575626e2"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9fdb3e781fa1fbe4cbdfab488c02819f79c1b9c89eecb862c61d806460bb2a0d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "96a481d26ea060f1da9282b8326b59f72b8cede604f4f4789c28baba67aad6a8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fa194c8481506b3735638e3dabb18fad94f018adc61f9408ab18b27430982290"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6d547c13800475ed27df22fce270a3f6972cc6402a1a4dd0c347f1dc3b428f1b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1fb5928dd7bb12e6a1d19f37a29c8ca1a1db90e7bbd1ede2b6dba72fdca9c38b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e7b7b255533144ff685ffcfaaf50b761711653f8d4372fb5ac24c72578405f89"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9fdb3e781fa1fbe4cbdfab488c02819f79c1b9c89eecb862c61d806460bb2a0d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "96a481d26ea060f1da9282b8326b59f72b8cede604f4f4789c28baba67aad6a8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fa194c8481506b3735638e3dabb18fad94f018adc61f9408ab18b27430982290"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6d547c13800475ed27df22fce270a3f6972cc6402a1a4dd0c347f1dc3b428f1b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1fb5928dd7bb12e6a1d19f37a29c8ca1a1db90e7bbd1ede2b6dba72fdca9c38b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "object-shorthand",
+      "digest": "280df69f208044c3f00c035fdd13430bc46a74df3cfc198016243f224e427509"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "object-shorthand",
+      "digest": "142d141af6f1fa54bf850424b48512b9f5c0780afcbd0f70c75f1da891df3652"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bf07c5a8747500d0b6f1cf8a839040392cd876747c53e4dc886e13d05317fb75"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fd34bc6ead7b6268f90ee770e5f7608b2146da17c491ddea73ce797fac79ecf0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fd34bc6ead7b6268f90ee770e5f7608b2146da17c491ddea73ce797fac79ecf0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8eb2ce7cb03909e626166727b97ef73a3f60bf028a0dc5ea494a5904ceb96d69"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6991a96323b95471e076600feedf6e154ec98adfc49966a94ade44f5106d6650"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "abf9b762f4ae0aa344cf9186cb0078854520c75706053bc40a9ca30ab5d76fe0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "252ae5c67fb7c7f1c9b566540a801b37a1e7bcb9641bfcff6d144944cc8cb75b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6060753d858321c3e24e9777e7a8fe7c396bd281648bdb355be255043fecc71b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7f357f9d6cd3f9e42dd39655c6c7f8b562db453ca0eeeca10f2d2edecebf10c8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ec1b20b1e3fa9a28e3a46e8d4d877b956a950aa187646f7f9ee6329124d9e76d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "eb433602ba5514fcb524a4fd0b945decd8430cb449923826ca5313b9da0cd040"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0c7233cfa38e280f1305d56eb90b4a04f8e84548676b8ce40d4c4cf12205b01f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7e74779717b7c3187cff747f584dc71c79b7c2712b9450d01c4bf7ff1d0df393"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9f0883dbea46e5d861f91816b9d13dc70fedc1e846df87ceeba251edffddc59f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8c792011e33b86290c7ebaa6f59c02b7d8cba852b491f1c59e633cb52628f043"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9b4a271785bbfd5bf04d46797301a23edad4cae4e7e71473829093b1b95e77a5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3d9cbb38bf94d48011e67c30b5a12277214e5483b9b676f9116374374b8ff01a"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "82e4356015c30d847883850b74a46ae769adee64530082328e2c26ad156b88f1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6ff78b6f45cf3ffa500725381b72521a076102d11763cccc14d5511945d2ed03"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ac095279f0ee1e113e91ea4ace8a45532133587ae643587939352652d478e31a"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fe842fb671e5a2e1dc9e9f13b84823881dfcc66548804fbb4f412b413cc42d4c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "74d2653bad370ccfb92ff9417c88feea95f204552999760258f3d33681bb85a0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "31623cb29e7c06e1d3926c6a958b4d43212469a408f5a1965e9d160f658a6459"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b4579e1be3e86b59aae1d8e92870451137ce5489103a2365fd59f1244b865ed1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "079465e34d5c0db417245ee6d98808dae729a5d21f32ea9dc34b0d5e0e705ab1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4eb0f2441209eb5357ad0bca06d89e3bcd73e99abfafa221eae0cb5c7bc4ae29"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9a1737b4f1fd80d6e2d313ef5394579130047a05d021c4e778e2fe60279cdac2"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "290f4e3bcbf07733a444d58b6a427184f5f0ae769e7c769a3318cc86f2bcd09c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "87a3739ae2d701f71d20366faba8c40d1ea69781c85bd9d77d7cf5b086b89d3f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c5d1b21b8a778f1d281c26fd1aec4b975ae98c6236f26f43e719bfdc2f04d002"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5acfb1e1ea44c68a89a3ab7f0b8eec78c44aab5629e43a6ed2b38ac22af1e1a8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "24991eff8cba8a9c029eb392638fb412b25a321ae9d712a74706ee68a9e79680"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "aa3bdeaf6be6d97d198598ad73005b9b90d90afa60015d80c682b4d0c0d5b77d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "eac373d088405526e08365c0d815df6077773de258790aa22887abdda8135da5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a5637edf0560726174c1b98bbf826272fccbf4368e8470e59a4e0b165534b99f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f9e1ce7516867c711cdce0d28385acc1e7822b0ae326a2cae166d1d0dc4c9fc5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1a99111c95f4cfab693e82ea4f5fa39814f08ecd666c10f7ba1c5c0b32a8d448"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "33bd2e34888190eb16f40f94c71f711d2199db2864745a94258c581418914b03"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fcf442a3fd3ff84b50aeb4919e95f2f21702f5fba1514520915f5cddda8c6db0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a202cddaf81d184f0f0b0f8e907bc4f7dc64f7da6bed1d740c6368a94a5f4638"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1304e4a3c0c226a6ac332d6251b5606368697752bb1221eaabc8bc914a6a8583"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d641d6bb28df442dd9fe7c6312c59afe41d7229fef591966872d64ee1280c8c9"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "79e9472030dad6e4272a7d81013dbb5ba384670b4513e57a977e18aff3d86bcb"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b26d3ca46cb2f6fb49ce67a6fc5589fb218844304ec390e83ab660cb69e65b4c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "03bfc28f3cda32a42b0a2e60f49afce720e8790781db1b16cfc8d46fb6b1ed61"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ffc207ab8b3307962a3bf4eb8cb7f5a6104463662fac4930d3a774bdddaec219"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f451d75652efb0bc3422284359c33ca7757ac6b7bf002496eade50d2641eb512"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "33810f11f1cd556ec3b13c962e23ed32bced543b8bcf6d165849df89b70ca544"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ad2cfb0ea983af5b4ea10f8e8e2afdbf189c0410d16d2208f8ee254e6234c462"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a0c16a795414466f47c6b0ecf49e1e86516c2dd17e2c8caae736a2cdc2348f04"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "746831e2e5a88dccd2d26009f0ba5b87d8de2b7cac77fcac03b9fd54fce7361e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "28c62b215a63de9540700b9512a80b466a2e4fb3717a8d850fb4253731767163"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d1e2cfba15ace8d18ba677fbe708550615a4bca3705ffbbdb80ea01d11484423"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cd021c01137c7395d042cd3c1e6a57076beb5d9e53c3da6303482646755acc9d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "aab41866523653d899ddb2fd2b702521f4fa40736b347ff11879b0aea9506884"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3fd8c1646ac2e826feb2ed6c565f7e4f9aea681a0201c0978bf25f92352babde"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4ba4db332239b1ccf4c761b4b3b87048917497cc03406418c18ded24c2867996"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1f7b732d3cdc87d4654846cec2130001dca3726d1236706f54f8101e11724643"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6773238df37406333af97038c7b562080174983e07147c778b0e05b59c5d507f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ab8f49c0434e80b266f5095d7abd148afb9b215e193d1427a0c942915d5faf21"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "95332e1c501d617677f59ffc2c2747e459debef433ad8d279a9626d3df68e000"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "308946fbe625a9f661aafb10385222beb74dbb7f9f28fdc13a50885e8bf062fb"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d201c4ec627cf4a1ae371ff458dac2455597e67f714dd2c30e88b998b7e31c0d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bfe26c65a6321543e537ecb0f59f0d4fd612df0e5019845e027139dfa56f1a98"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9f06b6ab52eb6f6e79f6bb2993686ec954dd7cdec6487fd9b1f7a7ae403c0abd"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "037a51761078ace4c1d09218f5ad57df56ce26e2e557307405c2e3a627026e7b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2080d20134e4cf17a29913f3208000daee048c953c5c36fd176954fc7275258e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ad099ec1af0ad429d4eff674a28ed0eda59d60335909633474ffe5404080f024"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "42d39c7ff4db04dc11ef909dd43166b5b96d97272a536f2a551d08ca201fa1a4"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "07ce4559892e5093f00f0ab4408ce8d9cfa5b5137f6fe7e91ef68481c35b9a3d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "aa31d00546cdd45d760415e8b9357e017fd87e0e98c50e948fc0b964ab1d5f65"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c916fcd5eebb367d17367f2fd8c0a188c719b285c3b1a29e4dc80626821ea326"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e2f1efeab0e3633e8c56cd4f4061f20ef88df6892c6b0d8129e8b463f703f8e1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "93cf620887c09706eb5f87e6801a2dfd6be3be80673c8f7197867b9d8a38df70"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6d1d41340aae03701e3ee708611c10316817d83653bb7f9336b889d45f33d6e5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a129febb4303e6a51ba3a9fc9a1a4acacc4b553874a202f86fa8e5424ffbee5d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "caf1706c876bd9781b3632a0c866da78fb3d0c75a7e41d2e213b923fd08fe262"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "66bc811348f834c790540d8ee65e0fffe92a2d46ea1d94aec38b98f2e80d755b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a135caf955788e73a6b51ef1cb447f45cb135e4743f6dec3271aa5b7326429ea"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "79a3ed89894a311cfb20642819cdca3333efbd77d69c24b4ee23f7f0bf6fe407"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c79a9cd54dd662eaa338fd6be847a655ecde381c0c72aa4c80e739166db2072e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "3c98be30ec21f482615a93d950973af3533a96d65c09203768f834aa9044c67e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5170c6903a0e26a2df78bfe1fbfc258fbb3035894df3841c769b780300e85ca8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9700397c28e2140a4df119451746a36960c0392cc59b56e7a4b2c0ec3c5a40b8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e0a2566f2d09255551c738d829cc3e24d607821d3ab5276ec97b18a15d5df973"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2719ad904c3241cb5a6f73878997b2e58c334177c5c377080a2251be95b66bd9"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0c269ff5ebe9cda74b1ecd97863fe1f3ab36162ac0eeefab75163def9aafe0d5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "60725a415599fb8f60f14fc9cb799a6ef40f377aa3383462c571fb947a07b7f1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ef44590bcb3597d35a217dcf322b23cc39c4c1ecef8a62ac42fc47375bffcd04"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c8ecf081be48714624ff83797e4c95b1171670ab6253b28202b2fff3d6be7100"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8a339d44e704e9fe4d0fb4aa24c16bb3b25825f98bd28f286255bdf69eebe4ad"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2c9bc6b7f23b6898c07eacbcd6fd3fa104f0315d3977498e5076dbb9bb9611e4"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "99ac4a5c1b697cf498e06f2d976b06d86e44add8f524e03d2b9b77558e9b5540"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7dfe568180cab72adec49f66563aa2b5e35807ac62079b6c292d5d0989ae7c6c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2a69a3b3594665096d7826c96947e46061c0423ddb5a855de50d1bcc54d7c06f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8cbca713db50f1f17e9602e73a18afcbe5c5160d267ea52094e780ef7d991e8e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bba8511f627a1fa684d90c457103280af9805bb6411f85f21e60d6cd5598f689"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0504fa1e52122153833743f5f9c50b9dc698689c3d07b4c83697cc87b0547e1a"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a8539a722c0ed488b55cda41bfe2c78381c519549c3e2d91d49a8e8b469d318b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "383c25714916987c4f175276c94865dc772182be953b6f9d4472d6cf86d4ae69"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8ae4de5d17f9a35bd414293b8770ca8a8cc0f03b3198a6b7e6e991a438a83ce6"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "77390333e22413b395d3c9976ae7ea23f87d6c30767308574c0a20fbcad61054"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "416469e38b00f4acd8ed1dc3b5fb99e215d8be2d27fadaea85051fcac44ef726"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "71d3434476aa3f1080979cf31165fa40155cec5a83346ba1adde88ca74db9c8b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "76164e8b9d0f5f8e05c623ce37bffbd45cd395277416d7cad8a7737ad073a81c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5fadb15c1e8324aa2ffa19e833c56362d83e1e0e730a693e428cf7d6832c2300"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4f318b895da844470d3ec0eb6fa662095f4a9ef423895412d6e9b362f273ea9e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1d06493a254bf380e5c6ba2930b0ea3f85f695a8e57061f920f029407185a9f4"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "c50e3f5f49cf948ab4fe728185ce3d74324cd11894316236fde0f91131618e66"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "12f4b909047c714c1124f28e845cf9f7db29cbf9689a9fab86c9cec5ef2661d4"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e4131005cbb400168b8b19ff74cea59b44ba83069ad21a5917ec25dcceaa06ed"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bcde8cf43e916a8943679764c0b5c1512e86f01d04563eafa61b75e6fa4842e0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7ad9583708de6ccfb13aae35e6714b0d8680fb2f4b35736c6f8b10220f50ab56"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "85bd633edf84e053e8c191f1e23eb30dacef01d27f35b0b0ecc48ea7f205e9ab"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a7337e3326589e774b5a7c475c43be75b40f9b81ff004a9b6ab12dc93809e5c3"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a7de02c34fc879d755ad2177c573ba078f7dc03517939bae3cc98e6c71e5fcff"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "08477c36e9ed0c4102bd2abcb7d359d97cf36da03638baa186005be87e6bab37"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "83cb1e4ff2af182ac681b1630994d05d90ed63bf188d05f1c783bb748ab12b20"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "acc87104e6f6d51c22d6bf5f6b6ab0fd51eacb03b8d4fdd6646d83bac2480cbb"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d15d00662ff23623702cdebd8df74fcdc063350a24819b74362e97f6f736ec17"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d378808ea907005815697fdf055171c9b3addb1562e547263644d7fc4d74df20"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bcdbf20cd1e565e82ca84a373204486f9d81fe9cde8c06491e00111a91dd73a9"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "14a7fe1e1af94a0981a642355281bdced8ac266512e26a5b92bc4bcedd85e64d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "be80f50201eba8535b0101ddf695537fe37f82ccf61df34275add4d20cea08ce"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6dc1fbe122a08787651b285325a051236ca6609a8fc2de5c96e90797364555de"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e46531af247548fd95b4e55a0a23f25a2f702aefea12bef3eeb4aa56425d7162"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4654e4123e835d0829a53f86feb5a9e4b3ffc0d83d922824992c120303261597"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "69df96e79e23f6db03847cc6c3b647bf16aa0e82b6cef5f30ab1154d7d6261ed"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "cb91b29c581b56fbb8a66442edfde6c81620c5f77feb6bd5cea513df216ad51e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "85a58b9901a01e2ade5aaf59edac4196c2be5928265e6adb631cff9e42d55e44"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a35a40d0866a4db371b10b97dda0c091258e385631c9609f6c302709df2829d7"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f5c145e5929c7821d68a723173b005e951d3d8adbdc3ca2c333a415df94da856"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "304e431c13336e14a18f3f2c2f1f7187cc65b02c637e059fd71add1385d480d2"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "598891459d3e237d5615e1b59952167631724ff3b0e4ffb8decbaeff8b26e702"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "621f066bae7cc30a6c9ec35192d5c438278c54ac9e948f11ac3682edf8c8d3ee"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ad468306581207cdd821e56155dc0c6c4bffb911b7f65d9adbf796a2e9d782c5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1750b4526a0a30e055207ff4c7af8aae256f283eae42dce861462ca536c89988"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8b77fa41e1e5152e888cbf1702ea7b79e874e27f8d5508134183002abf86fa39"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7f0da72acd992a88e279b275ebe0eb9e5ba3441c3ae24cb8d7ff8bbc4aff62c8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9ae196ab79da045c88114cd2b0672f129fa3f3c3e7d1c0f157158ed82b8214bb"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "21f8f8dd7c7cdaace73a07966dc19e8e97768048ab3d3d349d82b4b8088c738d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "70d3cb1f9b0c753a19545a93228b1eb38f5c5a9aa6cc3a699d1c8d754cc74be4"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8c2d8831de2d4f3159d57d26dc0229e1306b3d756978337ee92097768b4ee233"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "91add5c9b6e360496ec6bf1fc5f2b38cb0af40420cf43cb409b65532b505df99"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e58bc9998972129fc56259d5c6bcc8721a396758c35f8f216be5aac08e421f13"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "43c6554307ad2c6612685763267999fefb4966386143f34453139bf02be05b55"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "29ea710f1f46c117b32aa4fe9fd1567fc520f4e5e39821c9cea582b954a10757"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7898818a0bc3df6e7d6442c08e07d8a77d75233c9cfb2ef3faaca2d84c36a9b2"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "715b2d826fb63da3d3c08e54b1c536a7c7c929f8b7d1eec2e2afe9dd8d1b75c2"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4102a38f7c33e8ad78c64bba66815e04087f05f7e571863e750823e1d621146a"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "2926fbe71f8a359432bee2242d8481d6bbfe6d1d54a7687f2e0f0339e2141c54"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9868fdaaca7b2f3aa749d62f335845889807d23b031e64f846acad5edbc0f1a1"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "87377530812914ab81c455b4cfef340127bef23812d758b2ed7bc6aa302b3448"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "44435f91c5f13011867e915bfa59c9da515ac1fb60d74e0fc7f4a6047acbf21e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a58af16a2d1ec44bd66bdfb595ac224acc954594d1158b7246e951b423d15d99"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "18cc1378d84167bdeb07b59a31c14f6eb4040fdd6ac41773a31c448e009d937d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "53ac166a1113298680f669fe488fdf67e0f98221fc6fbb31c331d88fd70d116e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "b11d37a06ccd9f03931f8e899fc0c5597815e8a072223a44683b41a3fae10fff"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "80abac46536a2f19f98279b95edf1c1d7f19f93af2ef074365df9c91cb4f0dfb"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "1774c310363b5536e9ced48aa4bf8353a1299e009c8fe811da9ab7d6298398b0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "346502fb6561776af51afd56c19458893112cc7ab621a27ef962579c232f1536"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a2107dbe067ef094ed08b794abcfcd6de15e2b4cf801b88141b5d3c3619ae51c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "eceb944ebfe05c712cd86190565774f2ee171512e3dd62e73b5da3b4935cc44c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "5932a55badcb94913ee9044d88bbb145efc2d91b8c88da728883358b5be6598f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8a0d632bdb41064cb7ea01b622f82d9a32059eb90bfa6e9f47b42d4a45a40078"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "46e4e8bcfd60a93bde503976322a68f1d5e5b9c452afe1e5f0db23ae8f9f6fee"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "fef9876ea1d105cc6a34d798838107b80f6aaf9ffbd614ee6a920763e29e4033"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ed7e85e10ad3e4151368428d11bbe70af0cda0fb6a388b9ebaec20cb7f4508fd"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d016d73f7f37aab0996cf34b2deb6d3219eb3bd05ea48a754bc403d40018071c"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e7778b3d633fbc759b95f48efa3ef16fda761cb73f366efbdcc7cb165e95a3e0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "e265e4603297685ad7cef104e91f0ed4affded883dfc64c4e20ab6d699a95b0a"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8e9a2a2e010c9ed8fe377e1061af98b97f8b73e59d0b4760bbb94c86e98c4d02"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "4bb3cff6cf2e85c9532c6c5b9420c6b4bc9a434ca5d0e1d813ba8fe2ad1f6160"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0e0dad79c3076038b3a8b1a644a9c30d7e6b72006e6bd4ac59f4fa9f0ada535e"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "016234d4e86376a12115ad7339a9536ca544aa4a29a461330d68cdc35c91cf30"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "af419bd5f8ed5fbb8971c820e95b4e59a8586ef602ae870029184fb736bb8820"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "d747481f64f3a9f3bd5b6046ff5f96b3f7ffeebeba9537d183d5204ae5cbd784"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0ab1a23c664f2bc242274d6e34264c9bfa4196c18a8f0a0f07877d6df862ea19"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "34d6316a1c8168bf6030289df3c877cbb451c3473aeb7521296ad6434003bfb5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "06905a862f108b23412245e33a2bd234e115e76c14926ad7ab37bfe47339293b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "bf07c5a8747500d0b6f1cf8a839040392cd876747c53e4dc886e13d05317fb75"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7472119ea4967605c62a0d2edd49f0c14cdada852b6ae6fb45b96ebd0759aeb9"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "prefer-const",
+      "digest": "ce853992bb9f4f09bb74059ad5a190e5b7c2a16c36d6b47c2ecab731d5f60eb0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8eb2ce7cb03909e626166727b97ef73a3f60bf028a0dc5ea494a5904ceb96d69"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6991a96323b95471e076600feedf6e154ec98adfc49966a94ade44f5106d6650"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "abf9b762f4ae0aa344cf9186cb0078854520c75706053bc40a9ca30ab5d76fe0"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "252ae5c67fb7c7f1c9b566540a801b37a1e7bcb9641bfcff6d144944cc8cb75b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6060753d858321c3e24e9777e7a8fe7c396bd281648bdb355be255043fecc71b"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "7f357f9d6cd3f9e42dd39655c6c7f8b562db453ca0eeeca10f2d2edecebf10c8"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "ec1b20b1e3fa9a28e3a46e8d4d877b956a950aa187646f7f9ee6329124d9e76d"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "eb433602ba5514fcb524a4fd0b945decd8430cb449923826ca5313b9da0cd040"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "0c7233cfa38e280f1305d56eb90b4a04f8e84548676b8ce40d4c4cf12205b01f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9f0883dbea46e5d861f91816b9d13dc70fedc1e846df87ceeba251edffddc59f"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "8c792011e33b86290c7ebaa6f59c02b7d8cba852b491f1c59e633cb52628f043"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "9b4a271785bbfd5bf04d46797301a23edad4cae4e7e71473829093b1b95e77a5"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "object-shorthand",
+      "digest": "142d141af6f1fa54bf850424b48512b9f5c0780afcbd0f70c75f1da891df3652"
+    },
+    {
+      "file": "server/storage.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "a711033b76b2995e05ae2401e80663f5680a8009192bb0a8fb628baeee98ea8e"
+    },
+    {
+      "file": "server/structured-log.ts",
+      "rule": "no-useless-escape",
+      "digest": "3eaebac7f14ac6f48523169870057331e5fee790bca007361930cf75915966bb"
+    },
+    {
+      "file": "server/subscription-payment-runtime.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "20310c5bfe23f7ccf799ec5b1256638547b83c2467dc1002991d981b250d10e2"
+    },
+    {
+      "file": "server/windcave.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "52f615c559402f950cc472a7ee90c49d284c9c261ed393ddcbfaa1af593696b3"
+    },
+    {
+      "file": "server/windcave.ts",
+      "rule": "no-empty",
+      "digest": "3f64b235bef15dfb3d458e62934513b5fbc916e5179bdd937047793a61449525"
+    },
+    {
+      "file": "scripts/config-hygiene.test.mjs",
+      "rule": "no-regex-spaces",
+      "digest": "d0d43f8e7309b978c1312c554372ec6e1e3656bb8b43a5e0e5559a5d8e9f6fab"
+    },
+    {
+      "file": "scripts/deploy.js",
+      "rule": "no-unused-vars",
+      "digest": "dbe561775b165b7f8346482e822bec0ea54301af4ad4b0a31d47f89670b17c35"
+    },
+    {
+      "file": "scripts/deploy.js",
+      "rule": "no-unused-vars",
+      "digest": "23104f2ae9c06ee29ff39bda5ab8ef06a9480f55b9665e0e0910062af41f57cf"
+    },
+    {
+      "file": "scripts/inventory-44px.mjs",
+      "rule": "no-unused-vars",
+      "digest": "f2f7f6c339de8d7e696e356e275c607ebaa93712059db45350ea96f813d9706b"
+    },
+    {
+      "file": "scripts/inventory-44px.mjs",
+      "rule": "no-unused-vars",
+      "digest": "44443763176d9dcbb3e8281b5b84ae65816eab676074cd0f131657a0368f3733"
+    },
+    {
+      "file": "scripts/scan-secrets.mjs",
+      "rule": "no-useless-escape",
+      "digest": "10ce7363f39b737e9dc65dc33bda3a7845b6c4bc9d5e53563fa601b4509ea4eb"
+    },
+    {
+      "file": "scripts/summarize-tutorial-contrast.mjs",
+      "rule": "no-unused-vars",
+      "digest": "779146ab1e0fd11e8a5876a12f5e3cd1c89b37ed4d2b29b79482429315c69dc2"
+    },
+    {
+      "file": "scripts/summarize-tutorial-contrast.mjs",
+      "rule": "no-unused-vars",
+      "digest": "563d74877ab14b1cb6ebc97b269854aa9cfee137fc133354f3c27114df90b815"
+    },
+    {
+      "file": "scripts/tmp-gesture-probe.mjs",
+      "rule": "no-unused-vars",
+      "digest": "cd81e6406edf785ba070947b4e9a7d0e6209a30409ff953b7fec6a326c4483c3"
+    },
+    {
+      "file": "scripts/tutorial-geometry.mjs",
+      "rule": "prefer-const",
+      "digest": "ffcbd89ed735e2d860ecdb4f5b65ac22db3b486b0ffd1758f8f598301f33d45e"
+    },
+    {
+      "file": "scripts/verify-accessibility-audit.mjs",
+      "rule": "no-useless-escape",
+      "digest": "74771aceb7213ce310d743d4dcb33c9c68a9ac928398e4dfc3bd5767b0307313"
+    },
+    {
+      "file": "scripts/verify-chunk-resilience.mjs",
+      "rule": "no-unused-vars",
+      "digest": "3c2514eb2675522b337fc4af9e04f3c6b0a9bd763c6d2c2613dcf7d35dd0ee69"
+    },
+    {
+      "file": "scripts/verify-mobile-keyboard.mjs",
+      "rule": "no-unused-vars",
+      "digest": "f2f7f6c339de8d7e696e356e275c607ebaa93712059db45350ea96f813d9706b"
+    },
+    {
+      "file": "scripts/verify-r1-t10-tutorial-accessibility.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "90d528d2adcbf89cfd380531b780a526924e730bd492f316a2995b5db1ff16bb"
+    },
+    {
+      "file": "scripts/verify-r1-t4-sessions-browser.ts",
+      "rule": "prefer-const",
+      "digest": "ebbb5ca88c82265cd2fd997cf6e57e43a01435e262b40a258335fa666f75f892"
+    },
+    {
+      "file": "scripts/verify-r1-t5-apple-browser.ts",
+      "rule": "no-duplicate-imports",
+      "digest": "06b0244dd7c3d47f5757359cb13d6bea6d9df699f1b98b0b94146fc81431b901"
+    },
+    {
+      "file": "scripts/verify-r1-t5-apple-browser.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "74a2bdb8fbf982f30879fa090ef958fe2d9aa9b24ec2d05360bfa8f5f7cf15f7"
+    },
+    {
+      "file": "scripts/verify-r6-cron-postgres.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "6605b09283f78f0a1b2b510a5d92c37c34b1325e880de2498b91654e45467ca8"
+    },
+    {
+      "file": "scripts/verify-r6-cron-postgres.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "digest": "f61dfd4ed88a49b58ad0eda451b13f9e34bfd1992b3b5f45da0308fc98bee350"
+    },
+    {
+      "file": "scripts/verify-r6-cron-postgres.ts",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "scripts/verify-r6-cron-postgres.ts",
+      "rule": "no-empty",
+      "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
+    },
+    {
+      "file": "scripts/verify-server-postgres.mjs",
+      "rule": "no-unused-vars",
+      "digest": "f12824eac99482728202939d13b80a85312edd7794437f2459a95bb44b38b8c3"
+    },
+    {
+      "file": "scripts/verify-terminal-dock.mjs",
+      "rule": "no-unused-vars",
+      "digest": "df81b0346ffbd9624b904d661978edec1c3fd49fc7f672e287b934035c41c345"
+    },
+    {
+      "file": "scripts/verify-terminal-dock.mjs",
+      "rule": "prefer-const",
+      "digest": "bc2551d885bf3386eb7af389878b8b0b9160853df49113ba6f4f803b8269fe1d"
+    }
+  ]
+}

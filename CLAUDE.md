@@ -1,5 +1,18 @@
 # Claude repository handoff
 
+**R8 first repository slice is on `remediation/r8-ci-20261016`.** Read
+`docs/HANDOFF-2026-10-16-r8-inflight.md` first, then the R8 verification and
+truthfulness runbooks. Node22.23.3/npm10.9.9, isolated CI/PG/browser tooling,
+critical dependency repairs, dead auth-package removal, zero-new-error lint and
+unsupported ecommerce/documentation corrections are implemented. Full isolated
+client/server regression passed 1507/5249 tests with zero open handles. Final
+browser/tooling evidence and the precise push state are in the handoff; verify
+Git rather than assuming a background task completed. R8 remains open for high
+advisories, unresolved history findings, production-install/dependency hygiene
+and real-target/professional release evidence. No deployment or phase exit.
+Claude retains R4. Preserve owner PID4196 and root node_modules; updated dependency
+validation uses a private isolated install. Keep D13 and all deferred gates.
+
 **R7 repository implementation and available regression are complete on
 `remediation/r7-capabilities-20261015`.** Source `62a80d9c` is pushed:
 locked D13, retired fake native/JS/wallet/attended paths,

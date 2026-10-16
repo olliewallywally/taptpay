@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ],
+    "tsBuildInfoFile": "./node_modules/typescript/r8-scripts.tsbuildinfo",
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": [
+    "scripts/ci-upload-inventory.ts",
+    "scripts/verify-ci-postgres.ts",
+    "scripts/verify-r8-browser.ts",
+    "scripts/verify-r1-t10-device-matrix.ts"
+  ]
+}

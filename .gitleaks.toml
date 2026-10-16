@@ -41,7 +41,7 @@ keywords = ["postgres://", "postgresql://", "mysql://", "mongodb://", "mongodb+s
   condition = "OR"
   regexTarget = "match"
   regexes = [
-    '''(?i)@(?:127\.0\.0\.1|\[::1\]|localhost)(?::[0-9]{1,5})?(?:[/?]|$)''',
+    '''(?i)@(?:127\.0\.0\.1|\[::1\]|localhost)(?::(?:[0-9]{1,5}|<port>))?(?:[/?]|$)''',
     '''(?i)@(?:[A-Za-z0-9-]+\.)*example(?:\.[A-Za-z]{2,63})?(?::[0-9]{1,5})?(?:[/?]|$)''',
     '''(?i)@postgres(?::[0-9]{1,5})?(?:[/?]|$)''',
   ]
@@ -59,3 +59,112 @@ keywords = ["postgres://", "postgresql://", "mysql://", "mongodb://", "mongodb+s
     '''^[$]\{[^}]{1,120}\}$''',
     '''^<[^>]+>$''',
   ]
+
+# R8 October16: exact public source/build checksum rows; never exempt the file.
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+description = "Reviewed public artifact SHA256 rows: R1-T10-tasks-2-6-browser-summary-2026-10-11.json"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(?:^|/)docs/evidence/remediation\-v2\-2/r1/R1\-T10\-tasks\-2\-6\-browser\-summary\-2026\-10\-11\.json$''']
+regexes = [
+  '''^\s*"scripts/capture\-r1\-h1\-auth\-baseline\.mjs": "bda1588576fa37f55e907a4f7dd9b7bb5aac46228304bfe0c16df91de2a9f235",?\s*$''',
+  '''^\s*"scripts/count\-merchant\-credentials\.mjs": "69602ae1ce9d215657b327c84995cd18ecc4149df73bb7201e37cd746865470f",?\s*$''',
+  '''^\s*"scripts/count\-merchant\-credentials\.test\.mjs": "6a9f3f5b426c29e06927477ed8cbc0a7372b984a4ea7a1ac53260d9ab69a9646",?\s*$''',
+  '''^\s*"scripts/scan\-secrets\.mjs": "26716addc990edceb74fc3bb52f13096e05909498ec675452656feb3e12aa728",?\s*$''',
+  '''^\s*"scripts/scan\-secrets\.test\.mjs": "531d07ee47e91257c4ef704ce7bf54dc1a9f88f108de7f83a7c4136d8b35c98c",?\s*$''',
+  '''^\s*"scripts/set\-admin\-password\.ts": "1dda92063d70f7fa07851000a8bab1137ec08db5c8b598146cadab55b4ca98ee",?\s*$''',
+  '''^\s*"scripts/verify\-password\-rule\-browser\.mjs": "f0b47eca7f9d71808969ff0363541439d519541cddde2d493a2d55263533b9b2",?\s*$''',
+]
+[[rules.allowlists]]
+description = "Reviewed public artifact SHA256 rows: R1-T10-terminal-followup-browser-summary-2026-10-12.json"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(?:^|/)docs/evidence/remediation\-v2\-2/r1/R1\-T10\-terminal\-followup\-browser\-summary\-2026\-10\-12\.json$''']
+regexes = [
+  '''^\s*"client/src/features/terminal/terminal\-tokens\.css": "fc1904b6631abf7ac37b8e35dfa0eaaa1ba9096cc47bbf2957cff4aedc8a5f56",?\s*$''',
+  '''^\s*"scripts/capture\-r1\-h1\-auth\-baseline\.mjs": "bda1588576fa37f55e907a4f7dd9b7bb5aac46228304bfe0c16df91de2a9f235",?\s*$''',
+  '''^\s*"scripts/count\-merchant\-credentials\.mjs": "69602ae1ce9d215657b327c84995cd18ecc4149df73bb7201e37cd746865470f",?\s*$''',
+  '''^\s*"scripts/count\-merchant\-credentials\.test\.mjs": "6a9f3f5b426c29e06927477ed8cbc0a7372b984a4ea7a1ac53260d9ab69a9646",?\s*$''',
+  '''^\s*"scripts/scan\-secrets\.mjs": "26716addc990edceb74fc3bb52f13096e05909498ec675452656feb3e12aa728",?\s*$''',
+  '''^\s*"scripts/scan\-secrets\.test\.mjs": "531d07ee47e91257c4ef704ce7bf54dc1a9f88f108de7f83a7c4136d8b35c98c",?\s*$''',
+  '''^\s*"scripts/set\-admin\-password\.ts": "1dda92063d70f7fa07851000a8bab1137ec08db5c8b598146cadab55b4ca98ee",?\s*$''',
+  '''^\s*"scripts/verify\-password\-rule\-browser\.mjs": "f0b47eca7f9d71808969ff0363541439d519541cddde2d493a2d55263533b9b2",?\s*$''',
+]
+[[rules.allowlists]]
+description = "Reviewed public artifact SHA256 rows: R1-T10e-completion-browser-summary-2026-10-11.json"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(?:^|/)docs/evidence/remediation\-v2\-2/r1/R1\-T10e\-completion\-browser\-summary\-2026\-10\-11\.json$''']
+regexes = [
+  '''^\s*"client/src/hooks/use\-accessible\-modal\.test\.tsx": "495a54ccca318cb78cd53ae177dc1151e34df000ff919203b1482816dbe3521b",?\s*$''',
+  '''^\s*"client/src/hooks/use\-accessible\-modal\.ts": "a43816ef07e4a0672859ce7af7ab23a0a30b9cf45a02afa9764bf6ec4dca2424",?\s*$''',
+  '''^\s*"client/src/pages/admin/APIManagement\.tsx": "bfa8cea250f7843ea9a3d452ab1144a06e4ec83262893590b6d4f212bf0a7b86",?\s*$''',
+  '''^\s*"client/src/pages/forgot\-password\.tsx": "7bcc5424601c5b2fe20c962e704fc8d3092ca85eb80d12892c7932128d691462",?\s*$''',
+]
+[[rules.allowlists]]
+description = "Reviewed public artifact SHA256 rows: R1-T10e-tutorial-contrast-browser-summary-2026-10-11.json"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(?:^|/)docs/evidence/remediation\-v2\-2/r1/R1\-T10e\-tutorial\-contrast\-browser\-summary\-2026\-10\-11\.json$''']
+regexes = [
+  '''^\s*"client/public/app/assets/auth\-DnCXt1zh\.js": "5f1b86ffe68d33453919015c042d6417e18d960e819d685343b8f3b9a52977be",?\s*$''',
+  '''^\s*"client/public/app/assets/forgot\-password\-C5qc41IT\.js": "56b9ac93bbbc27fbcbcd677900df538f8de37dc35a9f30e8a49c15d07cdd80e4",?\s*$''',
+  '''^\s*"client/public/app/assets/forgot\-password\-D6SeO09h\.js": "b33728c13d8bc834ae59259b7fb35e26e1520c07cb5e388d6c1c934ba5288ebc",?\s*$''',
+  '''^\s*"client/public/app/assets/mock\-api\-Hpt4T5pO\.js": "5ead89b9906eafdf1c50c3ea86fcf3aaf3e785f49967802e646926c035c05701",?\s*$''',
+  '''^\s*"client/public/app/assets/property\-api\-BhlONgUE\.js": "7a709a1b2cbcf441563359aa3bb817716f858e3a37dee7090d30422d6a937f73",?\s*$''',
+  '''^\s*"client/public/app/assets/property\-api\-CTwI_r11\.js": "535097e5778180016bd2b9c3612fa4a696569b7318c8160afdfda1f91a791974",?\s*$''',
+  '''^\s*"client/public/app/assets/reset\-password\-Dinf9Siy\.js": "611ebc040dbfa25fdc26d791d7d489238cc6baa7e4d8a1dc5fe152fb86914a7f",?\s*$''',
+  '''^\s*"client/public/app/assets/reset\-password\-SgV8R1fv\.js": "ae2d3b8bef496ef2c84a1f1c952fddbcbf2f855ab645fe2bcef684d7663a6eae",?\s*$''',
+  '''^\s*"client/public/app/assets/trades\-api\-D2AvqHKu\.js": "ef7b0f876f73c8b1b57e7af03931c0e6ed0095fa0f7d9c9c16747c6608399d74",?\s*$''',
+  '''^\s*"client/public/app/assets/trades\-api\-fpI9U5QN\.js": "47a232e1bad45fe63a7f7e0de8fb0c6106e51824b1a2edee9d3738ece048badd",?\s*$''',
+  '''^\s*"client/src/desktop/desktop\-keypad\.test\.tsx": "d01febf3d570840aa52da51e6949f5a90365fbc1a2fe1df08573aa36cbd54606",?\s*$''',
+  '''^\s*"client/src/desktop/desktop\-keypad\.tsx": "7fa9dc21867ac032d0724b1af088e83b9f6ec865c4ba71c30bf2e04e760c13cc",?\s*$''',
+  '''^\s*"client/src/features/terminal/terminal\-tokens\.css": "fc1904b6631abf7ac37b8e35dfa0eaaa1ba9096cc47bbf2957cff4aedc8a5f56",?\s*$''',
+  '''^\s*"client/src/hooks/use\-token\-page\-privacy\.ts": "a6c55cef976b71fa61f5c102c722a331c678f46d863d6ad2bf80ec2e33a71f83",?\s*$''',
+  '''^\s*"client/src/lib/__tests__/api\-fetchers\.test\.ts": "dd88562b05dacac78b9e55ec2159a275ad15d1c72a91293db7f829e562bf98ee",?\s*$''',
+  '''^\s*"client/src/lib/api\-error\.test\.ts": "c011b3fde49d97cf8fdd62e3f436ef264c4c174a6f6a59658368edf7ca2c1740",?\s*$''',
+  '''^\s*"client/src/lib/api\-error\.ts": "9261573b61987b509841584f39e7050a5664aaf922e5f20c7d9fae28b159cfa6",?\s*$''',
+  '''^\s*"client/src/lib/auth\.ts": "ecc24457f0e04d542c54dc56bf45e7b98ccba41eb44bae7a5103410e2a02a136",?\s*$''',
+  '''^\s*"client/src/lib/property\-api\.ts": "ac474015c6c6a54c4899c5a4792bdc610ea7294d0d33a13145cb117d1bb516fc",?\s*$''',
+  '''^\s*"client/src/lib/trades\-api\.ts": "9889d26d66b99777fd553d3abffc6a9fecf571ec2f8cb4f4cc90c32eeeb38176",?\s*$''',
+  '''^\s*"client/src/pages/admin/APIManagement\.tsx": "f6a06fb9df8040ef9eaf4f7af31a505fb392efa0ed105991458894d88e7eaca1",?\s*$''',
+  '''^\s*"client/src/pages/admin\-api\.tsx": "4f61069f15e80e21347ec5d7504634efdefa7e16cba9349cc578a23ef47b9d08",?\s*$''',
+  '''^\s*"client/src/pages/forgot\-password\.tsx": "e93eb06a62b2fa75379d8ad1a4f72305641677c4b26526c5e7d169de497d38e8",?\s*$''',
+  '''^\s*"client/src/pages/password\-rule\-forms\.test\.tsx": "463e0ec5141da8240f369aa031e746927b48b153c3b98a21633cc5f1bda7753b",?\s*$''',
+  '''^\s*"client/src/pages/reset\-password\-check\.test\.tsx": "b626c6342a0075be97da3a82bcb93a493d16d9cfcd29b7eefa7778380a22bd7d",?\s*$''',
+  '''^\s*"client/src/pages/reset\-password\.tsx": "f61a2f82fdff117664b339dc735fb2f42fdad72e2429d94816dc633ef1abc190",?\s*$''',
+  '''^\s*"client/src/pages/token\-payment\.tsx": "f3368bee0f45f0850f8969ab6c63a28826272657201b8d8b5a48755c3ca65bd5",?\s*$''',
+]
+[[rules.allowlists]]
+description = "Reviewed public artifact SHA256 rows: R5-T1-VERIFICATION-2026-10-14.json"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(?:^|/)docs/evidence/remediation\-v2\-2/r5/R5\-T1\-VERIFICATION\-2026\-10\-14\.json$''']
+regexes = [
+  '''^\s*"server/__tests__/support/clear\-ambient\-credentials\.ts": "906da8e66793793e4bb8e02f4d38c8588d8529bce87dbbb11f875e120f67e628",?\s*$''',
+]
+[[rules.allowlists]]
+description = "Reviewed public artifact SHA256 rows: R7-BUILD-SHA256-2026-10-15.json"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(?:^|/)docs/evidence/remediation\-v2\-2/r7/R7\-BUILD\-SHA256\-2026\-10\-15\.json$''']
+regexes = [
+  '''^\s*"assets/auth\-D0AmiyPX\.js": "3c7aa488a8e816dd8ebbd37cf4a7baa5cb3da10a955879065a9c86f264d2c685",?\s*$''',
+  '''^\s*"assets/cash\-command\-key\-DIXHG68q\.js": "3d6483ad212b1925a4449fae662a8447f107e6b90b1905e3496d89eb79630d5c",?\s*$''',
+  '''^\s*"assets/desktop\-keypad\-B0KPTi__\.js": "440c9101a520fcd4dd08ac93e48db34f36cfe2230c354f8e676b4f317aa743e1",?\s*$''',
+  '''^\s*"assets/forgot\-password\-DMpFkhlv\.js": "21afe511af4d66bf35fd7d3ba2c6deaf9d353915450a1fa9a556aeb67be79c6b",?\s*$''',
+  '''^\s*"assets/property\-api\-BjyfkzIF\.js": "c1e67e55557ffaf47149ed248d5efc0b995146ec86f68eb4b43f3bbfb26b2ca4",?\s*$''',
+  '''^\s*"assets/reset\-password\-DWabwMM_\.js": "f304a4c25027331170cdd0713d4c2f501458d96d3118ce6547c8fae6b42da2f8",?\s*$''',
+  '''^\s*"assets/terminal\-tokens\-BdypmEjk\.js": "5192748c818218c5fd807f63ea54c02cf236d053e3ef838ebe4bb3b43139f1e8",?\s*$''',
+  '''^\s*"assets/terminal\-tokens\-BpHbyxOA\.css": "7b5f66b4026b1bdbe9c759a5e0005dc10c8a7a7c8dea0e952d34c8f5c102a474",?\s*$''',
+  '''^\s*"assets/token\-payment\-_raRr6ve\.js": "0338e6fca6aa2689bdd263567cbe4ec8df01030b9a5fcdf735215ce01bdf5f11",?\s*$''',
+  '''^\s*"assets/trades\-api\-CpaMowp4\.js": "12fc61c6e21ca8cb91b130d384c9656ef61029dcf9315c34e53e767be7867844",?\s*$''',
+]
+[[rules.allowlists]]
+description = "Literal synthetic HTTP account password in the owned admin-delete verifier"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''(?:^|/)scripts/verify-admin-business-delete-postgres\.ts$''']
+regexes = ['''^(?:Synthetic\-pass\-2026)$''']

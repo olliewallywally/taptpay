@@ -46,7 +46,7 @@ function clientSources(dir = "client/src"): string[] {
  * A file is taken off this list by deleting it or by moving it onto the builder, never added to it.
  */
 const NEVER_LOADED: Record<string, number> = {
-  "client/src/pages/admin-api.tsx": 7,
+  "client/src/pages/admin-api.tsx": 0,
   "client/src/pages/admin-dashboard.tsx": 6,
   "client/src/pages/admin-merchant-broken.tsx": 9,
   "client/src/pages/admin-merchant.tsx": 9,
@@ -573,7 +573,7 @@ describe("R1-T10 — where an API address may still be spelled", () => {
       expect([file, loaded.has(file)]).toEqual([file, false]);
     }
     expect(Object.keys(NEVER_LOADED)).toHaveLength(12);
-    expect(Object.values(NEVER_LOADED).reduce((sum, times) => sum + times, 0)).toBe(104);
+    expect(Object.values(NEVER_LOADED).reduce((sum, times) => sum + times, 0)).toBe(97);
   });
 
   it("the reading of what the app loads reaches every file that names a route", () => {

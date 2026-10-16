@@ -43,8 +43,8 @@ describe("fail-closed runtime configuration", () => {
     expect(falseConfig.rawBooleans[key]).toBe(false);
 
     const trueAttempt = () => loadConfig({ ...BASE_ENV, [key]: "TRUE" });
-    if (key === "FEATURE_CRYPTO") {
-      expect(trueAttempt).toThrow("FEATURE_CRYPTO");
+    if (key === "FEATURE_CRYPTO" || key === "FEATURE_TAP_TO_PAY") {
+      expect(trueAttempt).toThrow(key);
     } else {
       expect(trueAttempt).not.toThrow();
       expect(trueAttempt().rawBooleans[key]).toBe(true);

@@ -235,6 +235,7 @@ function browserGeometry(rowSelector) {
 export const GEOMETRY_SOURCE = `(${browserGeometry.toString()})`;
 export const GEOMETRY_SOURCE_SHA256 = createHash("sha256").update(GEOMETRY_SOURCE).digest("hex");
 
+/** @param {string|null} [rowSelector] */
 export async function measureGeometry(page, rowSelector = null) {
   if (rowSelector !== null && (typeof rowSelector !== "string" || !rowSelector.trim())) {
     throw new TypeError("Terminal row selector must be a nonempty selector or null");

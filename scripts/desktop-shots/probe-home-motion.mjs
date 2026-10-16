@@ -137,7 +137,7 @@ async function probeSurface(page, surface, label, failures, notes) {
     const firstFrame = await page.evaluate(
       (prefix) =>
         new Promise((resolve) =>
-          requestAnimationFrame(() => resolve(READ_STATE_INLINE(prefix))),
+          requestAnimationFrame(() => resolve(window.READ_STATE_INLINE(prefix))),
         ),
       p,
     );

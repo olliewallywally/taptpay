@@ -3547,19 +3547,9 @@ export class MemStorage implements IStorage {
     }
   }
 
-  // API Key operations - Memory implementations
-  async createApiKey(data: any): Promise<any> {
-    const id = Date.now();
-    const apiKey = {
-      ...data,
-      id,
-      keyPrefix: `tapt_${data.environment}_`,
-      apiKey: `tapt_${data.environment}_${Math.random().toString(36).substring(2, 15)}`,
-      status: 'active',
-      createdAt: new Date().toISOString()
-    };
-    // Store in memory (would normally go to database)
-    return apiKey;
+  // Issuing real ecommerce credentials needs a separately approved design.
+  async createApiKey(_data: any): Promise<any> {
+    throw new Error('ECOMMERCE_API_UNSUPPORTED');
   }
 
   async getApiKey(id: number): Promise<any> {
@@ -3578,8 +3568,8 @@ export class MemStorage implements IStorage {
     return null;
   }
 
-  async revokeApiKey(id: number): Promise<boolean> {
-    return true;
+  async revokeApiKey(_id: number): Promise<boolean> {
+    throw new Error('ECOMMERCE_API_UNSUPPORTED');
   }
 
   async updateApiKeyLastUsed(id: number): Promise<any> {
@@ -6857,10 +6847,9 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // API Key operations - placeholder implementations
-  async createApiKey(data: any): Promise<any> {
-    // TODO: Implement when API tables are available
-    return { ...data, id: Date.now(), keyPrefix: 'tapt_sandbox_', status: 'active', createdAt: new Date() };
+  // Unsupported ecommerce key operations must not manufacture success.
+  async createApiKey(_data: any): Promise<any> {
+    throw new Error('ECOMMERCE_API_UNSUPPORTED');
   }
 
   async getApiKey(id: number): Promise<any> {
@@ -6879,8 +6868,8 @@ export class DatabaseStorage implements IStorage {
     return null;
   }
 
-  async revokeApiKey(id: number): Promise<boolean> {
-    return true;
+  async revokeApiKey(_id: number): Promise<boolean> {
+    throw new Error('ECOMMERCE_API_UNSUPPORTED');
   }
 
   async updateApiKeyLastUsed(id: number): Promise<any> {

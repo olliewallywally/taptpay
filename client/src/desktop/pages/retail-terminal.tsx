@@ -167,6 +167,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const [destination, setDestination] = useState<SaleDestination>({ kind: "no-board" });
   const [currentSale, setCurrentSale] = useState<CurrentSale | null>(null);
   const [saleError, setSaleError] = useState<string | null>(null);
+  const createSaleInFlight = useRef(false);
   const [boardError, setBoardError] = useState<string | null>(null);
   const [splitOn, setSplitOn] = useState(false);
   const [splitN, setSplitN] = useState<number>(2);
@@ -293,6 +294,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setSaleError(message);
       toast({ title: "Couldn't start the sale", description: message, variant: "destructive" });
     },
+    onSettled: () => { createSaleInFlight.current = false; },
   });
 
   const createBoardMutation = useMutation<Stone, Error, string | undefined>({
@@ -535,6 +537,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
   /* ── actions ── */
   const send = (withSplit: boolean) => {
+    if (createSaleInFlight.current) return;
     if (amount <= 0) {
       toast({ title: "Enter an amount first", variant: "destructive" });
       return;
@@ -549,6 +552,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       toast({ title: "Choose a destination", description: message, variant: "destructive" });
       return;
     }
+    createSaleInFlight.current = true;
     createMutation.mutate({
       item: itemName.trim(),
       price: amount.toFixed(2),

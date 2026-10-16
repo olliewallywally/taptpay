@@ -9,11 +9,11 @@ import globals from 'globals';
 
 export default [
   // Base JavaScript configuration
-  js.configs.recommended,
+  { ...js.configs.recommended, files: ['client/src/**/*.{js,jsx,ts,tsx}', 'server/**/*.{js,mjs,ts}', 'shared/**/*.{js,ts}', 'scripts/**/*.{js,mjs,cjs,ts}', '*.config.{js,mjs,ts}'] },
   
   // Configuration for JavaScript and JSX files
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['**/*.{js,jsx,mjs,cjs}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -116,6 +116,7 @@ export default [
     },
     rules: {
       // TypeScript rules
+      'no-undef': 'off', // TypeScript checks value/type scope, including namespaces.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
@@ -174,9 +175,13 @@ export default [
   
   // Apply Prettier config to disable conflicting rules
   prettier,
+  {
+    files: ['**/__tests__/**/*.{js,jsx,ts,tsx}', '**/*.test.{js,jsx,ts,tsx}', '**/*.spec.{js,jsx,ts,tsx}'],
+    languageOptions: { globals: globals.jest },
+  },
   
   // Files to ignore
   {
-    ignores: ['dist/**', 'node_modules/**', '*.config.js', '*.config.ts', 'vite.config.ts'],
+    ignores: ['dist/**', 'node_modules/**', 'client/public/**', 'ios/**', 'android/**', 'coverage/**', 'docs/**', 'attached_assets/**', 'logs/**'],
   },
 ];

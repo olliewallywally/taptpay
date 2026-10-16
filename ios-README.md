@@ -1,117 +1,27 @@
-# TaptPay iOS App — Capacitor Build Guide
+# TaptPay iOS build and acceptance
 
-## Overview
+The Capacitor wrapper is configured to load https://taptpay.co.nz/app-login.
+A web deployment changes that served content; it does not prove native binary,
+redirect, App Store policy or device compatibility. Native dependency, entitlement
+and capability changes require a reviewed signed build and appropriate release.
 
-TaptPay is wrapped as a native iOS app using Capacitor. The app loads from the live production URL (`https://taptpay.co.nz/app-login`), so **every Replit deployment instantly updates the app — no App Store re-submission needed for content or feature changes**.
+Use the exact Node version in `.nvmrc` and `npm ci`. This repository already has
+an iOS project using Swift Package Manager. Do not recreate it with `cap add ios`
+or assume the older CocoaPods/Xcode guide applies to the locked Capacitor version.
+A macOS/Xcode environment meeting that version's actual requirements is needed
+for a signed build; Linux synchronization is not Xcode/device evidence.
 
-App Store re-submissions are only required when updating native code (Swift plugins, entitlements, or Capacitor version bumps).
+Run `npm run verify:build`, refresh the complete generated `client/public/app`
+snapshot using the reviewed workflow, rebuild and verify `npm run verify:r7:artifacts`.
+Then `npx cap sync ios` and `npm run verify:r7:artifacts -- --native` must prove
+coherent web/native assets. Preserve source index/hash evidence and the full asset
+rollover. Do not hand-edit hashed files or copy a recursive nested app directory.
 
----
+Preserve HTTPS, cleartext=false and the exact Apple login and production Windcave
+HPP navigation hosts in capacitor.config.ts. Cookie login and sessionStorage-bound
+billing redirects need their approved WebView behavior. No wildcard host rule.
 
-## Prerequisites
-
-- macOS with Xcode 15+ installed
-- Apple Developer account (enrolled in the Apple Developer Program)
-- Node.js 22+ installed (required by Capacitor CLI v8)
-- CocoaPods installed (`sudo gem install cocoapods`)
-
----
-
-## One-Time Setup
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Add the iOS platform
-
-```bash
-npx cap add ios
-```
-
-This creates the `ios/` directory with the Xcode project.
-
-### 3. Sync Capacitor config and web assets
-
-```bash
-npx cap sync ios
-```
-
-This copies `capacitor.config.ts` settings and any bundled web assets into the Xcode project.
-
----
-
-## Building and Running
-
-### 4. Open in Xcode
-
-```bash
-npx cap open ios
-```
-
-### 5. Configure Signing in Xcode
-
-1. Select the `App` target in the Project Navigator.
-2. Go to **Signing & Capabilities**.
-3. Set **Team** to your Apple Developer account.
-4. Confirm **Bundle Identifier** is `nz.taptpay.app`.
-
-### 6. Add Required Capabilities
-
-In **Signing & Capabilities**, click **+ Capability** and add:
-
-- **Near Field Communication Tag Reading** (for NFC flows)
-- **ProximityReader** — required for **Tap to Pay on iPhone** (Paywave/Task #20). This requires Apple approval; apply at [developer.apple.com/contact/request/payment-hardware](https://developer.apple.com/contact/request/payment-hardware).
-
-### 7. Build and run on a device or simulator
-
-Select a connected iPhone or simulator and press **Run (⌘R)**.
-
----
-
-## OTA Updates (No Re-Submission Required)
-
-Because `server.url` in `capacitor.config.ts` points to `https://taptpay.co.nz/app-login`, the WebView always loads the latest deployed version from Replit. This means:
-
-- UI changes, new features, and bug fixes ship instantly on the next Replit deploy.
-- No App Store review cycle is needed for web-layer changes.
-- Only native code changes (Swift, entitlements, Capacitor plugins) require a new App Store build.
-
----
-
-## Updating the Production URL
-
-If the production URL changes, update `capacitor.config.ts`:
-
-```typescript
-server: {
-  url: "https://YOUR_DOMAIN/app-login",
-  // ...
-}
-```
-
-Then run `npx cap sync ios` and rebuild.
-
----
-
-## App Store Guidelines Note
-
-TaptPay is a point-of-sale tool that processes physical-world payments. Under **App Store Review Guideline 3.1.5(a)**, POS apps processing physical transactions are fully exempt from Apple's in-app purchase requirement. No StoreKit, no IAP — Apple billing is entirely absent from TaptPay's payment flows.
-
-The **Subscription & Billing** section of merchant settings shows a redirect to `taptpay.co.nz` in the iOS app so that merchant billing (TaptPay's own fees) never goes through Apple.
-
----
-
-## Project Config Reference
-
-| Field | Value |
-|---|---|
-| `appId` | `nz.taptpay.app` |
-| `appName` | `TaptPay` |
-| `server.url` | `https://taptpay.co.nz/app-login` |
-| `backgroundColor` | `#0055FF` |
-| Capacitor version | see `package.json` |
-| Config file | `capacitor.config.ts` |
-| Web entry route | `/app-login` |
+Tap to Pay, native wallet processing and attended POS are unavailable. Do not add
+NFC/payment entitlements or enable a payment feature based on this wrapper alone.
+See [R7 native release checks](docs/operations/r7-native-capability-release.md)
+for actual iPhone/iPad/Safari/VoiceOver, redirect and provider acceptance gates.

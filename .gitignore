@@ -26,4 +26,5 @@ playwright-report
 *.backup
 /uploads/
 /traces/
+/logs/
 /provider-fixtures/live/

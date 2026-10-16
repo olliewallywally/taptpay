@@ -30,6 +30,27 @@ test('clean tree passes and ignored local artifacts are not scanned', (t) => {
   assert.equal(f.scan(), 0);
   assert.equal(f.records.at(-1).status, 'clean');
 });
+test('a reviewed artifact checksum row does not exempt credentials in the same file or the hash elsewhere', t => {
+  const f=fixture(t),name='docs/evidence/remediation-v2-2/r7/R7-BUILD-SHA256-2026-10-15.json';
+  const original=JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)),'../'+name),'utf8'));
+  const hash=original.rootFiles['assets/auth-D0AmiyPX.js'];
+  fs.mkdirSync(path.dirname(path.join(f.root,name)),{recursive:true});
+  fs.writeFileSync(path.join(f.root,name),`{\n  "assets/auth-D0AmiyPX.js": "${hash}"\n}\n`);
+  assert.equal(f.scan(),0);
+  fs.writeFileSync(path.join(f.root,name),`{\n  "assets/auth-D0AmiyPX.js": "${hash}",\n  "api_key": "${synthetic}"\n}\n`);
+  assert.equal(f.scan(),1);
+  fs.writeFileSync(path.join(f.root,'credentials.txt'),`api_key = "${hash}"\n`);
+  assert.equal(f.scan(),1);
+  assert.ok(f.records.some(r=>r.file==='credentials.txt'));
+});
+test('a literal loopback port template is excluded but a remote URI remains detected',t=>{
+  const f=fixture(t),password=['not','a','real','credential','9384'].join('-');
+  fs.writeFileSync(path.join(f.root,'local.md'),`postgresql://verifier:${password}@127.0.0.1:<port>/synthetic\n`);
+  assert.equal(f.scan(),0);
+  fs.writeFileSync(path.join(f.root,'remote.md'),`postgresql://verifier:${password}@db.invalid:<port>/synthetic\n`);
+  assert.equal(f.scan(),1);
+  assert.ok(f.records.some(r=>r.rule==='connection-uri-password'&&r.file==='remote.md'));
+});
 
 test('untracked source leak fails with only metadata; inline suppression cannot bypass it', (t) => {
   const f = fixture(t);

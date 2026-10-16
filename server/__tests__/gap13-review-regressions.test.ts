@@ -2,6 +2,8 @@ import "./support/test-env";
 import crypto from "node:crypto";
 import request from "supertest";
 import express from "express";
+import {execFile} from 'node:child_process';
+import type {AddressInfo} from 'node:net';
 import { signedIn, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
 import * as billing from "../billing-card";
 import * as delivery from "../trades-delivery";
@@ -103,12 +105,24 @@ it("a made-up link is answered from the lookup alone and never touches the share
 });
 
 it("a flood of made-up links cannot switch off View invoice for a real customer", async () => {
-  const { app } = await createTestApp();
-  const { token } = await invoiceWithDocument();
-  const junk: number[] = [];
-  for (let i = 0; i <= 600; i++) junk.push((await request(app).get(`/api/checkout/document/junk-${i}`)).status);
-  expect(junk.every((status) => status === 404)).toBe(true);
-  expect((await request(app).get(`/api/checkout/document/${token}`)).status).toBe(200);
+  const {app} = await createTestApp();
+  const {token} = await invoiceWithDocument();
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>((resolve, reject) => {server.once('listening', resolve); server.once('error', reject);});
+  try {
+    // Real requests still traverse this application's complete HTTP pipeline.
+    // Only the load-generating client runs outside Jest's resource stack tracing.
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const child = execFile(process.execPath, ['scripts/verify-document-flood.mjs'],
+        {timeout: 4250, killSignal: 'SIGKILL', env: {PATH: process.env.PATH}},
+        (error, output) => error ? reject(new Error('DOCUMENT_FLOOD_FAILED')) : resolve(output));
+      child.stdin!.end(JSON.stringify({port: (server.address() as AddressInfo).port, token}));
+    });
+    expect(JSON.parse(stdout)).toEqual({unknown: 601, rejected: 601, valid: 200});
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
 });
 
 it("fails closed for a real invoice when the shared budget is unavailable, before reading the document", async () => {

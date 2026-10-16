@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "scope": "Git-tracked metadata; categories overlap; content/PII/license/provenance assessment remains open",
+  "categories": {
+    "runtime_uploads": {
+      "trackedFiles": 0,
+      "availableBytes": 0,
+      "availableFiles": 0,
+      "unavailableFiles": 0
+    },
+    "attached_assets": {
+      "trackedFiles": 569,
+      "availableBytes": 534540473,
+      "availableFiles": 569,
+      "unavailableFiles": 0
+    },
+    "design_documentation": {
+      "trackedFiles": 426,
+      "availableBytes": 37108050,
+      "availableFiles": 426,
+      "unavailableFiles": 0
+    },
+    "native_or_demo_archives": {
+      "trackedFiles": 14,
+      "availableBytes": 72908610,
+      "availableFiles": 14,
+      "unavailableFiles": 0
+    },
+    "screenshots": {
+      "trackedFiles": 804,
+      "availableBytes": 248264914,
+      "availableFiles": 804,
+      "unavailableFiles": 0
+    },
+    "sql_files": {
+      "trackedFiles": 54,
+      "availableBytes": 172099,
+      "availableFiles": 54,
+      "unavailableFiles": 0
+    },
+    "root_html": {
+      "trackedFiles": 1,
+      "availableBytes": 18979,
+      "availableFiles": 1,
+      "unavailableFiles": 0
+    },
+    "local_ai_state": {
+      "trackedFiles": 10,
+      "availableBytes": 0,
+      "availableFiles": 10,
+      "unavailableFiles": 0
+    }
+  },
+  "deleted": 0
+}

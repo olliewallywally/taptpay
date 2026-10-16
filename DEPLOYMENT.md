@@ -1,206 +1,39 @@
-# Production Deployment Checklist
+# TaptPay release and deployment gates
 
-## Essential Requirements Met ✅
+A deployment is not approved by this checklist or by the presence of credentials.
+The release owner must name the exact source SHA, dependency lock hash, target,
+operator and approvers. R4 belongs to Claude; its integration and all deferred
+R3/R5/R6/R7 release evidence remain required.
 
-### 1. Authentication & Security ✅
-- [x] JWT-based authentication with bcrypt password hashing
-- [x] Protected routes requiring login
-- [x] Bearer token authentication for all API endpoints
-- [x] Input validation using Zod schemas
-- [x] Demo account: demo@tapt.co.nz / demo123
+Use Node from `.nvmrc` with `npm ci`. CI uses disposable PostgreSQL17 and synthetic
+browser data, with no production secrets. `npm run verify:ci` documents the local
+gates; [the R8 CI runbook](docs/operations/r8-ci-verification.md) explains setup,
+reports and limitations. High/critical vulnerabilities block release. The lint
+baseline permits no new errors and is not a clean full-lint certification.
 
-### 2. Database Integration ✅
-- [x] PostgreSQL database with Drizzle ORM
-- [x] Database schema migrations
-- [x] Automatic database seeding
-- [x] Fallback to in-memory storage for development
+`npm run build` must perform no database connection, migration or seeding.
+`npm run verify:build` enforces that boundary for this Node build. Never attach a
+production database to CI or use `db:push` to repair drift. Expansion migrations
+require their separately reviewed target-bound operator step and approved upload
+ownership inventory; no migration is authorized by a web build or Git push.
 
-### 3. Payment Processing Structure ✅
-- [x] Windcave API integration framework
-- [x] Transaction management system
-- [x] Real-time payment status updates via SSE
-- [x] QR code generation for merchants
+Before a real deployment, complete remediation plan section15.7: verify target
+identity and read-only migration/fingerprint status; take a managed encrypted
+snapshot; restore it into isolated scratch with external jobs/messages/provider
+credentials absent; verify counts, constraints, tenant isolation, decryptability,
+RPO/RTO and rollback timing; rehearse forward migrations with bounded locks.
+Synthetic empty databases do not establish backup/restore readiness for real data.
 
-### 4. Application Features ✅
-- [x] Merchant terminal for transaction entry
-- [x] Customer payment interface with slide-to-pay
-- [x] Analytics dashboard with savings calculator
-- [x] Professional login interface with Tapt branding
+Deploy with PAYMENT_MODE=disabled and all new initiation flags false, including
+FEATURE_ECOMMERCE_API and FEATURE_TAP_TO_PAY. Verify /healthz and /readyz, cookie
+login/tenant isolation, reconciliation backlog, durable-cron status, redacted logs
+and device smoke on the actual target. UAT capabilities are enabled individually
+only through the reviewed provider/operator procedure. No demo account or seed is
+a release prerequisite.
 
-## Remaining Production Requirements
-
-### 1. External API Configuration
-**Status: REQUIRED - Needs User Action**
-
-#### Windcave Payment Processing
-Set these environment variables:
-- `WINDCAVE_USERNAME`: Your Windcave API username
-- `WINDCAVE_API_KEY`: Your Windcave API key
-
-**Where to get them:**
-1. Register with Windcave: https://www.windcave.com/
-2. Access your merchant portal
-3. Generate API credentials in the developer section
-
-### 2. Production Environment Variables
-**Status: RECOMMENDED**
-
-#### Security
-- `JWT_SECRET`: Strong random string for JWT signing (generate with: `openssl rand -base64 32`)
-- `NODE_ENV`: Set to "production"
-
-#### Database (Already configured in Replit)
-- `DATABASE_URL`: PostgreSQL connection string ✅
-
-### 3. SSL/HTTPS Configuration
-**Status: AUTO-HANDLED BY REPLIT**
-- Replit automatically provides SSL certificates
-- Custom domains require DNS configuration
-
-### 4. PCI Compliance Considerations
-**Status: IMPLEMENTATION DEPENDENT**
-
-#### Current Security Measures ✅
-- No card data stored locally
-- All payment processing via Windcave (PCI DSS compliant)
-- HTTPS encryption for all communications
-- Secure session management
-
-#### Additional Requirements for High-Volume Merchants
-- Security audit by certified PCI assessor
-- Vulnerability scanning
-- Network security hardening
-- Staff training documentation
-
-### 5. Monitoring & Logging
-**Status: BASIC IMPLEMENTATION**
-
-#### Currently Implemented ✅
-- Request/response logging
-- Error handling middleware
-- Database connection monitoring
-
-#### Recommended Additions
-- Error tracking service (Sentry, LogRocket)
-- Uptime monitoring (Pingdom, UptimeRobot)
-- Performance monitoring (New Relic, DataDog)
-- Transaction volume alerts
-
-### 6. Backup & Recovery
-**Status: HANDLED BY REPLIT/NEON**
-- Database backups via Neon PostgreSQL service
-- Application code versioned in Git
-- Configuration in environment variables
-
-## Deployment Steps
-
-### Quick Deploy (Replit)
-1. Click "Deploy" button in Replit
-2. Configure custom domain (optional)
-3. Add Windcave API credentials to secrets
-4. Test payment flow with Windcave sandbox
-
-### Custom Domain Setup
-1. Purchase domain name
-2. Configure DNS A record to point to Replit
-3. Update `paymentUrl` in merchant settings
-4. Regenerate QR codes with new domain
-
-### Post-Deployment Testing
-1. Test authentication flow
-2. Create test transaction
-3. Verify QR code generation
-4. Test customer payment flow
-5. Confirm analytics dashboard
-6. Validate Windcave integration
-
-## Security Hardening Checklist
-
-### Application Security ✅
-- [x] Password hashing with bcrypt
-- [x] JWT token expiration (24 hours)
-- [x] Input validation on all endpoints
-- [x] SQL injection prevention via Drizzle ORM
-- [x] XSS prevention via input sanitization
-
-### Infrastructure Security (Replit Managed) ✅
-- [x] HTTPS/TLS encryption
-- [x] Network isolation
-- [x] DDoS protection
-- [x] Automated security updates
-
-### Operational Security
-- [ ] Regular security audits
-- [ ] Access logging review
-- [ ] Incident response plan
-- [ ] Staff security training
-
-## Performance Optimization
-
-### Current Implementation ✅
-- [x] Database indexing on foreign keys
-- [x] QR code caching (1 hour)
-- [x] Optimized bundle sizes with Vite
-- [x] Efficient SQL queries with Drizzle
-
-### Recommended Improvements
-- [ ] Redis caching layer
-- [ ] CDN for static assets
-- [ ] Database connection pooling
-- [ ] Response compression
-
-## Cost Structure
-
-### Current Monthly Costs (Estimated)
-- Replit Pro: $7/month (if using custom domain)
-- Neon PostgreSQL: $0-19/month (depending on usage)
-- Domain name: $10-15/year
-
-### Transaction Costs
-- Windcave: Varies by volume (typically 1.5-2.9%)
-- Your rate: 0.20% (competitive advantage)
-
-### Break-even Analysis
-- $1,000 monthly transaction volume = $2-$29 in processing costs vs $2 with Tapt
-- Significant savings scale with volume
-
-## Legal & Compliance
-
-### Required Disclosures
-- Privacy policy for customer data
-- Terms of service for merchants
-- PCI compliance statement
-- Data retention policies
-
-### Business Registration
-- Business license in operating jurisdiction
-- Payment processor merchant agreement
-- Tax registration for transaction fees
-- Insurance coverage consideration
-
-## Support & Maintenance
-
-### Current Support Features ✅
-- [x] Error logging and monitoring
-- [x] Database health checks
-- [x] Automated failover to memory storage
-
-### Ongoing Maintenance Tasks
-- [ ] Monthly security updates
-- [ ] Database backup verification
-- [ ] Performance monitoring review
-- [ ] Customer support ticketing system
-
----
-
-## Ready for Production?
-
-**YES** - With Windcave API credentials configured, this application is production-ready and can handle real payment processing with proper security measures.
-
-**Next Steps:**
-1. Obtain Windcave API credentials
-2. Deploy on Replit
-3. Test with small transaction volumes
-4. Scale up as needed
-
-The foundation is solid, secure, and ready for business use!
+Provider UAT, actual Safari/VoiceOver/native device checks, owner visual acceptance,
+PCI/privacy/AML/KYB review, merchant-of-record/settlement/accounting decisions,
+external monitoring and final owner sign-off remain explicit go-live gates.
+[The claims matrix](docs/operations/r8-truthfulness-and-release-gates.md) tracks
+which evidence is still missing. The user deploys through Replit; this repository
+work neither deploys nor enables payments.

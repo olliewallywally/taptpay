@@ -1,3 +1,9 @@
+> Historical design proposal, qualified October16,2026. This is not a statement
+> of released functionality, current prices, settlement timing or compliance.
+> Native Tap to Pay/wallet acceptance and ecommerce/WooCommerce are unsupported.
+> Fees, merchant-of-record and settlement require owner/provider/legal/accounting
+> approval. Current evidence and approval status: docs/operations/r8-truthfulness-and-release-gates.md.
+
 # TaptPay — Deep Product Brief (for design)
 
 ## The one-line
@@ -22,10 +28,7 @@ another place where "two disconnected products" becomes "one."
   arguments. Rent platforms and tradie billing apps charge subscriptions *plus*
   card fees; TaptPay collects rent or a job balance for a rounding error.
 
-Payment rails under everything: **QR scan-to-pay** and **NFC tap-to-phone**
-(Apple Pay, Google Pay, Samsung Pay, contactless cards), settled through
-**Windcave** (PCI-DSS), with **real-time Server-Sent-Event** status on both the
-merchant and customer screens. iOS, Android, web.
+Current repository direction is hosted QR/link checkout with provider UAT still required. NFC tap-to-phone and native wallet acceptance are future proposals. SSE reports payment state and does not certify settlement or PCI scope. Actual native/device support requires the R7 release evidence.
 
 ---
 

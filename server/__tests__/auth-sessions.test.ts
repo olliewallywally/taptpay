@@ -26,7 +26,7 @@ import {
   resetTestStorage,
   storage,
   storageSnapshot,
-  useFakeClock,
+  useFakeClock as createFakeClock,
 } from "./support/http-harness";
 import { observeRefusalEffects } from "./support/refusal-effects";
 
@@ -157,7 +157,7 @@ describe("signing in starts a session the server keeps", () => {
   });
 
   it("keeps only the secret's digest, the login, its session version and a device label — no address", async () => {
-    const clock = useFakeClock(new Date("2026-10-01T09:00:00.000Z"));
+    const clock = createFakeClock(new Date("2026-10-01T09:00:00.000Z"));
     try {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
@@ -372,7 +372,7 @@ describe("how long a sign-in lasts", () => {
   const HOUR = 60 * 60_000;
 
   it("a business session ends after 24 hours unused; each use moves that forward", async () => {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     try {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
@@ -393,7 +393,7 @@ describe("how long a sign-in lasts", () => {
   });
 
   it("and after 7 days, however often it is used", async () => {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     try {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
@@ -415,7 +415,7 @@ describe("how long a sign-in lasts", () => {
   });
 
   it("the 7-day limit holds on its own, even where the unused limit would allow more", async () => {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     try {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
@@ -438,7 +438,7 @@ describe("how long a sign-in lasts", () => {
   });
 
   it("a use never moves the unused limit past the 7-day one", async () => {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     try {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
@@ -460,7 +460,7 @@ describe("how long a sign-in lasts", () => {
   });
 
   it("the admin's session ends after 30 minutes unused, and after 12 hours however often it is used", async () => {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     try {
       const { app } = await createTestApp();
       const unused = await adminSignIn(app);
@@ -487,7 +487,7 @@ describe("how long a sign-in lasts", () => {
   });
 
   it("a use is written at most once a minute", async () => {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     try {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
@@ -510,7 +510,7 @@ describe("the daily swap of the secret", () => {
   const T0 = new Date("2026-10-06T08:00:00.000Z");
 
   async function signedInADayAgo() {
-    const clock = useFakeClock(T0);
+    const clock = createFakeClock(T0);
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const browser = await signIn(app, owner.user.email);

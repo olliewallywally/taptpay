@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   ATTACH_WINDOW, INVENTORY_GATED_MIGRATIONS, STAGED_INVENTORY_TABLE, UPLOAD_OWNERSHIP_REPAIR_MIGRATION,
-  buildDraftInventory, classifyInvoiceDocument, parseUploadOwnershipInventory, readUploadOwnershipInventory,
+  buildDraftInventory, classifyInvoiceDocument, parseUploadOwnershipInventory,
   readUploadOwnershipInventoryOption, requireUploadOwnershipInventory, summarizeClassifications,
   UploadOwnershipInventoryError, type InvoiceDocumentFacts, type UploadInventoryFailure,
 } from "../upload-ownership-inventory";
@@ -13,6 +13,7 @@ import {
   redactedFailureText, runPendingMigrations, parseCliArgs, type LedgerRow, type MigrationClient,
 } from "../migrate";
 import { parseDraftArguments } from "../draft-upload-inventory";
+import { emptyCIUploadInventory } from '../../scripts/ci-upload-inventory';
 
 const target = { host: "127.0.0.1", port: 55439, database: "synthetic" };
 // Version 2 (owner decision 2026-09-21): every invoice document is listed once,
@@ -426,14 +427,14 @@ describe("the command line", () => {
 });
 
 describe("the CI convergence inventory", () => {
-  it("is an approved, empty inventory bound to CI's disposable database", () => {
-    const workflow = fs.readFileSync(path.resolve(".github/workflows/verify.yml"), "utf8");
-    const file = /UPLOAD_OWNERSHIP_INVENTORY:\s*(\S+)/.exec(workflow)?.[1];
-    const digest = /UPLOAD_OWNERSHIP_INVENTORY_SHA256:\s*([0-9a-f]{64})/.exec(workflow)?.[1];
-    expect([file, digest].every(Boolean)).toBe(true);
-    const inventory = readUploadOwnershipInventory(path.resolve(file!), digest!,
-      { host: "127.0.0.1", port: 5432, database: "convergence" });
+  it("is empty and digest-bound to the actual randomly named CI database", () => {
+    const ciTarget = {host: '127.0.0.1', port: 5432, database: 'r8_ci_0123456789abcdef'};
+    const {source, sha256} = emptyCIUploadInventory(ciTarget);
+    const inventory = parseUploadOwnershipInventory(source, sha256, ciTarget);
     expect(inventory.entries).toEqual([]);
+    expect(() => parseUploadOwnershipInventory(source, sha256, {...ciTarget, database: 'r8_ci_1111111111111111'})).toThrow();
+    expect(() => parseUploadOwnershipInventory(source + ' ', sha256, ciTarget)).toThrow();
+    expect(() => emptyCIUploadInventory({...ciTarget, database: 'production'})).toThrow('CI_INVENTORY_TARGET_REFUSED');
   });
 });
 

@@ -174,6 +174,21 @@ async function openBoardPicker(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("desktop retail terminal payment destinations", () => {
+  it("submits once for immediate repeated Send and permits retry after failure", async () => {
+    const pending = deferred<Response>();
+    saleHandler = () => pending.promise;
+    const { user } = renderTerminal();
+    await enterFiveDollarSale(user, "One sale");
+    const send = screen.getByRole('button', {name: 'send payment'});
+    act(() => { send.click(); send.click(); });
+    await waitFor(() => expect(saleBodies).toHaveLength(1));
+    await act(async () => { pending.resolve(jsonResponse({message: 'Synthetic refusal'}, 503)); await pending.promise; });
+    await waitFor(() => expect(send).toBeEnabled());
+    saleHandler = () => jsonResponse({id: 1, price: '5.00', paymentUrl: 'https://private.example/retry', qrCodeUrl: 'https://private.example/retry/qr'});
+    await user.click(send);
+    await waitFor(() => expect(saleBodies).toHaveLength(2));
+    expect(await screen.findByTitle('https://private.example/retry')).toBeInTheDocument();
+  });
   it("defaults to no board and sends per-payment mode without a selected board", async () => {
     const { user } = renderTerminal();
     /* Boards start disengaged: neither the picker nor the list exists, so there

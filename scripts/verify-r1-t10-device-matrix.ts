@@ -61,12 +61,11 @@ import bcrypt from "bcrypt";
 import https from "node:https";
 import http from "node:http";
 import { createHash, randomUUID } from 'node:crypto';
-import net from "node:net";
+import net, {type AddressInfo} from "node:net";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AddressInfo } from "node:net";
 import { chromium, type BrowserContext, type Page, type Request as BrowserRequest } from "playwright";
 import { CHROMIUM_PATH } from "./desktop-shots/retail-fixtures.mjs";
 import { tutorialStepsForDevice } from "../client/src/features/tutorial/tutorial-registry";
@@ -96,6 +95,8 @@ const ONLY_SURFACE = flag("--surface");
 const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
 const TUTORIALS = argv.includes("--tutorials") ? (argv.splice(argv.indexOf("--tutorials"), 1), true) : false;
+const CHUNKS = argv.includes('--chunks') ? (argv.splice(argv.indexOf('--chunks'), 1), true) : false;
+const TERMINAL_CHECKS = argv.includes('--terminal-checks') ? (argv.splice(argv.indexOf('--terminal-checks'), 1), true) : false;
 // R7 public outcomes use real attempt storage/routes, never provider calls.
 const PAYMENT_STATES = argv.includes("--payment-states") ? (argv.splice(argv.indexOf("--payment-states"), 1), true) : false;
 const ACCESSIBILITY = argv.includes("--accessibility") ? (argv.splice(argv.indexOf("--accessibility"), 1), true) : false;
@@ -129,6 +130,7 @@ if (DIALOGS && !ACCESSIBILITY) throw new Error("--dialogs requires --accessibili
 if ((ZOOM || REDUCED_MOTION) && !ACCESSIBILITY && !TUTORIAL_ACCESSIBILITY) throw new Error("--zoom/--reduced-motion require --accessibility or --tutorial-accessibility");
 if (ZOOM && REDUCED_MOTION) throw new Error("zoom and reduced motion are separate matrix gates");
 if (PAYMENT_STATES && (MANUAL_PREVIEW || SELF_TEST || TUTORIALS || ACCESSIBILITY || TUTORIAL_ACCESSIBILITY || MEASURE || KEYBOARD || DIALOGS || ZOOM || REDUCED_MOTION)) throw new Error('--payment-states is a separate public-page gate');
+if ((CHUNKS || TERMINAL_CHECKS) && ((CHUNKS && TERMINAL_CHECKS) || MANUAL_PREVIEW || SELF_TEST || TUTORIALS || PAYMENT_STATES || ACCESSIBILITY || TUTORIAL_ACCESSIBILITY || MEASURE || KEYBOARD || DIALOGS || ZOOM || REDUCED_MOTION || ONLY_SURFACE)) throw new Error('R8 browser modes must run separately');
 const accessibilityAuditor = ACCESSIBILITY ? (await import('./accessibility-audit.mjs')).auditAccessibility : null;
 mkdirSync(out, { recursive: true });
 
@@ -167,8 +169,10 @@ for (const key of Object.keys(process.env)) {
 Object.assign(process.env, {
   NODE_ENV: "development",
   APP_ENV: "development",
-  ENV_VALIDATION_MODE: "audit",
+  ENV_VALIDATION_MODE: TERMINAL_CHECKS ? 'enforce' : 'audit',
   PAYMENT_MODE: "disabled",
+  FEATURE_NEW_RETAIL_PAYMENTS: TERMINAL_CHECKS ? 'true' : 'false',
+  PAYMENT_RETURN_STATE_SECRET: 'r8-matrix-synthetic-return-state-only-000001',
   EMAIL_PROVIDER: "simulation",
   JWT_SECRET: "device-matrix-not-a-real-secret-0001",
   PUBLIC_ORIGIN: MANUAL_PREVIEW ? PREVIEW_ORIGIN! : base,
@@ -196,7 +200,12 @@ function routeFor(method: string, pathname: string): string | null {
 
 const requestLog: string[] = [];
 const previewRoutes: Array<{ path: string; label: string }> = [];
-const app = createApp({ writeRequestLog: (line: string) => requestLog.push(line) });
+const { ApplicationHealth } = await import('../server/application-health');
+let fixturesReady = false;
+// Synthetic storage readiness, explicitly separate from production SQL readiness.
+const health = new ApplicationHealth({ database: async () => fixturesReady,
+  schemaValid: () => fixturesReady, configValid: true, cacheMs: 0 });
+const app = createApp({ writeRequestLog: (line: string) => requestLog.push(line), health });
 if (MANUAL_PREVIEW) {
   // Only this explicit synthetic preview mode accepts the hosting reverse proxy.
   app.set('trust proxy', 1);
@@ -220,7 +229,17 @@ app.use(express.static(builtClient));
 app.use("*", (_req, res) => res.sendFile(path.join(builtClient, "index.html")));
 const previewIsLocal = MANUAL_PREVIEW && ['127.0.0.1', 'localhost'].includes(new URL(PREVIEW_ORIGIN!).hostname);
 const server = MANUAL_PREVIEW && !previewIsLocal ? http.createServer(app) : https.createServer(tls, app);
-await new Promise<void>((resolve) => server.listen(port, MANUAL_PREVIEW ? '0.0.0.0' : "127.0.0.1", resolve));
+await new Promise<void>((resolve) => server.listen(port, MANUAL_PREVIEW && !previewIsLocal ? '0.0.0.0' : "127.0.0.1", resolve));
+async function readinessStatus() {
+  return new Promise<number>((resolve, reject) => {
+    const request = (MANUAL_PREVIEW && !previewIsLocal ? http : https).get(
+      { hostname: '127.0.0.1', port, path: '/readyz', ca: tls.cert, servername: 'localhost', timeout: 5000 },
+      response => { response.resume(); resolve(response.statusCode ?? 0); });
+    request.on('error', reject);
+    request.on('timeout', () => request.destroy(new Error('READINESS_TIMEOUT')));
+  });
+}
+if (await readinessStatus() !== 503) throw new Error('MATRIX_READY_BEFORE_BOOT');
 
 // ── One business in good standing, with rows for all three verticals ─────────────────────────────
 const DAY = 24 * 3600_000;
@@ -483,10 +502,14 @@ if (PAYMENT_STATES) {
   paymentStatePages.push(OUTSIDE.find(page => page.name === '/pay/return/:state')!);
 }
 
+fixturesReady = true;
+health.completeBoot();
+if (await readinessStatus() !== 200) throw new Error('MATRIX_NOT_READY');
+console.log('PASS owned /readyz: before boot 503; seeded synthetic storage 200');
 if (MANUAL_PREVIEW) {
   previewRoutes.push(...SURFACES.map(s => ({ path: s.path, label: `${s.mode}: ${s.path}` })), ...OUTSIDE.map(s => ({ path: s.path, label: `${s.who}: ${s.name ?? s.path}` })));
   if (previewIsLocal) writeFileSync(path.join(out, 'manual-preview-cert.pem'), tls.cert);
-  const stop = () => { server.close(); rmSync(certDir, { recursive: true, force: true }); process.exit(0); };
+  const stop = () => { health.beginDrain(); server.close(); rmSync(certDir, { recursive: true, force: true }); process.exit(0); };
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   const timeout = setTimeout(stop, 2 * 60 * 60 * 1000);
   console.log(`Synthetic acceptance preview ready; public origin ${PREVIEW_ORIGIN}; business submissions disabled; expires in two hours.`);
@@ -704,7 +727,7 @@ async function signIn(context: BrowserContext, email = OWNER_EMAIL, realm: "busi
 
 interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; accessibility?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>>; initialGeometry?: Awaited<ReturnType<typeof measureGeometry>>; interaction?: { name: string; coveredControlsCannotFocus?: boolean; restoredControlsCanFocus?: boolean; geometryRestored: boolean } }
 /** A fallback that names something of the screen's own (a class, an attribute), not any page's furniture. */
-const ownFallback = (selector: string | undefined | null): boolean => !!selector && /[.#\[]/.test(selector);
+const ownFallback = (selector: string | undefined | null): boolean => !!selector && ['.', '#', '['].some(marker => selector.includes(marker));
 const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking longer than expected|Connection Lost/i;
 
 async function dragTransactionsSheet(page: Page, expand: boolean, historyId = "tx-history"): Promise<void> {
@@ -964,7 +987,11 @@ try {
   const surfaces = PAYMENT_STATES ? [] : SURFACES.filter((surface) => !ONLY_SURFACE || surface.path === ONLY_SURFACE);
   const pages = (PAYMENT_STATES ? paymentStatePages : OUTSIDE).filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
   if (!sizes.length || (!surfaces.length && !pages.length)) throw new Error("matrix filters selected zero cells");
-  if (TUTORIALS || TUTORIAL_ACCESSIBILITY) {
+  if (CHUNKS || TERMINAL_CHECKS) {
+    const { runR8BrowserChecks } = await import('./verify-r8-browser');
+    await runR8BrowserChecks({base, out, sizes, builtClient, openContext, openPage, signIn,
+      mode: CHUNKS ? 'chunks' : 'terminal'});
+  } else if (TUTORIALS || TUTORIAL_ACCESSIBILITY) {
     if (!surfaces.length) throw new Error("tutorial filters selected zero merchant surfaces");
     const { runTutorialMatrix } = await import("./verify-r1-t10-tutorials");
     const { runTutorialAccessibilityMatrix } = TUTORIAL_ACCESSIBILITY ? await import("./verify-r1-t10-tutorial-accessibility") : { runTutorialAccessibilityMatrix: null };
@@ -1016,9 +1043,9 @@ try {
     );
     // Session status alone is not proof of sign-in, and console errors during sign-in cannot disappear.
     const signInPlants: Array<[string, RegExp, (page: Page) => Promise<void>]> = [
-      ["a signed-out session reply with HTTP 200", /did not leave the expected business session/, (page) => page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: false }) }))],
-      ["another business's session reply with HTTP 200", /did not leave the expected business session/, (page) => page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: true, csrfToken: "fixture", user: { email: OWNER_EMAIL, merchantId: newcomer.id } }) }))],
-      ["a console error during sign-in", /console error: planted sign-in fault/, (page) => page.evaluate("console.error('planted sign-in fault')") as Promise<void>],
+      ["a signed-out session reply with HTTP 200", /did not leave the expected business session/, async (page) => { await page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: false }) })); }],
+      ["another business's session reply with HTTP 200", /did not leave the expected business session/, async (page) => { await page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: true, csrfToken: "fixture", user: { email: OWNER_EMAIL, merchantId: newcomer.id } }) })); }],
+      ["a console error during sign-in", /console error: planted sign-in fault/, async (page) => { await page.evaluate("console.error('planted sign-in fault')"); }],
     ];
     for (const [name, expected, plant] of signInPlants) {
       const context = await openContext(phone);
@@ -1100,6 +1127,7 @@ try {
     if (failed.length) exitCode = 1;
   }
 } finally {
+  health.beginDrain();
   await browser.close().catch(() => undefined);
   await new Promise<void>((resolve) => server.close(() => resolve()));
   rmSync(certDir, { recursive: true, force: true });

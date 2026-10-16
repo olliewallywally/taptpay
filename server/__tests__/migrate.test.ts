@@ -91,6 +91,7 @@ const REAL_MIGRATIONS = [
   "0048b_active_secret_vault.sql",
   "0048c_invoice_email_constraint_canonical.sql",
   "0049a_durable_cron.sql",
+  "0049b_subscription_entitlements.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */
