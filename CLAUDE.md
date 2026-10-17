@@ -1,5 +1,17 @@
 # Claude repository handoff
 
+**R8 dependency follow-up is verified on `remediation/r8-ci-20261016`.**
+Code85e38c22 moves38 proven tooling/type/native-build declarations to development,
+patches compression/multer/ws, and bounds both real single-file upload parsers.
+Read `docs/HANDOFF-2026-10-17-r8-dependencies.md` first. Group A passed all6756 unit
+tests; group B passed468 affected tests including12 new multipart cases, plus
+static/build/production-install/dev/native proofs. Production packages1314 ->626;
+8 advisory IDs removed. R8 remains open: full audit77 affected /58 high /0 critical,
+prior124 history candidates, remaining hygiene and real release evidence. No merge,
+deployment or phase exit. Claude retains R4. Preserve actual owner processes and
+their dependencies; PID4196 did not survive this environment reset. Node22 and
+setup helpers are under /workspace/.onboarding. All owner/feature/SQL gates remain.
+
 **R8 first repository slice and production-import follow-up are verified on
 `remediation/r8-ci-20261016`.** Code340e284b and1c7fdf2f include isolated CI,
 critical patches, truthful unsupported integrations, all328 browser cells and
