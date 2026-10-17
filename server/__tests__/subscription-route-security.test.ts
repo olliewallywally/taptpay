@@ -1,14 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readRouteRegistrationSource } from '../route-inventory';
 
 const source = fs.readFileSync(path.join(process.cwd(), "server/routes.ts"), "utf8");
 
 function handler(method: "get" | "post" | "put" | "delete", route: string): string {
-  const marker = `app.${method}("${route}",`;
-  const start = source.indexOf(marker);
-  if (start < 0) throw new Error(`Missing route ${method.toUpperCase()} ${route}`);
-  const next = source.indexOf("\n  app.", start + marker.length);
-  return source.slice(start, next < 0 ? source.length : next);
+  return readRouteRegistrationSource(method, route).registration;
 }
 
 describe("subscription and team route authorization", () => {

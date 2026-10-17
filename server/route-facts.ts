@@ -12,14 +12,17 @@
  * response. The judgments (who may call, which tenant, is this disclosure
  * acceptable) are recorded separately and checked against these facts.
  *
- * Not followed: functions imported from other modules (only classified by
- * name, below) and methods on service objects (recorded as calls). So
- * `storageMethods` is what the route file itself calls.
+ * Named helpers and literal dependencies in the explicitly approved composition
+ * sources can be followed across files. External/package functions retain their
+ * existing name/status classification; service methods are recorded as calls.
+ * This is bounded source analysis, not a whole-program security proof.
  */
 import * as ts from "typescript";
 import fs from "fs";
 import path from "path";
 import { findExpressBindings, REGISTRATION_FILES } from "./route-inventory";
+import { currentRouteComposition } from './route-composition';
+import { routeFunctionResolver } from './route-analysis-functions';
 
 export interface RouteFacts {
   /** Middleware between the path and the handler, as written. */
@@ -50,7 +53,7 @@ export interface RouteFacts {
   rateLimits: string[];
   /** Idempotency keys and one-time claims. */
   idempotency: string[];
-  /** Helper functions in the same file that were followed. */
+  /** Source helper functions actually followed, including approved module boundaries. */
   helpers: string[];
 }
 
@@ -220,6 +223,9 @@ function describeArgument(node: ts.Expression, sourceFile: ts.SourceFile): strin
 }
 
 export interface RouteFactsOptions {
+  /** Shared parsed sources retain lexical identity across approved registrar calls. */
+  sourceFile?: ts.SourceFile;
+  resolveFunction?: (expression: ts.Expression) => ts.FunctionLikeDeclaration | undefined;
   /**
    * Statuses answered inside imported functions the routes use as gates,
    * by name — e.g. `authenticateToken` from server/auth.ts, read with
@@ -251,15 +257,22 @@ class FactCollector {
   constructor(
     private sourceFile: ts.SourceFile,
     private importedStatuses: Record<string, number[]> = {},
+    private functionResolver?: RouteFactsOptions['resolveFunction'],
   ) {}
+
+  private resolveFunction(expression: ts.Expression): ts.FunctionLikeDeclaration | undefined {
+    return this.functionResolver ? this.functionResolver(expression)
+      : ts.isIdentifier(expression) ? resolveLocalFunction(expression) : undefined;
+  }
 
   /** Adds the statuses an imported gate answers, when `name` is one. */
   noteImportedGate(name: string) {
-    for (const status of this.importedStatuses[name] ?? []) this.statuses.add(status);
+    if (!Object.prototype.hasOwnProperty.call(this.importedStatuses, name)) return;
+    for (const status of this.importedStatuses[name]) this.statuses.add(status);
   }
 
   private text(node: ts.Node): string {
-    return compact(node.getText(this.sourceFile));
+    return compact(node.getText(node.getSourceFile() ?? this.sourceFile));
   }
 
   /**
@@ -316,7 +329,7 @@ class FactCollector {
     }
     const parent = current.parent;
     if (parent && ts.isCallExpression(parent) && parent.arguments.includes(current as ts.Expression)) {
-      const callee = parent.expression.getText(this.sourceFile);
+      const callee = this.text(parent.expression);
       if (STRICT_PARSERS.has(callee)) return callee;
     }
     return "raw";
@@ -502,7 +515,7 @@ class FactCollector {
     // so what it does belongs to this route too.
     for (const argument of node.arguments) {
       if (!ts.isIdentifier(argument) || AUTH_CHECK_CALLS.has(argument.text)) continue;
-      const handedOver = resolveLocalFunction(argument);
+      const handedOver = this.resolveFunction(argument);
       if (handedOver) {
         this.helpers.add(argument.text);
         this.readFunction(handedOver);
@@ -526,12 +539,12 @@ class FactCollector {
 
     // Follow a helper defined in this file. An authorization check is followed
     // quietly and not listed as a helper: it is recorded above.
-    if (ts.isIdentifier(node.expression)) {
-      this.noteImportedGate(node.expression.text);
-      const helper = resolveLocalFunction(node.expression);
+    if (ts.isIdentifier(node.expression) || this.functionResolver) {
+      this.noteImportedGate(calleeName);
+      const helper = this.resolveFunction(node.expression);
       if (helper) {
-        const isCheck = AUTH_CHECK_CALLS.has(node.expression.text);
-        if (!isCheck) this.helpers.add(node.expression.text);
+        const isCheck = AUTH_CHECK_CALLS.has(callee) || AUTH_CHECK_CALLS.has(calleeName);
+        if (!isCheck) this.helpers.add(calleeName);
         this.readFunction(helper, isCheck);
       }
     }
@@ -653,7 +666,7 @@ export function extractRouteFacts(
   fileName: string,
   options: RouteFactsOptions = {},
 ): Map<string, RouteFacts> {
-  const sourceFile = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+  const sourceFile = options.sourceFile ?? ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
   const bindings = new Set([...findExpressBindings(sourceFile), "app", "router"]);
   const facts = new Map<string, RouteFacts>();
 
@@ -669,7 +682,7 @@ export function extractRouteFacts(
     ) {
       const method = ROUTE_METHODS[node.expression.name.text];
       const routePath = (node.arguments[0] as ts.StringLiteralLike).text;
-      const collector = new FactCollector(sourceFile, options.importedStatuses);
+      const collector = new FactCollector(sourceFile, options.importedStatuses, options.resolveFunction);
       const middlewareArgs = node.arguments.slice(1, -1);
       const handler = node.arguments[node.arguments.length - 1];
 
@@ -679,7 +692,7 @@ export function extractRouteFacts(
           collector.noteImportedGate(argument.text);
           // A middleware defined in this file is read like a helper (the
           // admin gate's own checks, a limiter's storage use).
-          const middleware = resolveLocalFunction(argument);
+          const middleware = options.resolveFunction ? options.resolveFunction(argument) : resolveLocalFunction(argument);
           if (middleware) {
             collector.helpers.add(argument.text);
             collector.readFunction(middleware);
@@ -691,14 +704,16 @@ export function extractRouteFacts(
       if (isFunctionLike(handler)) {
         collector.readFunction(handler as ts.FunctionLikeDeclaration);
       } else if (ts.isIdentifier(handler)) {
-        const named = resolveLocalFunction(handler);
+        const named = options.resolveFunction ? options.resolveFunction(handler) : resolveLocalFunction(handler);
         if (named) {
           collector.helpers.add(handler.text);
           collector.readFunction(named);
         }
       }
 
-      facts.set(`${method} ${routePath}`, collector.result(middlewareArgs.map((arg) => describeArgument(arg, sourceFile))));
+      const key = `${method} ${routePath}`;
+      if (facts.has(key)) throw Error('DUPLICATE_ROUTE_FACTS');
+      facts.set(key, collector.result(middlewareArgs.map((arg) => describeArgument(arg, sourceFile))));
     }
     ts.forEachChild(node, visit);
   };
@@ -765,17 +780,26 @@ export function expandFacts(recorded: RecordedRouteFacts): RouteFacts {
  */
 export function currentRouteFacts(repoRoot = process.cwd()): Map<string, RouteFacts> {
   const read = (file: string) => fs.readFileSync(path.join(repoRoot, file), "utf8");
+  const composition = currentRouteComposition(repoRoot);
+  const resolveFunction = routeFunctionResolver(composition);
   const importedStatuses = {
     authenticateToken: statusesOfFunction(read("server/auth.ts"), "server/auth.ts", "authenticateToken"),
   };
   const all = new Map<string, RouteFacts>();
   for (const file of REGISTRATION_FILES) {
-    for (const [key, facts] of extractRouteFacts(read(file), file, { importedStatuses })) all.set(key, facts);
+    for (const [key, facts] of extractRouteFacts(read(file), file, {
+      importedStatuses, sourceFile: composition.sourceFiles.get(file), resolveFunction,
+    })) {
+      if (all.has(key)) throw Error('DUPLICATE_ROUTE_FACTS');
+      all.set(key, facts);
+    }
   }
-  // The retained payment factories live in separate modules. Follow their
+  // Inspect every approved registration file: retained factories can move with
+  // their routes. They live in separate modules. Follow their
   // actual nested handlers so moving code cannot erase its validation/effects
   // from the policy. Only the reviewed factory bindings are recognized.
-  const routes=read('server/routes.ts'),tree=ts.createSourceFile('server/routes.ts',routes,ts.ScriptTarget.Latest,true);
+  for (const registrationFile of REGISTRATION_FILES) {
+  const tree=composition.sourceFiles.get(registrationFile) ?? ts.createSourceFile(registrationFile,read(registrationFile),ts.ScriptTarget.Latest,true);
   const modules:Record<string,{factory:string;file:string}>={
     retailCheckoutHandlers:{factory:'createRetailCheckoutHandlers',file:'server/payment-checkout-handlers.ts'},
     invoiceCheckoutHandlers:{factory:'createInvoiceCheckoutHandlers',file:'server/invoice-checkout-handlers.ts'},
@@ -787,13 +811,13 @@ export function currentRouteFacts(repoRoot = process.cwd()): Map<string, RouteFa
     if(ts.isVariableDeclaration(node)&&ts.isIdentifier(node.name)&&modules[node.name.text]&&node.initializer&&ts.isCallExpression(node.initializer)&&
       node.initializer.expression.getText(tree)===modules[node.name.text].factory){
       bindings.add(node.name.text);
-      const collector=new FactCollector(tree,importedStatuses);
+      const collector=new FactCollector(tree,importedStatuses,resolveFunction);
       const argument=node.initializer.arguments[0];
       if(argument && ts.isObjectLiteralExpression(argument))for(const property of argument.properties){
         if(ts.isPropertyAssignment(property) && property.name.getText(tree)==='checkRateLimit'){
           if(isFunctionLike(property.initializer))collector.readFunction(property.initializer);
           else if(ts.isIdentifier(property.initializer)){
-            const helper=resolveLocalFunction(property.initializer);if(helper)collector.readFunction(helper);
+            const helper=resolveFunction(property.initializer);if(helper)collector.readFunction(helper);
           }
         }
       }
@@ -803,7 +827,7 @@ export function currentRouteFacts(repoRoot = process.cwd()): Map<string, RouteFa
   };inspect(tree);
   const follow=(module:{file:string},names:string[],middleware:string[])=>{
     const source=ts.createSourceFile(module.file,read(module.file),ts.ScriptTarget.Latest,true);
-    const collector=new FactCollector(source,importedStatuses),found=new Set<string>();
+    const collector=new FactCollector(source,importedStatuses,resolveFunction),found=new Set<string>();
     const visit=(node:ts.Node)=>{
       if(ts.isVariableDeclaration(node)&&ts.isIdentifier(node.name)&&names.includes(node.name.text)&&node.initializer&&isFunctionLike(node.initializer)){
         found.add(node.name.text);collector.helpers.add(`${module.file}:${node.name.text}`);collector.readFunction(node.initializer);
@@ -832,5 +856,6 @@ export function currentRouteFacts(repoRoot = process.cwd()): Map<string, RouteFa
     }
     ts.forEachChild(node,visit);
   };visit(tree);
+  }
   return all;
 }

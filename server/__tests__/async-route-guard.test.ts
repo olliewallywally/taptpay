@@ -611,21 +611,9 @@ describe("async route guard — installation", () => {
 
 describe("registerRoutes wiring", () => {
   test("the guard is installed before the first route registration", () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fs = require("node:fs") as typeof import("node:fs");
-    const path = require("node:path") as typeof import("node:path");
-    const source = fs.readFileSync(
-      path.join(process.cwd(), "server/routes.ts"),
-      "utf8",
-    );
-
-    const install = source.indexOf("installAsyncRouteGuard(app)");
-    const registerRoutes = source.indexOf(
-      "export async function registerRoutes(",
-    );
-    const firstRoute = source.indexOf("app.get(", registerRoutes);
-
-    expect(install).toBeGreaterThan(registerRoutes);
-    expect(firstRoute).toBeGreaterThan(install);
+    const { HARNESS_ROUTE_ROOTS } = require('../route-composition-manifest') as typeof import('../route-composition-manifest');
+    const { currentRouteComposition } = require('../route-composition') as typeof import('../route-composition');
+    expect(HARNESS_ROUTE_ROOTS.find(entry => entry.name === 'registerRoutes')?.guard).toBe('installAsyncRouteGuard');
+    expect(currentRouteComposition().registrations).toHaveLength(196);
   });
 });

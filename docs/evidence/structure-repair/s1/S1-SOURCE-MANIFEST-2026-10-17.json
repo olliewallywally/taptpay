@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "dateUTC": "2026-10-17",
+  "baseCommit": "1cbf5c04463121453093584db0fa8c9e7e3d2927",
+  "scope": "S1 executable analysis tooling, tests and the frozen registration-order contract. No business-route extraction. Documentation/evidence and this manifest are excluded to avoid self-reference.",
+  "files": [
+    {
+      "file": "scripts/generate-route-policy.ts",
+      "sha256": "222b5fe96537224066426c0e2ec267c283644855dbf20ff678bed6f9f4ad154f"
+    },
+    {
+      "file": "server/__tests__/async-route-guard.test.ts",
+      "sha256": "df00d538a140a763b68caafade31b373d806ce6ab8448bdbe5c1443e08da0534"
+    },
+    {
+      "file": "server/__tests__/route-analysis-functions.test.ts",
+      "sha256": "effc82e3620fccf0cf4039d074ee9303e3e8ca2ef02a2bfc27b5edf070717669"
+    },
+    {
+      "file": "server/__tests__/route-composition.test.ts",
+      "sha256": "f47c875af8588107bb61be3611419c4398d745d765869e8d6c2b9f80ab2bfc2b"
+    },
+    {
+      "file": "server/__tests__/route-facts-modules.test.ts",
+      "sha256": "b94cc2a18fd743273669c0a16066f9198a8de4e9f7e787c3142b3ac7dad70c2d"
+    },
+    {
+      "file": "server/__tests__/route-facts.test.ts",
+      "sha256": "69bd8e9df4af4893f83733614bb716ee7f8eb8862f975a7edb62c0217462f77e"
+    },
+    {
+      "file": "server/__tests__/route-policy-inventory.test.ts",
+      "sha256": "4912500d44f02866e35f92746f8d9a4a609ce900ab819d7b8f36f9c1c4c7b1f8"
+    },
+    {
+      "file": "server/__tests__/route-registration-source.test.ts",
+      "sha256": "2db9d57feeb4d0f1cd3997447044124e5f15fc5010b1d33325f8d83971b0d7c5"
+    },
+    {
+      "file": "server/__tests__/subscription-route-security.test.ts",
+      "sha256": "725125ca96bedd238b9cb78ca9cd5220cd776009fcea3c5a24b2fb71efb54d4c"
+    },
+    {
+      "file": "server/route-analysis-functions.ts",
+      "sha256": "4ec41d014caf1cbdfffe0b8efa683b1f7f926f7e30a021861bf705d93cf0977e"
+    },
+    {
+      "file": "server/route-composition-manifest.ts",
+      "sha256": "58ce61965e5a7e1866725943748c5ab1bc608b3cd161965d281a0721f1ba89f3"
+    },
+    {
+      "file": "server/route-composition.ts",
+      "sha256": "7609af4686778adae3ab3de594614ceb2aabad8a0c65daa601f001c15541ffc9"
+    },
+    {
+      "file": "server/route-facts.ts",
+      "sha256": "c61f6e08d239f03035b490f3658f11f6a81066d996f1730fa14b804094bbdf90"
+    },
+    {
+      "file": "server/route-inventory.ts",
+      "sha256": "931281ea4e452d048d88c15d8e72de76d083441ab90f84e07b214ae1f2b4a61d"
+    },
+    {
+      "file": "server/route-registration-order.json",
+      "sha256": "cae989ccda400f19ef1450e5cfcc59f25d0abbed2390ab01acec9705a2e557c5"
+    }
+  ],
+  "deleted": [],
+  "unchangedInputs": [
+    {
+      "file": "package.json",
+      "sha256": "51d90a90e2778481c95a3f36575e2dcd86e35d0910e43d32ef494c78246660d4"
+    },
+    {
+      "file": "package-lock.json",
+      "sha256": "d8f43cb1aa9dc93e7956d420e45e32ac9b41f69d1181fbf4f223ef586db01c5e"
+    }
+  ],
+  "protectedPathsUnchangedFromBase": [
+    "server/routes.ts",
+    "server/app.ts",
+    "server/storage.ts",
+    "server/index.ts",
+    "server/vite.ts",
+    "server/route-policy.ts",
+    "server/route-review.ts",
+    "server/route-matrix.ts",
+    "shared",
+    "client",
+    "migrations",
+    "ios",
+    "package.json",
+    "package-lock.json"
+  ],
+  "webSnapshot": {
+    "sourceManifest": "docs/evidence/remediation-v2-2/r8/R8-CLOSEOUT-SOURCE-MANIFEST-2026-10-17.json",
+    "entries": 198,
+    "matchingCopies": [
+      "client/public/app",
+      "dist/public",
+      "dist/public/app",
+      "ios/App/App/public"
+    ]
+  }
+}

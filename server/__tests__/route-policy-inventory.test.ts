@@ -1,4 +1,8 @@
 import "./support/test-env";
+import fs from 'node:fs';
+import path from 'node:path';
+import { currentRouteComposition, routeOrderProblems } from '../route-composition';
+import { DOMAIN_ROUTE_REGISTRARS, HARNESS_ROUTE_ROOTS } from '../route-composition-manifest';
 
 import { createTestApp } from "./support/http-harness";
 import {
@@ -19,7 +23,7 @@ interface RuntimeRoute {
 }
 
 /** The files the test harness builds into its app: createApp, then registerRoutes. */
-const HARNESS_FILES = ["server/app.ts", "server/routes.ts"] as const;
+const HARNESS_FILES = [...new Set([...HARNESS_ROUTE_ROOTS, ...DOMAIN_ROUTE_REGISTRARS].map(entry => entry.file))];
 
 /**
  * Express 4 stores every app.get/post/.../all() registration as a Layer with
@@ -58,14 +62,13 @@ function registrationsIn(files: readonly string[]) {
 describe("R1-T2 route policy inventory", () => {
   it("the runtime-registered route stack matches the source inventory", async () => {
     const { app } = await createTestApp();
-    const runtime = new Set(extractRuntimeRoutes(app).map((r) => registrationKey(r.method, r.path)));
-    const source = new Set(registrationsIn(HARNESS_FILES).map((r) => registrationKey(r.method, r.path)));
-
-    const missingFromRuntime = [...source].filter((k) => !runtime.has(k));
-    const missingFromSource = [...runtime].filter((k) => !source.has(k));
-
-    expect(missingFromRuntime).toEqual([]);
-    expect(missingFromSource).toEqual([]);
+    const runtime = extractRuntimeRoutes(app);
+    const source = currentRouteComposition().registrations;
+    const reviewed = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'server/route-registration-order.json'), 'utf8'));
+    expect(routeOrderProblems(runtime, source)).toEqual([]);
+    expect(routeOrderProblems(source, reviewed)).toEqual([]);
+    expect(routeOrderProblems(runtime, reviewed)).toEqual([]);
+    expect(source.map(route => route.file).every(file => (REGISTRATION_FILES as readonly string[]).includes(file))).toBe(true);
   });
 
   it("every source-registered route, in every registration file, has a route-policy.ts entry", () => {

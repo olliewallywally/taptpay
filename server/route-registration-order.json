@@ -1,0 +1,786 @@
+[
+  {
+    "method": "GET",
+    "path": "/healthz"
+  },
+  {
+    "method": "GET",
+    "path": "/readyz"
+  },
+  {
+    "method": "GET",
+    "path": "/robots.txt"
+  },
+  {
+    "method": "GET",
+    "path": "/nfc/:merchantId/stone/:stoneId"
+  },
+  {
+    "method": "GET",
+    "path": "/nfc/:merchantId"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/apple-developer-merchantid-domain-association"
+  },
+  {
+    "method": "GET",
+    "path": "/sitemap.xml"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/google"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/google/callback"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/google/session"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/apple"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/apple/available"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/apple/callback"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/apple/session"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/apple/connection"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/apple/connect"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/apple/disconnect"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/sign-out-everywhere"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/forgot-password"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/reset-password"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/validate-reset-token/:token"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/request-origin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/auth/login"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/session"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tutorial/state"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/tutorial/pages/:pageKey"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tutorial/restart"
+  },
+  {
+    "method": "POST",
+    "path": "/api/merchants/:id/onboarding"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/auth/me"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/auth/logout"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/qr"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/stone/:stoneId/qr"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/stone/:stoneId/brand"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/profile"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pay/t/:token"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pay/t/:token/qr"
+  },
+  {
+    "method": "POST",
+    "path": "/api/pay/t/:token/split"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pay/t/:token/receipt"
+  },
+  {
+    "method": "POST",
+    "path": "/api/pay/t/:token/receipt-pdf"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pay/t/:token/receipt-qr"
+  },
+  {
+    "method": "POST",
+    "path": "/api/pay/t/:token/session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/pay/t/:token/hosted-fields-complete"
+  },
+  {
+    "method": "POST",
+    "path": "/api/pay/t/:token/googlepay-complete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pay/return/:state"
+  },
+  {
+    "method": "ALL",
+    "path": "/api/pay/notification/:state"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/active-transaction"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/cash-sale"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/tap-to-pay"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:id/split"
+  },
+  {
+    "method": "GET",
+    "path": "/api/split-payments/:id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:id/cancel"
+  },
+  {
+    "method": "GET",
+    "path": "/api/nfc/capabilities"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:id/pay"
+  },
+  {
+    "method": "GET",
+    "path": "/api/windcave/env"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:id/hosted-fields-complete"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:id/googlepay-complete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/transactions/:id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:id/receipt-pdf"
+  },
+  {
+    "method": "GET",
+    "path": "/api/transactions/:id/receipt-qr"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/export/pdf"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/merchants/:id/verify"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/merchants/:id/set-active"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/merchants/:id/transactions"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admin/merchants/:id/windcave-merchant-id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/merchants/:id/activate"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:id/details"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:id/change-password"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:id/theme"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:id/daily-goal"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/merchants/:id/logo"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/merchants/:id/logo"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/transactions"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/tapt-stones"
+  },
+  {
+    "method": "POST",
+    "path": "/api/merchants/:id/tapt-stones"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:merchantId/tapt-stones/:stoneId"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/merchants/:merchantId/tapt-stones/:stoneId"
+  },
+  {
+    "method": "ALL",
+    "path": "/api/windcave/notification"
+  },
+  {
+    "method": "GET",
+    "path": "/api/windcave/callback"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/analytics"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/revenue-over-time"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/payment-method-breakdown"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/ga4-detailed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/ga4-metrics"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/merchants"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/merchants/:id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/resend-verification"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/email-status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/confirm-email"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/resend-confirmation"
+  },
+  {
+    "method": "POST",
+    "path": "/api/info-pack-leads"
+  },
+  {
+    "method": "POST",
+    "path": "/api/merchants/signup"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:id/events"
+  },
+  {
+    "method": "GET",
+    "path": "/api/push/capabilities"
+  },
+  {
+    "method": "GET",
+    "path": "/api/push/vapid-key"
+  },
+  {
+    "method": "POST",
+    "path": "/api/push/subscribe"
+  },
+  {
+    "method": "POST",
+    "path": "/api/push/unsubscribe"
+  },
+  {
+    "method": "POST",
+    "path": "/api/push/native-subscribe"
+  },
+  {
+    "method": "POST",
+    "path": "/api/push/native-unsubscribe"
+  },
+  {
+    "method": "GET",
+    "path": "/api/push/status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/push/preferences"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/push/preferences"
+  },
+  {
+    "method": "POST",
+    "path": "/api/transactions/:transactionId/refunds"
+  },
+  {
+    "method": "GET",
+    "path": "/api/transactions/:transactionId/refunds"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:merchantId/refunds"
+  },
+  {
+    "method": "GET",
+    "path": "/api/merchants/:merchantId/stock-items"
+  },
+  {
+    "method": "POST",
+    "path": "/api/merchants/:merchantId/stock-items"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/merchants/:merchantId/stock-items/:itemId"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/merchants/:merchantId/stock-items/:itemId"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/transactions"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/transactions/:id"
+  },
+  {
+    "method": "GET",
+    "path": "/api/subscription"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/subscription/plan"
+  },
+  {
+    "method": "POST",
+    "path": "/api/subscription/cancel"
+  },
+  {
+    "method": "POST",
+    "path": "/api/subscription/resume"
+  },
+  {
+    "method": "GET",
+    "path": "/api/team"
+  },
+  {
+    "method": "POST",
+    "path": "/api/team/invite"
+  },
+  {
+    "method": "POST",
+    "path": "/api/team/:userId/resend"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/team/:userId/invite"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/team/:userId/status"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/team/:userId"
+  },
+  {
+    "method": "POST",
+    "path": "/api/team/accept-invite"
+  },
+  {
+    "method": "GET",
+    "path": "/api/subscription/billing-history"
+  },
+  {
+    "method": "GET",
+    "path": "/api/billing/card"
+  },
+  {
+    "method": "POST",
+    "path": "/api/billing/card/session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/billing/card/confirm"
+  },
+  {
+    "method": "ALL",
+    "path": "/api/billing/card/notification"
+  },
+  {
+    "method": "GET",
+    "path": "/api/billing/card/callback"
+  },
+  {
+    "method": "POST",
+    "path": "/api/billing/card/callback"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/billing/card"
+  },
+  {
+    "method": "POST",
+    "path": "/api/board-builder/submit"
+  },
+  {
+    "method": "GET",
+    "path": "/uploads/:folder/:name"
+  },
+  {
+    "method": "GET",
+    "path": "/api/property/tenants"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/tenants"
+  },
+  {
+    "method": "GET",
+    "path": "/api/property/tenants/:id"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/property/tenants/:id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/tenants/:id/archive"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/tenants/:id/unarchive"
+  },
+  {
+    "method": "GET",
+    "path": "/api/property/tenants/:id/events"
+  },
+  {
+    "method": "GET",
+    "path": "/api/property/schedules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/tenants/:tenantId/schedules"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/property/schedules/:id"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/property/schedules/:id"
+  },
+  {
+    "method": "GET",
+    "path": "/api/property/invoices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/invoices/document"
+  },
+  {
+    "method": "GET",
+    "path": "/api/invoice-documents/:name"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/invoices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/invoices/:id/resend"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/invoices/:id/void"
+  },
+  {
+    "method": "POST",
+    "path": "/api/property/invoices/:id/mark-paid-external"
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkout/resolve/:token"
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkout/document/:token"
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkout/:token/split"
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkout/:token/session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkout/:token/hosted-fields-complete"
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkout/:token/googlepay-complete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkout/callback"
+  },
+  {
+    "method": "ALL",
+    "path": "/api/windcave/rent-notification"
+  },
+  {
+    "method": "ALL",
+    "path": "/api/windcave/trades-notification"
+  },
+  {
+    "method": "POST",
+    "path": "/api/webhooks/whatsapp"
+  },
+  {
+    "method": "GET",
+    "path": "/api/property/reminder-settings"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/property/reminder-settings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/reminder-settings"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/trades/reminder-settings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/gst-settings"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/trades/gst-settings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/clients"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/clients"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/clients/:id"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/trades/clients/:id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/clients/:id/archive"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/clients/:id/unarchive"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/clients/:id/promote"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/clients/:id/events"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/quotes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/quotes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/quotes/:id/pdf"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/quotes/token/:token/pdf"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/quotes/token/:token"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/quotes/token/:token/respond"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/invoices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/invoices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/invoices/:id/send-balance"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/invoices/:id/mark-paid-external"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/invoices/:id/complete"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/invoices/:id/void"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades/schedules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trades/schedules"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/trades/schedules/:id"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/trades/schedules/:id"
+  },
+  {
+    "method": "GET",
+    "path": "/api/internal/cron/status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/internal/cron"
+  }
+]

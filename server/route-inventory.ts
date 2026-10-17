@@ -520,3 +520,32 @@ export function sliceHandlerBodies(sourceText: string, registrations: RouteRegis
     return lines.slice(startLine, nextStart).join("\n");
   });
 }
+
+/** Locate the actual registration for source-level assertions after a module move.
+ * Returns the AST call itself, so a neighbouring route/comment cannot satisfy it.
+ */
+export function readRouteRegistrationSource(
+  method: string, routePath: string, repoRoot = process.cwd(), files: readonly string[] = REGISTRATION_FILES,
+): { file: string; source: string; registration: string } {
+  const matches: Array<{ file: string; source: string; registration: string }> = [];
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    const tree = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+    const bindings = new Set([...findExpressBindings(tree), ...CONVENTIONAL_BINDINGS]);
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) && (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression)) &&
+          ts.isIdentifier(node.expression.expression) && bindings.has(node.expression.expression.text)) {
+        const name = ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text
+          : ts.isStringLiteralLike(node.expression.argumentExpression) ? node.expression.argumentExpression.text : '';
+        if (ROUTE_METHODS[name] === method.toUpperCase() && node.arguments.length >= 2 &&
+            ts.isStringLiteralLike(node.arguments[0]) && node.arguments[0].text === routePath) {
+          matches.push({ file, source, registration: node.getText(tree) });
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(tree);
+  }
+  if (matches.length !== 1) throw Error(matches.length ? 'DUPLICATE_ROUTE_SOURCE' : 'MISSING_ROUTE_SOURCE');
+  return matches[0];
+}

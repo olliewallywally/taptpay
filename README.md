@@ -7,17 +7,18 @@ A Git push is not a deployment or approval to process live payments.
 
 ## Current work — start here, Claude
 
-The owner authorised the reviewed structure repair plan on October17,2026.
+The owner authorised the reviewed structure repair plan on October 17, 2026.
 
 - [Structure repair plan: S0–S7 and parallel R8 cleanup](docs/architecture/structure-repair-2026-10-17/PLAN.md)
 - [Execution ledger and current task ownership](docs/architecture/structure-repair-2026-10-17/EXECUTION.md)
 - [Qwen findings checked against current code](docs/architecture/structure-repair-2026-10-17/QWEN-FINDINGS-REGISTER.md)
 - [Independent planning review](docs/architecture/structure-repair-2026-10-17/PLAN-REVIEW.md)
+- [Completed S1 handoff and verification](docs/HANDOFF-2026-10-17-structure-s1.md)
 
-**Codex is starting S1: module-aware route safety checks. Claude retains R4.**
+**Codex has verified S1: module-aware route safety checks. Claude retains R4.**
 S1 strengthens route inventory, registration order and security/effect checks
-before any business routes move. S2 will trial the four stock routes. Coordinate
-before editing shared routes/storage/policy files. Keep the existing customer
+before any business routes move. The next package, S2, will trial the four stock
+routes. Coordinate before editing shared routes/storage/policy files. Keep the existing customer
 flows, cookie/CSRF/tenant controls, durable payment semantics and owner decisions.
 
 Read [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md) and the ledger before changing

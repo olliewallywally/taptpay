@@ -1,6 +1,6 @@
 /**
  * R1-T2 — regenerates server/route-policy.ts and the documentation table from
- * the current server/routes.ts source. Run this whenever routes.ts's
+ * the explicit registration sources and their reviewed composition. Run this whenever their
  * registrations change; server/__tests__/route-policy-inventory.test.ts fails
  * loudly if the two drift apart. R1-T10a: it also writes shared/api-routes.ts, the
  * client's typed list of the routes a browser calls (server/api-route-list.ts).
@@ -161,7 +161,7 @@ function main() {
   const generatedAt = new Date().toISOString().slice(0, 10);
 
   // Every file that registers on the app (server/route-inventory.ts,
-  // REGISTRATION_FILES); today every route is in server/routes.ts.
+  // REGISTRATION_FILES); business routes currently remain in server/routes.ts.
   const inventory = extractRegistrationInventory();
   const registrations: Array<RouteRegistration & { file: string; body: string }> = REGISTRATION_FILES.flatMap((file) => {
     const sourceText = fs.readFileSync(path.join(process.cwd(), file), "utf8");

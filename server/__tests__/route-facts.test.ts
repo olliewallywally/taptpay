@@ -1,5 +1,12 @@
 import { extractRouteFacts, statusesOfFunction, type RouteFacts } from "../route-facts";
 
+test('ordinary object method names are not inherited imported-gate entries', () => {
+  const facts = extractRouteFacts('app.get("/fixture", (_req, res) => res.json(value.toString()));', 'server/fixture.ts', {
+    resolveFunction: () => undefined,
+  });
+  expect(facts.get('GET /fixture')?.statuses).toEqual([200]);
+});
+
 /**
  * R1-T2 (C10): the per-route facts the policy records are read from each
  * handler's syntax tree — its own body, its middleware and the helper

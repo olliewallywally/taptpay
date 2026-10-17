@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "dateUTC": "2026-10-17",
+  "baseCommit": "1cbf5c04463121453093584db0fa8c9e7e3d2927",
+  "sourceManifest": {
+    "file": "docs/evidence/structure-repair/s1/S1-SOURCE-MANIFEST-2026-10-17.json",
+    "sha256": "e0b95bae23d0d60ecf35c2066d64de9bcd3ee34f0b737721806a16ab0d0726ae"
+  },
+  "scope": "S1 module-aware route safety. Application route registration and business behaviour are unchanged; S2 extraction is not implemented.",
+  "affectedRegression": {
+    "command": "node_modules/.bin/jest --runInBand --detectOpenHandles --json --outputFile=<private-report> --runTestsByPath <the 15 suites listed below>",
+    "success": true,
+    "passedTests": 436,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "todoTests": 0,
+    "passedSuites": 15,
+    "openHandles": 0,
+    "suites": [
+      {
+        "file": "server/__tests__/route-composition.test.ts",
+        "tests": 31,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-role-defaults.test.ts",
+        "tests": 18,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-all-methods.test.ts",
+        "tests": 172,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/tenant-stock-board-http.test.ts",
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/subscription-route-security.test.ts",
+        "tests": 25,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/api-route-contract.test.ts",
+        "tests": 43,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-inventory.test.ts",
+        "tests": 23,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/async-route-guard.test.ts",
+        "tests": 31,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-facts.test.ts",
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-facts.test.ts",
+        "tests": 22,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-analysis-functions.test.ts",
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/tenant-stock-board-storage.test.ts",
+        "tests": 29,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-facts-modules.test.ts",
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-review.test.ts",
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-registration-source.test.ts",
+        "tests": 3,
+        "status": "passed"
+      }
+    ],
+    "newCases": {
+      "composition": 31,
+      "dependencyResolution": 10,
+      "factoryRelocation": 3,
+      "registrationSource": 3,
+      "prototypeInheritedStatusName": 1,
+      "total": 48
+    },
+    "negativeEvidence": "Private fail-first fixture runs reproduced moved-factory fact loss, missing/late guard, unsupported dependency/indirect/deferred assembly and shadowing. The final reread reproduced same-line deferred registrations before fixing the analyser. These are analyser regressions, not claims of new live application exploits."
+  },
+  "static": {
+    "command": "R8_REPORT_DIR=<private-directory> npm run verify:ci -- --stage=static",
+    "stages": [
+      {
+        "name": "typecheck",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "typecheck-r5",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "typecheck-r6",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "typecheck-r8",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "package-contracts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "css-config-contracts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "portable-scripts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tool-contracts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "backup-safety",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "fingerprint-safety",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r5-cli",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r6-cli",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r7-artifact-safety",
+        "status": "pass",
+        "exitCode": 0
+      }
+    ],
+    "toolingTests": 48
+  },
+  "lint": {
+    "command": "npm run verify:lint",
+    "existingFindings": 558,
+    "newFindings": 0,
+    "baselineChanged": false
+  },
+  "buildAndRuntime": {
+    "command": "R8_REPORT_DIR=<private-directory> npm run verify:ci -- --stage=build",
+    "stages": [
+      {
+        "name": "build-without-db",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "web-snapshot-parity",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "production-install",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "development-middleware",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "development-replit",
+        "status": "pass",
+        "exitCode": 0
+      }
+    ],
+    "finalGuardedBuild": "npm run verify:build passed after the final analyser fix; dist/index.js is byte-identical to the bundle used in the five-stage proof.",
+    "servedBundle": {
+      "file": "dist/index.js",
+      "sha256": "8f38c6db2c219296fbc716c39e87f47d48927cb94670968dc6d5191a6559b37d"
+    }
+  },
+  "routeFacts": {
+    "entries": 196,
+    "status": "exact-baseline-equality",
+    "sha256": "ce3784951a442c4c353b4f1bdfafc4564b605ef45cc215dbf3c59b8aaefcf734"
+  },
+  "routeOrder": {
+    "entries": 196,
+    "comparison": "Actual Express runtime, explicit source composition and reviewed frozen method/path array agree in order and multiplicity.",
+    "contract": {
+      "file": "server/route-registration-order.json",
+      "sha256": "cae989ccda400f19ef1450e5cfcc59f25d0abbed2390ab01acec9705a2e557c5"
+    }
+  },
+  "actualGenerator": {
+    "status": "pass",
+    "generatedPolicyAfterHeader": "byte-identical",
+    "browserApiContract": "byte-identical",
+    "privateOutputOnly": true,
+    "generatedMarkdown": "Produced successfully; dated metadata not compared to historical evidence."
+  },
+  "protectedApplicationPaths": {
+    "status": "unchanged from published baseline",
+    "paths": [
+      "server/routes.ts",
+      "server/app.ts",
+      "server/storage.ts",
+      "server/index.ts",
+      "server/vite.ts",
+      "server/route-policy.ts",
+      "server/route-review.ts",
+      "server/route-matrix.ts",
+      "shared",
+      "client",
+      "migrations",
+      "ios",
+      "package.json",
+      "package-lock.json"
+    ]
+  },
+  "webAndNativeParity": {
+    "status": "pass",
+    "filesPerCopy": 198,
+    "matchingCopies": [
+      "client/public/app",
+      "dist/public",
+      "dist/public/app",
+      "ios/App/App/public"
+    ],
+    "sourceManifest": "docs/evidence/remediation-v2-2/r8/R8-CLOSEOUT-SOURCE-MANIFEST-2026-10-17.json"
+  },
+  "currentTreeSecretScan": {
+    "status": "clean",
+    "mode": "tree",
+    "findings": 0,
+    "dispositioned": 0,
+    "unresolved": 0,
+    "scanner": "gitleaks8.30.1 via scripts/scan-secrets.mjs",
+    "rulesOrDispositionsRelaxed": false
+  },
+  "review": {
+    "preflight": "S1-PREFLIGHT-2026-10-17.md",
+    "preflightReread": "S1-PREFLIGHT-REREAD-2026-10-17.md",
+    "final": "S1-FINAL-REVIEW-2026-10-17.md",
+    "finalReread": "S1-FINAL-REREAD-2026-10-17.md",
+    "reviewer": "Same assistant, separately recorded rereads. No new independent code reviewer is claimed."
+  },
+  "limits": [
+    "Pure bounded AST analysis supports the explicit named synchronous same-app registrar and literal dependency pattern documented in the source map. It is not a whole-program semantic or provider-security verifier.",
+    "Existing external/package function name/status classifications remain; source helpers are followed only through approved parsed sources.",
+    "No actual business routes were moved. Each future extraction needs its own concrete source/ownership review and affected HTTP/storage/SQL checks.",
+    "Full unit, browser, owned PostgreSQL and real-device/provider/operations evidence was not rerun for this tooling-only slice. Earlier 6772-unit, 328-browser-plus-4-map and 25-PG-stage results remain bound to their historical source.",
+    "Dependency declarations/lock and scanner rules are unchanged. Earlier full-audit/history, email/assets and real release gates remain open; no fresh audit or history-rotation claim is made.",
+    "Claude retains R4. No migration, deployment, capability activation or phase exit."
+  ],
+  "publicationChecks": {
+    "explicitReviewedIndexPaths": 26,
+    "unexpectedPaths": 0,
+    "whitespaceErrors": 0,
+    "localMarkdownLinksChecked": 38,
+    "brokenLinks": 0,
+    "reviewHeadingChecks": "All four S1 preflight/final records retain the ten required headings."
+  }
+}
