@@ -293,7 +293,7 @@ recorded by its coordinator; no running result is presumed passed here.
 
 ## Generated-byte whitespace review
 
-Staged git diff --check reports8 trailing-whitespace lines in4 emitted JavaScript
+Staged git diff --check reports8 trailing-whitespace lines in3 emitted JavaScript
 assets (index.es, landingRuntime and vendor-radix chunks), including template
 literal payloads. These are actual Vite outputs and match all198 files in source
 build, checked-in snapshot and native copy. Do not hand-trim or reformat compiled

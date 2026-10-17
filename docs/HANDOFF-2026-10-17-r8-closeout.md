@@ -1,9 +1,10 @@
 # R8 verified dependency, CI and hygiene follow-up
 
 Branch: `remediation/r8-ci-20261016`, based on pushed
-`87ee93e83b9ce0a1e231d61518e4ecbcd2cbe75e`. The commit containing this handoff
-binds the reviewed source through the source manifest below; confirm actual HEAD
-and remote before continuing. R8 remains open. No merge, deployment, live database
+`87ee93e83b9ce0a1e231d61518e4ecbcd2cbe75e`. Reviewed code/evidence commit
+`79e9bdb1117b5b02efaa85c077ee3a6beb2ec78b` is pushed. This follow-up handoff
+pins that source through the source manifest below; confirm actual HEAD and
+remote before continuing. R8 remains open. No merge, deployment, live database
 change or payment enablement is authorized. Claude retains R4.
 
 Read the [final review](evidence/remediation-v2-2/r8/R8-CLOSEOUT-FINAL-REVIEW-2026-10-17.md),
