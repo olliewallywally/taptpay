@@ -1,5 +1,14 @@
 # Claude repository handoff
 
+**Structure repair is authorised; Codex is starting S1, Claude retains R4.**
+Read README.md and `docs/architecture/structure-repair-2026-10-17/EXECUTION.md`
+first, then its plan, Qwen disposition register and planning review. S1 prepares
+module-aware source/runtime route order and guard/effect checks before any domain
+move; S2 is the four-stock-route pilot. Coordinate shared routes/storage/policy
+edits. Preserve all frozen SQL, owner/feature decisions and open R8/release gates.
+The older R8 passes below remain bound to their dated source, not later code.
+
+
 **R8 groups C–G, expanded CI and scoped hygiene are locally verified on
 `remediation/r8-ci-20261016`.** Read `docs/HANDOFF-2026-10-17-r8-closeout.md`
 first, then its final/independent reviews and frozen source/verification records.

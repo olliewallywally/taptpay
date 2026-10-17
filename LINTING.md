@@ -1,83 +1,46 @@
-# ESLint and Prettier Setup
+# Scoped lint and formatting workflow
 
-This project has been configured with ESLint and Prettier to catch JSX syntax errors early and ensure consistent code formatting.
+Use the Node/npm versions pinned by the repository. `eslint.config.js` defines
+JavaScript/TypeScript/React/accessibility rules. The supported package scripts are
+in `package.json`; package editing is not subject to the old blanket restriction.
 
-## Configuration Files
-
-- `eslint.config.js` - ESLint v9 configuration with React/TypeScript rules
-- `.prettierrc` - Prettier formatting configuration
-
-## Manual Commands
-
-Since package.json editing is restricted, use these npx commands directly:
-
-### Linting Commands
+## Current gate
 
 ```bash
-# Check for linting issues
-npx eslint . --ext .ts,.tsx,.js,.jsx --report-unused-disable-directives --max-warnings 0
-
-# Auto-fix linting issues
-npx eslint . --ext .ts,.tsx,.js,.jsx --fix
-
-# Lint specific file
-npx eslint client/src/components/SomeComponent.tsx
-
-# Lint specific directory
-npx eslint client/src/pages/ --ext .ts,.tsx
+npm run verify:lint
 ```
 
-### Formatting Commands
+This compares actual errors with the reviewed `scripts/lint-baseline.json` and
+fails on new entries. The latest accepted baseline contains558 findings; it is
+not a claim that full lint is clean. `npm run lint` reports the full current set.
+Do not add baseline rows, disable rules or increase warning tolerances to hide a
+new finding. Retire only rows whose underlying problem is actually resolved.
+
+## Work on exact files
+
+For a scoped change, inspect its findings before deciding whether any automatic
+fix is appropriate. Use repository-installed tools through npm exec:
 
 ```bash
-# Check formatting issues
-npx prettier --check .
-
-# Auto-fix formatting issues
-npx prettier --write .
-
-# Format specific file
-npx prettier --write client/src/components/SomeComponent.tsx
-
-# Format specific directory
-npx prettier --write client/src/pages/
+npm exec -- eslint server/route-inventory.ts
+npm exec -- prettier --check server/route-inventory.ts
 ```
 
-### Combined Commands
+Replace that path with the exact reviewed file. If you choose a mechanical
+fix/format command, apply it only to those paths and review the resulting diff.
+Do not run repository-wide --fix or prettier --write . as a pre-commit routine.
+Do not hand-format generated application assets, schemas or policy files.
 
-```bash
-# Check both linting and formatting
-npx eslint . --ext .ts,.tsx,.js,.jsx && npx prettier --check .
+Preserve initialization side effects, hook order, accessibility, business/legal
+copy and public response shapes. A removed unused variable is safe only after
+checking whether its initializer or surrounding code has effects. Coordinate
+with the integration owner before linting a file another code slice is changing.
 
-# Fix both linting and formatting
-npx eslint . --ext .ts,.tsx,.js,.jsx --fix && npx prettier --write .
-```
+## Before a code commit
 
-## Key ESLint Rules for JSX Error Detection
-
-The configuration includes these important rules to catch JSX syntax errors:
-
-- `react/jsx-no-comment-textnodes` - Prevents accidental JSX comment syntax errors
-- `react/jsx-no-useless-fragment` - Catches unnecessary React fragments
-- `react/self-closing-comp` - Enforces proper self-closing component syntax
-- `react/jsx-closing-bracket-location` - Ensures proper JSX bracket placement
-- `react/jsx-closing-tag-location` - Validates closing tag placement
-- `react/jsx-tag-spacing` - Enforces proper spacing in JSX tags
-- `react/jsx-wrap-multilines` - Requires parentheses around multiline JSX
-
-## IDE Integration
-
-Most IDEs will automatically detect these configuration files and provide:
-- Real-time error highlighting
-- Auto-formatting on save
-- Inline error messages
-
-## Running Before Commits
-
-Always run linting and formatting before committing:
-
-```bash
-npx eslint . --ext .ts,.tsx,.js,.jsx --fix && npx prettier --write .
-```
-
-This ensures code quality and prevents JSX syntax errors from breaking the application.
+Run the relevant types/tests and `npm run verify:lint`; inspect the exact staged
+files. Use the [CI runbook](docs/operations/r8-ci-verification.md) and the current
+[execution ledger](docs/architecture/structure-repair-2026-10-17/EXECUTION.md)
+for additional scope-specific checks. Follow the [remediation plan's](docs/PLAN-2026-08-24-taptpay-remediation-v2-2.md)
+staged baseline burn; full lint with max-warnings=0 becomes the mandatory clean
+release gate only once the baseline reaches zero.
