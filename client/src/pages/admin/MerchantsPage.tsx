@@ -80,7 +80,7 @@ export function MerchantsPage() {
       <div className="bg-[#24263a] rounded-lg overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block size-8 border-4 border-[#0055FF] border-t-transparent rounded-full animate-spin"></div>
+            <div className="inline-block size-8 border-4 border-[#0055FF] border-t-transparent rounded-full animate-spin" />
             <p className="text-[#dbdfea] text-sm mt-4">Loading merchants...</p>
           </div>
         ) : filteredMerchants.length === 0 ? (

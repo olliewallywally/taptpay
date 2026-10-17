@@ -1,0 +1,1 @@
+import{R as n}from"./index-y55qo8Rp.js";function s(){const r=n("business");if(!r)return null;const{user:e}=r;return{id:e.id,userId:e.id,email:e.email,merchantId:e.merchantId,role:e.role}}function u(){return s()?.merchantId||null}export{u as g};

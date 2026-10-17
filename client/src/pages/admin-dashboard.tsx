@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
+
 import { 
   Users, 
   DollarSign, 
@@ -227,9 +227,9 @@ export default function AdminDashboard() {
         {/* Liquid Background - Matching Merchant Site */}
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
           <div className="absolute inset-0">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-gray-500/20 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gray-600/20 rounded-full blur-3xl animate-pulse animation-delay-700"></div>
-            <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-gray-400/20 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
+            <div className="absolute top-0 left-0 w-96 h-96 bg-gray-500/20 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gray-600/20 rounded-full blur-3xl animate-pulse animation-delay-700" />
+            <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-gray-400/20 rounded-full blur-3xl animate-pulse animation-delay-1000" />
           </div>
         </div>
         
@@ -252,10 +252,10 @@ export default function AdminDashboard() {
       {/* Liquid Glass Background - Matching Merchant Site */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-gray-500/15 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gray-600/15 rounded-full blur-3xl animate-pulse animation-delay-700"></div>
-          <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-gray-400/15 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-gray-500/10 rounded-full blur-3xl animate-pulse animation-delay-500"></div>
+          <div className="absolute top-0 left-0 w-96 h-96 bg-gray-500/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gray-600/15 rounded-full blur-3xl animate-pulse animation-delay-700" />
+          <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-gray-400/15 rounded-full blur-3xl animate-pulse animation-delay-1000" />
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-gray-500/10 rounded-full blur-3xl animate-pulse animation-delay-500" />
         </div>
       </div>
 
@@ -455,7 +455,7 @@ export default function AdminDashboard() {
                     <div className="text-right flex-shrink-0">
                       <p className="text-lg sm:text-2xl font-light text-white">99.9%</p>
                       <div className="flex items-center text-green-400 text-xs sm:text-sm">
-                        <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                        <div className="w-2 h-2 bg-green-400 rounded-full mr-2" />
                         Online
                       </div>
                     </div>
@@ -495,7 +495,7 @@ export default function AdminDashboard() {
                     <div className="text-right flex-shrink-0">
                       <p className="text-lg sm:text-2xl font-light text-white">{analytics?.activeMerchants || 0}</p>
                       <div className="flex items-center text-gray-400 text-xs sm:text-sm">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 animate-pulse"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 animate-pulse" />
                         Live
                       </div>
                     </div>
@@ -528,7 +528,7 @@ export default function AdminDashboard() {
                     onClick={() => setLocation(`/admin/merchants/${merchant.id}`)}
                   >
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${merchant.status === 'active' ? 'bg-green-400' : 'bg-gray-400'} animate-pulse`}></div>
+                      <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${merchant.status === 'active' ? 'bg-green-400' : 'bg-gray-400'} animate-pulse`} />
                       <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-white/40 group-hover:text-white/70 transition-colors" />
                     </div>
                     

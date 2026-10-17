@@ -1,14 +1,14 @@
 import {cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
-import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2, Download, Banknote, CheckCircle } from "lucide-react";
+import { Plus, Minus, Users2, Share2, QrCode, ChevronDown, X, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2, Download, Banknote, CheckCircle } from "lucide-react";
 import waveIconPath from "@assets/wave_1762733987203.png";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
@@ -1212,7 +1212,7 @@ export default function DemoTerminal() {
                   const stoneNumber = (taptStones?.length || 0) + 1;
                   const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
                     name: `Stone ${stoneNumber}`,
-                    stoneNumber: stoneNumber
+                    stoneNumber
                   });
                   
                   if (response.ok) {

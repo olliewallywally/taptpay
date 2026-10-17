@@ -723,7 +723,7 @@ export class LandingRuntime {
 
     let cur = -1;
     let rot = 0;
-    let hideT = null; let showT = null; let midT = null; let driveT = null;
+    const hideT = null; let showT = null; let midT = null; let driveT = null;
     let visPanel = null;
 
     const setHash = (h) => { try { if (frame.contentWindow && frame.contentWindow.location.hash !== h) frame.contentWindow.location.hash = h; } catch (e) {} };

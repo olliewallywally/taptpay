@@ -6,33 +6,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
+
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+
 import { updateMerchantDetailsSchema } from "@shared/schema";
-import { 
-  ArrowLeft, 
-  Building2, 
-  DollarSign, 
-  CreditCard, 
-  Users, 
-  Link as LinkIcon,
-  Edit,
-  Save,
-  X,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  LogOut,
-  Trash2
-} from "lucide-react";
+import { ArrowLeft, Building2, DollarSign, CreditCard, Link as LinkIcon, Edit, CheckCircle, AlertCircle, Loader2, LogOut, Trash2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { sessionFetch } from "@/lib/session";
 import { logOutAdmin } from "@/lib/session";

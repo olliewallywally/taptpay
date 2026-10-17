@@ -38,8 +38,9 @@ try {
   assert.equal(hash(await readFile(path.join(install,'package-lock.json'))),hash(lock),'PRODUCTION_LOCK_CHANGED');
   const connections = path.join(privateDir,'connections.jsonl');
   await writeFile(connections,'',{mode:0o600});
-  const entry = await run('entry',[process.execPath,'--import',path.resolve('scripts/r8-build-guard.mjs'),'dist/index.js'],
-    {...runtimeEnv,R8_BUILD_GUARD_REPORT:connections},install);
+  const entry = await run('entry',['npm','start'],
+    {...runtimeEnv,NODE_OPTIONS:'--import='+path.resolve('scripts/r8-build-guard.mjs'),
+      npm_config_update_notifier:'false',npm_config_audit:'false',R8_BUILD_GUARD_REPORT:connections},install);
   // Intentionally omit DATABASE_URL: module resolution must reach the existing
   // fail-closed configuration gate without starting a daemon or touching a DB.
   assert.equal(entry.result.exitCode,1,'PRODUCTION_CONFIG_REFUSAL_REQUIRED');
@@ -52,7 +53,7 @@ try {
   const served = await run('static',[process.execPath,'dist/static-proof.mjs'],{PATH:process.env.PATH},install);
   assert.equal(served.result.exitCode,0,'PRODUCTION_STATIC_FAILED');
   assert.equal(served.output.trim(),'PRODUCTION_STATIC_PASS');
-  console.log(JSON.stringify({productionInstall:'pass',lockUnchanged:true,entryConfigRefusal:'pass',
+  console.log(JSON.stringify({productionInstall:'pass',productionNpmStart:'pass',lockUnchanged:true,entryConfigRefusal:'pass',
     entryNetworkAttempts:0,staticServing:'pass'}));
 } catch {
   console.error('PRODUCTION_INSTALL_VERIFICATION_FAILED');process.exitCode = 1;

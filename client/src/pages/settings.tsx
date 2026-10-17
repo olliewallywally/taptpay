@@ -8,7 +8,7 @@ import { forgetThisDeviceSignIn, logOut } from "@/lib/log-out";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { MerchantGate } from "@/components/merchant-gate";
@@ -79,9 +79,7 @@ const BILLING_TYPE_LABELS: Record<string, string> = {
 
 const billingTypeLabel = (value: string) =>
   BILLING_TYPE_LABELS[value] ?? value.replace(/_/g, " ");
-import {
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, Wrench, BookOpen, RotateCcw, SlidersHorizontal, UserCircle
-} from "lucide-react";
+import { CheckCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, BookOpen, RotateCcw, SlidersHorizontal, UserCircle } from "lucide-react";
 import { sessionFetch } from "@/lib/session";
 import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
@@ -754,7 +752,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     return (
       <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
         <div className="flex items-center justify-center" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: '#F4F4F4' }}>
-          <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
     );

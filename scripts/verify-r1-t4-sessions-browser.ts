@@ -215,7 +215,7 @@ const LEGACY_KEYS = ["authToken", "user", "merchantId", "adminAuthToken", "admin
 try {
   // ── 1. What the page kept before the switch is removed on the first load. ──────────────────────
   const desktop = await newContext({ viewport: { width: 1440, height: 900 } });
-  let page = await openLogin(desktop);
+  const page = await openLogin(desktop);
   await page.evaluate((keys) => { for (const key of keys) localStorage.setItem(key, "left.from.before"); }, LEGACY_KEYS);
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByTestId("input-email").waitFor({ timeout: 120_000 });

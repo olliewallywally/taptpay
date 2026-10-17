@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Mail, Loader2 } from "lucide-react";
 import { forgotPasswordSchema } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+
 import { useToast } from "@/hooks/use-toast";
 import type { z } from "zod";
 import { apiPath } from "@shared/api-path";

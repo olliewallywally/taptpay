@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";

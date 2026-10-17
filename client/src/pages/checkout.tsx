@@ -9,26 +9,7 @@ import "@/styles/checkout.css";
 import { money } from "@/lib/checkout-theme";
 import { CheckoutView } from "@/features/checkout/CheckoutView";
 import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
-import {
-  checkoutCompletionEndpoint,
-  checkoutResolveEndpoint,
-  checkoutSessionEndpoint,
-  checkoutSourceForRoute,
-  bindPaymentIdempotencyKey,
-  clearPaymentIdempotencyKey,
-  currentTokenPaymentAmount,
-  currentTokenShareIndex,
-  getOrCreatePaymentIdempotencyKey,
-  paymentIdempotencyKey,
-  redactCustomerPaymentAddress,
-  rememberPaymentReturnState,
-  tokenCompletionRequest,
-  tokenPaymentPath,
-  tokenSessionRequest,
-  type CheckoutRouteKind,
-  type CheckoutSource,
-  type PaymentCheckoutSource,
-} from "@/lib/payment-addressing";
+import { checkoutCompletionEndpoint, checkoutResolveEndpoint, checkoutSessionEndpoint, checkoutSourceForRoute, currentTokenPaymentAmount, currentTokenShareIndex, paymentIdempotencyKey, redactCustomerPaymentAddress, rememberPaymentReturnState, tokenCompletionRequest, tokenPaymentPath, type CheckoutRouteKind, type CheckoutSource, type PaymentCheckoutSource } from "@/lib/payment-addressing";
 import { checkoutBusiness } from "@/lib/checkout-business";
 import { CHECKOUT_RESOLVE_KEY, QUOTE_TOKEN_KEY, TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 // Window augmentations are declared centrally in client/src/global.d.ts.

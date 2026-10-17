@@ -1,14 +1,10 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import {
   TrendingUp, DollarSign, Activity, Users, Monitor, Smartphone,
   Tablet, AlertCircle, Clock, Eye, Globe, BarChart2, Map
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
-// @ts-ignore - react-simple-maps ships no type declarations and has no @types package
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
 import { adminCsrfHeader } from "@/lib/session";
 import { apiPath } from "@shared/api-path";
@@ -94,7 +90,10 @@ const deviceIcon = (name: string) => {
 
 const DEVICE_COLORS = [BLUE, TEAL, GREEN];
 
-function WorldMap({ countries }: { countries: { code: string; users: number }[] }) {
+export function WorldMap({ countries, geography = GEO_URL }: {
+  countries: { code: string; users: number }[];
+  geography?: ComponentProps<typeof Geographies>['geography'];
+}) {
   const [tooltip, setTooltip] = useState<{ name: string; users: number } | null>(null);
   const countryMap = new globalThis.Map<number, number>(); // global Map — bare `Map` is the lucide icon import
   let maxUsers = 0;
@@ -120,10 +119,10 @@ function WorldMap({ countries }: { countries: { code: string; users: number }[] 
         projectionConfig={{ scale: 130, center: [0, 20] }}
       >
         <ZoomableGroup>
-          <Geographies geography={GEO_URL}>
-            {({ geographies }: any) =>
-              geographies.map((geo: any) => {
-                const num = parseInt(geo.id);
+          <Geographies geography={geography}>
+            {({ geographies }) =>
+              geographies.map((geo) => {
+                const num = Number(geo.id);
                 const users = countryMap.get(num) || 0;
                 return (
                   <Geography
@@ -132,13 +131,9 @@ function WorldMap({ countries }: { countries: { code: string; users: number }[] 
                     fill={getColor(num)}
                     stroke="#0a0b14"
                     strokeWidth={0.5}
-                    onMouseEnter={() => setTooltip({ name: geo.properties.name, users })}
+                    className="outline-none hover:fill-[#00E5CC] hover:cursor-pointer focus:fill-[#00E5CC] focus:cursor-pointer"
+                    onMouseEnter={() => setTooltip({ name: String(geo.properties?.name ?? ''), users })}
                     onMouseLeave={() => setTooltip(null)}
-                    style={{
-                      default: { outline: 'none' },
-                      hover: { fill: TEAL, outline: 'none', cursor: 'pointer' },
-                      pressed: { outline: 'none' },
-                    }}
                   />
                 );
               })

@@ -9,7 +9,7 @@ export function tutorialGeometry({ target, fallbackTarget }) {
   const visible = (el) => {
     const r = box(el);
     if (r.width <= 0 || r.height <= 0) return false;
-    let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+    const clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
     for (let n = el; n; n = n.parentElement) {
       const s = getComputedStyle(n);
       if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0 || n.inert) return false;

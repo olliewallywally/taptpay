@@ -62,7 +62,7 @@ export function GridDashboard() {
   /* One card's figure: a skeleton while loading, "didn't load" when it failed, else the figure and its caption. */
   const figure = (failed: boolean, value: string | undefined, caption: React.ReactNode) => {
     if (failed) return <p className="text-[#dbdfea]/60 text-sm mb-1">didn't load</p>;
-    if (value === undefined) return <div className="h-8 bg-[#1d1e2c] animate-pulse rounded"></div>;
+    if (value === undefined) return <div className="h-8 bg-[#1d1e2c] animate-pulse rounded" />;
     return (
       <>
         <p className="text-[#dbdfea] text-2xl md:text-3xl mb-1">{value}</p>
@@ -100,7 +100,7 @@ export function GridDashboard() {
           {/* Total Revenue */}
           <div className="bg-[#24263a] rounded-2xl p-4 md:p-6 relative overflow-hidden" data-testid="stat-total-revenue">
             <div className="absolute inset-0 opacity-20">
-              <div className="absolute bottom-0 right-0 w-full h-20 bg-gradient-to-tr from-[#0055FF] to-[#00E5CC]"></div>
+              <div className="absolute bottom-0 right-0 w-full h-20 bg-gradient-to-tr from-[#0055FF] to-[#00E5CC]" />
             </div>
             <div className="flex items-center justify-between mb-2 relative z-10">
               <p className="text-[#dbdfea] text-xs opacity-70">Total Revenue</p>
@@ -114,7 +114,7 @@ export function GridDashboard() {
           {/* Total Transactions */}
           <div className="bg-[#24263a] rounded-2xl p-4 md:p-6 relative overflow-hidden" data-testid="stat-total-transactions">
             <div className="absolute inset-0 opacity-20">
-              <div className="absolute bottom-0 right-0 w-full h-20 bg-gradient-to-tr from-[#00E5CC] to-[#0055FF]"></div>
+              <div className="absolute bottom-0 right-0 w-full h-20 bg-gradient-to-tr from-[#00E5CC] to-[#0055FF]" />
             </div>
             <div className="flex items-center justify-between mb-2 relative z-10">
               <p className="text-[#dbdfea] text-xs opacity-70">Total Transactions</p>
@@ -127,7 +127,7 @@ export function GridDashboard() {
 
           {/* Active Merchants */}
           <div className="bg-[#24263a] rounded-2xl p-4 md:p-6 relative overflow-hidden" data-testid="stat-active-merchants">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#0055FF]/10 via-transparent to-[#0055FF]/5"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0055FF]/10 via-transparent to-[#0055FF]/5" />
             <div className="flex items-center justify-between mb-2 relative z-10">
               <p className="text-[#dbdfea] text-xs opacity-70">Active Merchants</p>
               <Users className="size-4 text-[#00E5CC]" />
@@ -139,7 +139,7 @@ export function GridDashboard() {
 
           {/* Pending Transactions */}
           <div className="bg-[#24263a] rounded-2xl p-4 md:p-6 relative overflow-hidden" data-testid="stat-pending-transactions">
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#00E5CC]/10 via-transparent to-[#00E5CC]/5"></div>
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#00E5CC]/10 via-transparent to-[#00E5CC]/5" />
             <div className="flex items-center justify-between mb-2 relative z-10">
               <p className="text-[#dbdfea] text-xs opacity-70">Pending Transactions</p>
               <AlertCircle className="size-4 text-[#fbbf24]" />

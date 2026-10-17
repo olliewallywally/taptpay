@@ -1,1 +1,0 @@
-import{ah as r}from"./index-BImdaJ_D.js";function t(){const e=r("business");if(!e)return null;const{user:n}=e;return{id:n.id,userId:n.id,email:n.email,merchantId:n.merchantId,role:n.role}}function i(){const e=t();return(e==null?void 0:e.merchantId)||null}export{i as g};

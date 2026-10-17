@@ -1,0 +1,629 @@
+{
+  "version": 1,
+  "scanDateUTC": "2026-10-17",
+  "baseCommit": "87ee93e83b9ce0a1e231d61518e4ecbcd2cbe75e",
+  "scope": "All refs currently available in this non-shallow checkout; no assertion about hidden/deleted remote refs or prior clones.",
+  "refsCount": 3,
+  "refsSHA256": "a4279783413ce9bad7fdc7a1236e476c589edaf6508c8646f34280f020b8d485",
+  "scanner": "gitleaks8.30.1; metadata-only wrapper; redaction100",
+  "summary": {
+    "findings": 2327,
+    "dispositioned": 2206,
+    "unresolved": 121,
+    "rules": {
+      "generic-api-key": 105,
+      "jwt": 10,
+      "connection-uri-password": 6
+    }
+  },
+  "status": "release-blocked; not a count of confirmed live credentials",
+  "comparison": "Older124/2351 and current121/2327 differ with available refs. No rotation or clearance is inferred from the difference.",
+  "ownerAction": "Provide sanitized revocation/rotation or exact false-positive evidence for these tuples; do not provide credentials. Record approved exact dispositions only after evidence. No history rewrite or force push is authorized.",
+  "candidates": [
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "a4107684554cc84c28c1746933f1a36d5b316128"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/aca5eae5-d8cf-4e6b-9c02-a28ab6636e9c.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/aca5eae5-d8cf-4e6b-9c02-a28ab6636e9c.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/14d92e69-f00b-4820-80c8-82c81e270588.jsonl",
+      "commit": "3742d7166893027dfae049378a727e77718b45bc"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/0d6e3462-7c3a-41a8-a060-86c8d6ce5ea5/6f8fb2802d164473@v2",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/0d6e3462-7c3a-41a8-a060-86c8d6ce5ea5/6f8fb2802d164473@v2",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/0d6e3462-7c3a-41a8-a060-86c8d6ce5ea5.jsonl",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/0d6e3462-7c3a-41a8-a060-86c8d6ce5ea5.jsonl",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/6e1994a2-ab44-499f-a89c-70d0de5c060a/6f8fb2802d164473@v1",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/6e1994a2-ab44-499f-a89c-70d0de5c060a/6f8fb2802d164473@v1",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "connection-uri-password",
+      "file": ".claude-home/projects/-home-runner-workspace/1d0c3b2c-a758-49f9-9935-71e531a8ed08.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "connection-uri-password",
+      "file": ".claude-home/projects/-home-runner-workspace/1d0c3b2c-a758-49f9-9935-71e531a8ed08.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/0d6e3462-7c3a-41a8-a060-86c8d6ce5ea5/6f8fb2802d164473@v1",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/0d6e3462-7c3a-41a8-a060-86c8d6ce5ea5/6f8fb2802d164473@v1",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/6e1994a2-ab44-499f-a89c-70d0de5c060a/6f8fb2802d164473@v3",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/6e1994a2-ab44-499f-a89c-70d0de5c060a/6f8fb2802d164473@v3",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/6e1994a2-ab44-499f-a89c-70d0de5c060a/6f8fb2802d164473@v2",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/6e1994a2-ab44-499f-a89c-70d0de5c060a/6f8fb2802d164473@v2",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "188a660899dd42b1ce9c5940c824a661b70be66c"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "6b7840bf7661bf8874edb5994e790c9f90326c72"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "5d384f50309c7a9bf03bdcd9c3df47ae282139a9"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/042e8618-6ba0-4b84-814b-f08a70d545f7.jsonl",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/042e8618-6ba0-4b84-814b-f08a70d545f7.jsonl",
+      "commit": "d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "f8e00e6106b48e21d990116754bbd5acdb03b482"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "0c1e166936ac4591fa9aeb1a776dfcfd425986ff"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "8303da795b1bed0f33bfc716ebbf4ae83fb785e8"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "connection-uri-password",
+      "file": ".claude-home/projects/-home-runner-workspace/1d0c3b2c-a758-49f9-9935-71e531a8ed08.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "connection-uri-password",
+      "file": ".claude-home/projects/-home-runner-workspace/1d0c3b2c-a758-49f9-9935-71e531a8ed08.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a.jsonl",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a.jsonl",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a.jsonl",
+      "commit": "41af8386fe2483785eb66515bcd661df14bd5d79"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "b4e362d12dbf813c3ac60bef6bda3597e38a19b1"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "8a21448dbd51609e7c369a544b01075756e33e49"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "428ee3953fe842d00876e4a0006ce087b5d0664c"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "07879b33cd43cd1023f3fba39ba84da9010ce3e0"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "07879b33cd43cd1023f3fba39ba84da9010ce3e0"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "07879b33cd43cd1023f3fba39ba84da9010ce3e0"
+    },
+    {
+      "rule": "jwt",
+      "file": ".claude-home/projects/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca.jsonl",
+      "commit": "07879b33cd43cd1023f3fba39ba84da9010ce3e0"
+    },
+    {
+      "rule": "connection-uri-password",
+      "file": ".claude-home/projects/-home-runner-workspace/1d0c3b2c-a758-49f9-9935-71e531a8ed08.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "connection-uri-password",
+      "file": ".claude-home/projects/-home-runner-workspace/1d0c3b2c-a758-49f9-9935-71e531a8ed08.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "f91f2d3ccfe883215416f8c7fcd6e8d59cbfe4ee"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v1",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v1",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v2",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v2",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v1",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v1",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v2",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v2",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/6789f2f6-d7c9-4ad5-b89a-5cfc5eba258e.jsonl",
+      "commit": "f0150cefe599cca57ae4384d50bffd9f1b8a2bab"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "f7398eee52c3e71b4e72b40839d38d497654e649"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "b1fe744b5be68156aa187b17ab4d21f264bd78bd"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/.credentials.json",
+      "commit": "941d61901012fafeb17d72f9b668df6229c55263"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/623feb6a-7141-4fa8-b0bd-8bf70fb0bf7d.jsonl",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/623feb6a-7141-4fa8-b0bd-8bf70fb0bf7d.jsonl",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/623feb6a-7141-4fa8-b0bd-8bf70fb0bf7d.jsonl",
+      "commit": "3b8609781d5ce630f8528f49989bd8e0c2475de3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v2",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v2",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v1",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/826740c4-ccb4-4693-97a9-09e0d0ea267a/6f8fb2802d164473@v1",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v1",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v1",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v2",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/file-history/94da0d14-4dc0-49f5-bb03-4f3a429bc77a/6f8fb2802d164473@v2",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/623feb6a-7141-4fa8-b0bd-8bf70fb0bf7d.jsonl",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/623feb6a-7141-4fa8-b0bd-8bf70fb0bf7d.jsonl",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".claude-home/projects/-home-runner-workspace/623feb6a-7141-4fa8-b0bd-8bf70fb0bf7d.jsonl",
+      "commit": "bca683181fb9dafa164fb03b7145a6ddd6b56675"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".replit",
+      "commit": "0cc2ad7f3b923c3baae9a14d21374138c53a3cf3"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".replit",
+      "commit": "7be73552e0bd1198145396097055e3153354f27c"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": ".replit",
+      "commit": "60fe208ad392f6873d61d93fd3aa513b8de0ea70"
+    }
+  ]
+}

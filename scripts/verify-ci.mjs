@@ -45,6 +45,9 @@ try {
     await run('typecheck-r5', ['npm','run','check:r5']);
     await run('typecheck-r6', ['npm','run','check:r6']);
     await run('typecheck-r8', ['npm','run','check:r8']);
+    await run('package-contracts', ['npm','run','verify:package-contracts']);
+    await run('css-config-contracts', ['npm','run','verify:css-config']);
+    await run('portable-scripts', ['npm','run','verify:portable-scripts']);
     await run('tool-contracts', ['npm','run','test:r8:tools']);
     await run('backup-safety', ['npm','run','test:backup:safety']);
     await run('fingerprint-safety', ['npm','run','test:fingerprint']);
@@ -64,10 +67,12 @@ try {
     await run('web-snapshot-parity', ['npm','run','verify:r7:artifacts']);
     await run('production-install', ['npm','run','verify:production-install']);
     await run('development-middleware', ['npm','run','verify:development-vite']);
+    await run('development-replit', ['npm','run','verify:development-vite','--','--replit']);
   }
   if (wants('postgres')) await run('postgres', ['npm','run','verify:postgres'], {
     R8_CI_ADMIN_URL: process.env.R8_CI_ADMIN_URL ?? '',
     TAPTPAY_TEST_DATABASE: process.env.TAPTPAY_TEST_DATABASE ?? '',
+    R8_PG_REPORT_FILE: path.join(reports, 'postgres-stages.json'),
     RECORDED: process.env.RECORDED ?? 'docs/evidence/remediation-v2-2/r6/R6-through-0049b-fingerprint-2026-10-15.json',
     // Only the dedicated guarded runner receives these for collision refusal.
     DATABASE_URL: process.env.DATABASE_URL ?? '', NEON_DATABASE_URL: process.env.NEON_DATABASE_URL ?? '',
@@ -79,6 +84,7 @@ try {
       await run('browser-' + device + '-' + kind, [process.execPath,'--import','tsx','scripts/verify-r1-t10-device-matrix.ts',
         path.join(privateDir, device, kind), path.resolve('dist/public'), '--context', device, ...flags], {}, 30 * 60_000);
     }
+    if (mode === 'all' || mode === 'pages') await run('browser-' + device + '-map-package', [process.execPath,'scripts/verify-r8-map.mjs','--context=' + device]);
     }
   }
   if (wants('lint')) await run('lint-zero-new', ['npm','run','verify:lint']);

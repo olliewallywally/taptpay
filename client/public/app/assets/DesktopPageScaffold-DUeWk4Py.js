@@ -1,1 +1,0 @@
-import{j as s}from"./vendor-react-Bym1zpZ6.js";import{a as m,D as n,b as p,c as x}from"./DesktopChrome-D0EDmZr-.js";function j({deviceClass:a,vertical:r,page:o,children:e,showScope:t}){return m()?s.jsx(s.Fragment,{children:e}):s.jsx(n,{deviceClass:a,children:s.jsx(p,{children:s.jsx(x,{vertical:r,page:o,showScope:t,children:e})})})}export{j as D};

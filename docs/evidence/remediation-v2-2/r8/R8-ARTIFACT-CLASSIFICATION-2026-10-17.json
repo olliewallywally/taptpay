@@ -1,0 +1,227 @@
+{
+  "version": 1,
+  "scope": "Current Git-tracked metadata and ZIP directory records only; category counts overlap. No archive extraction, customer-data review or license approval.",
+  "categories": {
+    "runtime_uploads": {
+      "trackedFiles": 0,
+      "availableBytes": 0,
+      "missingFiles": 0
+    },
+    "attached_assets": {
+      "trackedFiles": 569,
+      "availableBytes": 534540473,
+      "missingFiles": 0
+    },
+    "design_documentation": {
+      "trackedFiles": 41,
+      "availableBytes": 2557757,
+      "missingFiles": 0
+    },
+    "screenshots": {
+      "trackedFiles": 804,
+      "availableBytes": 248264914,
+      "missingFiles": 0
+    },
+    "archives": {
+      "trackedFiles": 13,
+      "availableBytes": 72908601,
+      "missingFiles": 0
+    },
+    "local_AI_state": {
+      "trackedFiles": 0,
+      "availableBytes": 0,
+      "missingFiles": 0
+    },
+    "AI_project_guidance": {
+      "trackedFiles": 18,
+      "availableBytes": 13540,
+      "missingFiles": 0
+    },
+    "database_dumps": {
+      "trackedFiles": 0,
+      "availableBytes": 0,
+      "missingFiles": 0
+    },
+    "generated_web_snapshot": {
+      "trackedBeforeReplacement": 198,
+      "currentFiles": 198,
+      "currentBytes": 97965780,
+      "status": "Complete accepted frontend snapshot; final source build parity must be refreshed after lint edits. Old tracked hashed assets are deliberately replaced as one coherent set."
+    },
+    "root_html": {
+      "trackedFiles": 1,
+      "availableBytes": 18979,
+      "missingFiles": 0
+    }
+  },
+  "archives": [
+    {
+      "path": "attached_assets/components_1762726500202.zip",
+      "bytes": 290509,
+      "sha256": "ea2c34bda6584d127b6ca645e0a306c19c55cf2748d03d742f162694a97fb58d",
+      "entries": 56,
+      "uncompressedBytes": 284525,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 7,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/motion_design_1783367717186.zip",
+      "bytes": 367120,
+      "sha256": "a6feb97f414d02cd66cd8546a59c702d4a347891c8ef1a7336f6f7945c1bb5d3",
+      "entries": 16,
+      "uncompressedBytes": 977853,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/motion_design_1784884404684.zip",
+      "bytes": 26960457,
+      "sha256": "9da99416574f25002297799b9d9d0fd7000a1d11a5678d724ee2be6c8dd734da",
+      "entries": 383,
+      "uncompressedBytes": 34396728,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/styles_1762726500201.zip",
+      "bytes": 5910,
+      "sha256": "2435d11bf9f4f50e8cc889a1846251201aefdcebfe47f24ba11db2cfbef3d8fa",
+      "entries": 1,
+      "uncompressedBytes": 5788,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 1,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/tapt_pay_UI_redesign_(1)_1780110362373.zip",
+      "bytes": 114691,
+      "sha256": "1096c058edee2c0dd6589f5c7abfa352a06017f6a623066ed71c34e622775694",
+      "entries": 11,
+      "uncompressedBytes": 219263,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/tapt_pay_landing_1783333099687.zip",
+      "bytes": 20756882,
+      "sha256": "3f2299a972a062813b60f511543abf30fdb08f6bddccc2a3b4087b110d903efc",
+      "entries": 330,
+      "uncompressedBytes": 26818477,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/taptpay-property-management-v2.zip",
+      "bytes": 64429,
+      "sha256": "960df3a6cb1b27f849c2758d0a0c1ef9e5c59a0513440f9f50ca4e18ea6df335",
+      "entries": 25,
+      "uncompressedBytes": 264088,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/taptpaypropertymanagement_1779500565291.zip",
+      "bytes": 64537,
+      "sha256": "1d2afbc921622560b1e41bc70c189ebf02e15cf84cd1231c181d2a4df9eccc09",
+      "entries": 25,
+      "uncompressedBytes": 264102,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/trades-last-4-days-handoff_1782424522751.zip",
+      "bytes": 231169,
+      "sha256": "861f4bf2db6edefadda2e0e67609c9e9670767bf49b1f87ca08f6abb3a2ac548",
+      "entries": 13,
+      "uncompressedBytes": 588845,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "attached_assets/ui_1774670511543.zip",
+      "bytes": 154023,
+      "sha256": "d8503a9c6f04151e6d13a225a6982aadd3188a2ab7797bc6380b981647acfb51",
+      "entries": 48,
+      "uncompressedBytes": 149225,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "demo app v2.zip",
+      "bytes": 6090767,
+      "sha256": "3bb39c9bdd26aaa51f567fc0cdb2e81832a8c4bce49f462c50b20aceae87aa85",
+      "entries": 132,
+      "uncompressedBytes": 10833642,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "taptpay-ios.zip",
+      "bytes": 12696361,
+      "sha256": "551c2d440f2a0817f93b122801e2d7292eda54a050f88634b643c16e3bcf5b2c",
+      "entries": 111,
+      "uncompressedBytes": 14171909,
+      "licenseNamedEntries": 1,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    },
+    {
+      "path": "taptpay-visual-demo.zip",
+      "bytes": 5111746,
+      "sha256": "5225475b64700cb19ff2e69723eef01f48dac8d337fd1d187ff148919b777c66",
+      "entries": 129,
+      "uncompressedBytes": 9678924,
+      "licenseNamedEntries": 0,
+      "potentialPrivateConfigEntries": 0,
+      "unsafeArchivePaths": 0,
+      "disposition": "retain; content, licensing, provenance and handoff-owner review required"
+    }
+  ],
+  "retiredProbe": {
+    "path": ".verify1.mjs",
+    "sha256": "ef565a7aff0e072972ddd534841eb18a5f74435bdc709c536f4632ba5d205c44",
+    "classification": "Obsolete one-off Playwright probe; reads private /tmp token, writes legacy localStorage bearer, lacks assertions and bounded teardown. Superseded by isolated CI device matrix. No source/build/operator consumers beyond plan inventory.",
+    "recovery": "Git history; original blob remains in base commit 87ee93e83b9ce0a1e231d61518e4ecbcd2cbe75e.",
+    "action": "remove exact probe only; do not execute or copy its token files"
+  },
+  "retained": [
+    "All attached design assets and archives",
+    "Root index.html historical design artifact pending provenance/handoff review",
+    "Committed source/native web snapshot; active R7 parity contract",
+    "Project AI instructions/memory and empty .claude placeholders",
+    "SQL migrations; no database dumps identified by tracked filename"
+  ],
+  "remaining": [
+    "Asset content/PII review by authorized owner",
+    "Font/image/design-source commercial license and provenance evidence",
+    "Approved external archive storage and handoff disposition"
+  ],
+  "deletedAssets": 0,
+  "categoryDefinitions": {
+    "design_documentation": "docs/design/** only; prior inventory used a broader documentation category, so counts are not a deletion claim.",
+    "archives": "ZIP/TAR/TAR.GZ extensions only; prior inventory used a broader category.",
+    "AI_project_guidance": ".agents/memory/** plus .claude/** project placeholders; not credential-bearing local state."
+  }
+}

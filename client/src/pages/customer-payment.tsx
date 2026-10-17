@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { sseClient } from "@/lib/sse-client";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { CheckCircle, XCircle, Loader2, QrCode } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import { MERCHANTS_KEY, apiPath } from "@shared/api-path";

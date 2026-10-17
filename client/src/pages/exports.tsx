@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+
 import { useToast } from "@/hooks/use-toast";
 import { MerchantGate } from "@/components/merchant-gate";
 import { Download, FileText, FileSpreadsheet, Calendar, TrendingUp } from "lucide-react";
@@ -295,7 +295,7 @@ function ExportsPage({ merchantId }: { merchantId: number }) {
             >
               {csvExportMutation.isPending ? (
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Exporting...</span>
                 </div>
               ) : (
@@ -336,7 +336,7 @@ function ExportsPage({ merchantId }: { merchantId: number }) {
             >
               {pdfExportMutation.isPending ? (
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Generating...</span>
                 </div>
               ) : (

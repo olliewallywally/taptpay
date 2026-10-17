@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from "react";
-import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
-import { X, WifiOff, AlertTriangle, CheckCircle, Info, Smartphone } from "lucide-react";
-import { sseClient } from "@/lib/sse-client";
+import { AnimatePresence, motion } from "framer-motion";
+import { X, AlertTriangle, CheckCircle, Info, Smartphone } from "lucide-react";
+
 import {
   BILLING_CARD_REQUIRED_EVENT,
   BILLING_REQUIRED_MESSAGE,

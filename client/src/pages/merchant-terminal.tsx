@@ -4,15 +4,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeDisplay } from "@/components/qr-code-display";
-import { MerchantUrlDisplay } from "@/components/merchant-url-display";
-import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
+
+
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
@@ -20,11 +20,11 @@ import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { MerchantGate } from "@/components/merchant-gate";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Copy, Check, QrCode, Waves, CreditCard, X, Edit, ChevronDown, Tag, Mail, MessageCircle } from "lucide-react";
 import { canTapToPay } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
-import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
-import { Link } from "wouter";
+
+
 import { sessionFetch } from "@/lib/session";
 
 const transactionFormSchema = z.object({
@@ -602,7 +602,7 @@ function StonesSection({
                     const stoneNumber = (taptStones?.length || 0) + 1;
                     const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
                       name: `Stone ${stoneNumber}`,
-                      stoneNumber: stoneNumber
+                      stoneNumber
                     });
 
                     queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });

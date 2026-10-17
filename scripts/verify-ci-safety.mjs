@@ -7,10 +7,16 @@ export function assertNode22(version=process.versions.node){
   if(!m||Number(m[1])!==22||Number(m[2])<23||(Number(m[2])===23&&Number(m[3])<3)) throw Error('PINNED_NODE22_REQUIRED');
 }
 export function assertCIDatabase(raw,{marker,applicationUrls=[]}={}){
+  return assertDatabase(raw,{marker,applicationUrls},/^r8_ci_[a-f0-9]{16}$/);
+}
+export function assertCIStorageDatabase(raw,{marker,applicationUrls=[]}={}){
+  return assertDatabase(raw,{marker,applicationUrls},/^taptpay_s[234]_verify_r8_[a-f0-9]{16}$/);
+}
+function assertDatabase(raw,{marker,applicationUrls},namePattern){
   try{
     if(marker!=='1')throw Error();
     const u=new URL(raw),db=decodeURIComponent(u.pathname.slice(1));
-    if(!['postgres:','postgresql:'].includes(u.protocol)||u.hostname!=='127.0.0.1'||u.hash||!/^r8_ci_[a-f0-9]{16}$/.test(db))throw Error();
+    if(!['postgres:','postgresql:'].includes(u.protocol)||u.hostname!=='127.0.0.1'||u.hash||!namePattern.test(db))throw Error();
     if(!u.username||!u.password||!u.port||Number(u.port)<1||Number(u.port)>65535)throw Error();
     const keys=[...u.searchParams.keys()];
     if(new Set(keys).size!==keys.length||keys.some(k=>!['sslmode','connect_timeout'].includes(k)))throw Error();
@@ -18,7 +24,7 @@ export function assertCIDatabase(raw,{marker,applicationUrls=[]}={}){
     if(u.searchParams.has('connect_timeout')&&!/^(?:[1-9]|[12][0-9]|30)$/.test(u.searchParams.get('connect_timeout')))throw Error();
     for(const rawApp of applicationUrls.filter(Boolean)){
       const app=new URL(rawApp);
-      if(app.hostname===u.hostname&&(app.port||'5432')===u.port&&decodeURIComponent(app.pathname.slice(1))===db)throw Error();
+      if(['127.0.0.1','localhost','[::1]'].includes(app.hostname)&&(app.port||'5432')===u.port&&decodeURIComponent(app.pathname.slice(1))===db)throw Error();
     }
     return {url:u,database:db};
   }catch{throw Error('CI_DATABASE_REFUSED');}

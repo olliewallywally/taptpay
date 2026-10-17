@@ -1,28 +1,27 @@
 {
   "version": 1,
-  "reviewed": "2026-10-16",
-  "source": "c9f513c583573285bcc6c1aa7ddb480d2f1b8458 with reviewed R8 lint config; existing tracked files only",
+  "reviewed": "2026-10-17",
+  "source": "87ee93e83b9ce0a1e231d61518e4ecbcd2cbe75e plus reviewed R8 closeout source; no new baseline entries",
   "byRule": {
-    "@typescript-eslint/no-unused-vars": 475,
-    "react/no-unescaped-entities": 66,
-    "react/jsx-no-useless-fragment": 14,
-    "no-useless-escape": 11,
-    "object-shorthand": 8,
-    "react/no-unknown-property": 1,
+    "@typescript-eslint/no-unused-vars": 374,
     "jsx-a11y/anchor-has-content": 1,
-    "prefer-arrow-callback": 1,
-    "no-unused-vars": 21,
-    "react/jsx-pascal-case": 2,
-    "react/self-closing-comp": 27,
-    "no-duplicate-imports": 18,
-    "no-empty": 26,
-    "no-redeclare": 1,
-    "no-unreachable": 11,
-    "prefer-const": 7,
     "no-case-declarations": 3,
     "no-control-regex": 2,
+    "no-duplicate-imports": 18,
+    "no-empty": 26,
     "no-irregular-whitespace": 2,
-    "no-regex-spaces": 1
+    "no-redeclare": 1,
+    "no-regex-spaces": 1,
+    "no-unreachable": 11,
+    "no-unused-vars": 19,
+    "no-useless-escape": 11,
+    "object-shorthand": 3,
+    "prefer-arrow-callback": 1,
+    "prefer-const": 3,
+    "react/jsx-no-useless-fragment": 14,
+    "react/jsx-pascal-case": 2,
+    "react/no-unescaped-entities": 65,
+    "react/no-unknown-property": 1
   },
   "findings": [
     {
@@ -143,42 +142,12 @@
     {
       "file": "client/src/components/merchant-url-display.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "45cbd4bc45cb4279c82b4ca5f3acd92389bfaceecda51c5d85c10ad8c019ef3e"
-    },
-    {
-      "file": "client/src/components/merchant-url-display.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
       "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
     },
     {
       "file": "client/src/components/mobile-payment-interface.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "81238de4982dc0cfe51083d4cb4bb892009e07ffcc4c6119ffcdde958ff3b4bc"
-    },
-    {
-      "file": "client/src/components/notification-system.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "ca212c5b45e8123ea94af5e7b8dc85d747d549c3bcbbc89fe2bf03054bb554fc"
-    },
-    {
-      "file": "client/src/components/notification-system.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "07ba791dfcbd733e18d2bad748a1a24c8f2589b902d96eff99e17de497790e17"
-    },
-    {
-      "file": "client/src/components/notification-system.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7464a12e1e5085cfaee10bbe45342d606abadbfc048fa71261d8f09f56a8da8b"
-    },
-    {
-      "file": "client/src/components/notification-system.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "71260b3baf776036aab65420e29c55030df0274c0c321dfa9977a97bb1a93d25"
-    },
-    {
-      "file": "client/src/components/ui/carousel.tsx",
-      "rule": "object-shorthand",
-      "digest": "c3873ceda38e1bf7a8271670f6276d1928e2e5eb29933a085e5959189ce72e43"
     },
     {
       "file": "client/src/components/ui/command.tsx",
@@ -267,11 +236,6 @@
     },
     {
       "file": "client/src/desktop/pages/retail-stock.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "548f13260197dbb63a2ed194eff0f8e097df6e3a9505128df2e46686e12f91e7"
-    },
-    {
-      "file": "client/src/desktop/pages/retail-stock.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "f2a58170f201b4432a59d37715081fc448ba7da7b0059e589a31c3a9329f9ef4"
     },
@@ -289,11 +253,6 @@
       "file": "client/src/desktop/pages/retail-terminal.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "d6eaf97e3c06a7542d0f910cf2275342378d92f2b30a079c0da97628196ee46b"
-    },
-    {
-      "file": "client/src/desktop/pages/trades-analytics.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "263a411adee0231842b71a4b30ddcf72c340349a71e644e7fe09bd13c79cd93e"
     },
     {
       "file": "client/src/desktop/pages/trades-analytics.tsx",
@@ -471,39 +430,14 @@
       "digest": "0b41e107ecca3e2f512669ffa44d6561c09bfdca2dda89bb204ede34f0f72984"
     },
     {
-      "file": "client/src/hooks/use-toast.ts",
-      "rule": "object-shorthand",
-      "digest": "8cc9831d62fb9deeee78cc1b4c27550953eab134eac64049de50fc349876bd96"
-    },
-    {
-      "file": "client/src/hooks/use-toast.ts",
-      "rule": "object-shorthand",
-      "digest": "51d3e6a7bfe735f014f100e08bc977e3de2e805598850aca83e7f5b816dc58d2"
-    },
-    {
       "file": "client/src/lib/__tests__/creation-command.test.ts",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "1d74949482b90feedfea1695eb1171cf38b8d3cf695e122dcd84c53294453c30"
     },
     {
-      "file": "client/src/lib/report-pdf/reports/retail.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "f7c4524f15b56b093da09a9db1ab74f1f68729c51ab78d2a30c484b9274fb643"
-    },
-    {
-      "file": "client/src/lib/report-pdf/reports/retail.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "98f92d296dbc71c3d895228f8228f3936a1f319abe085748260045667dea644a"
-    },
-    {
       "file": "client/src/pages/__tests__/business-details-with-sale.test.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "bb2fed8cc61ac9fd34bb931df2ad5c9b15ed85e31822fd81e804e976e9bdaf5c"
-    },
-    {
-      "file": "client/src/pages/__tests__/jsx-syntax-smoke.test.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "2b554a6fbd0c55c6e40159708efa334b035aa72be319f14679a95276bc73c503"
     },
     {
       "file": "client/src/pages/__tests__/payment-stack.test.tsx",
@@ -524,11 +458,6 @@
       "file": "client/src/pages/accept-invite.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "2dfed90baa8969600690524994c5da64d84237ea38f37d8c127cd87eee4de740"
-    },
-    {
-      "file": "client/src/pages/admin/Analytics.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "e1635dfc3089ee17c57ead9e6fded1803c87f78cd3cb9b19cf42677af7496a17"
     },
     {
       "file": "client/src/pages/admin/Analytics.tsx",
@@ -567,48 +496,8 @@
     },
     {
       "file": "client/src/pages/admin/GridDashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "7c752fa3b284169bd08650607a9e06d9fe065dc65b170f6b496eee0a6a933aa8"
-    },
-    {
-      "file": "client/src/pages/admin/GridDashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "2ab3fa0d6d58503d54c4eb8eb11b9f1eac8a05a8d07315ac4a53289ecf3f81dc"
-    },
-    {
-      "file": "client/src/pages/admin/GridDashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "a89096fa4745603d0b8168c80a1ee793ca3050af8753b90ee7774e583578fb66"
-    },
-    {
-      "file": "client/src/pages/admin/GridDashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "0288bca30c220b111d332553d6634ccb83793f32df0270cab2c04b4eb15b95dc"
-    },
-    {
-      "file": "client/src/pages/admin/GridDashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "95cc3cfd55cbbea2fb4952d2382667583d0136e23fd56843fa99ecc518d1c56c"
-    },
-    {
-      "file": "client/src/pages/admin/GridDashboard.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "bbf352f05309a1b301056c76bcc967f2054a83e9181be0203ae0aa1ffd85e73b"
-    },
-    {
-      "file": "client/src/pages/admin/MerchantDetail.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "c9d78088adac6378e9a5a8566f81619f4e72926984954fe961c35e40db0f36ec"
-    },
-    {
-      "file": "client/src/pages/admin/MerchantDetail.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "382d2575f535e270a02daadd1b8ab1a0c57ca6fa949a6bb2916fbd72963068c5"
-    },
-    {
-      "file": "client/src/pages/admin/MerchantsPage.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "78b52cd1fd7e7fc310f20110c66efbd66a6cb69898d79d1480a82cef857ec570"
     },
     {
       "file": "client/src/pages/admin/ProtectedAdminRoute.tsx",
@@ -621,86 +510,6 @@
       "digest": "411a32d3f0ad2441bb98b86173bd41ec06ba15eeb171d0a534d04e7a41903a02"
     },
     {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "ecfb59ad133c3c592fe8e76a3b4c0feb904c008221955f8d23129ebe1ab617a8"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "53e225d84372f68b32ccc04c140b7f3562c0d19dd241b4a204ade3693cc5e00a"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fdb72c123140e8242527ee9002dd3a728863debc432698e7faa008859f5b3597"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "f57ccb0b87d53520c81970eb49113108b94820ddb7bfa2b888d20ccfa9f4a5e0"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "2132b403bcbb609222a4e305bfd556733a01412fc7aec998028b7def8c517c5a"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "b590d191ac707752d281778048b1cf549798471e8ed48740a56376e0dc5ff6ec"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "ba40fba2c5300965042ec6827afd5fd38c9d1caf85ee6d96f4ad974c2aca6db9"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "12b9379260abc432dc0fd517af20e488a615d27c9b7d06f1b551a2b8d5129186"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fdbddc64d316b3e1dab0e18b73e6d14ec8e58ca74a0f2f875d1d77ffb218cbd2"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "902f3da5499c45220d128a8b3bf7819228e897cde9191467acb2547a7db507a2"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "954af8e99b186b9656f66b28fbd1cae71e41f8a788656a6a2b186bcbbd8cf967"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "035ec4ef689e67c461fd91018e81c59b313e91ba54ee03a2ce7a6f671fd6d741"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "react/no-unescaped-entities",
-      "digest": "28dcd0c7b1523b149f810c5dc8feca82bcb8f3901c26fd4cf99717677561cf1f"
-    },
-    {
-      "file": "client/src/pages/admin-api.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "75528816359ee87b4bbb74f4a3d9198bf637777c2f234c4fc95525164a5bedb9"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "56927e4029b25aa461d967eb8113b40c359498c9aff9fae55a40799420d8e973"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "0c606c716093448b64a7aab01ebd6cc62fa986da85132c83b79fe5ff4e35c5d5"
-    },
-    {
       "file": "client/src/pages/admin-dashboard.tsx",
       "rule": "no-duplicate-imports",
       "digest": "c8fdeca9b988b27cc34977d7884f07854325087d86b0a382bac22143acd3166f"
@@ -709,96 +518,6 @@
       "file": "client/src/pages/admin-dashboard.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "5d5da188a32d665bb08fe701e520737d1d975835a795370f2cf3731d3a8c56cc"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "285206b23db1554d7a6c898861baa7af6a44a63cd9ceaa889ce8b8f5ba7dc0e0"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "224d179551b9b80110316ba188bb9502bc63b4aa2d8d199e44538ac4a3c7b731"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "58e048d0c30bf1bc435d46961ceaa374ad120f67c40e28800bd022f2b7dea63f"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "f9b4b3f56be01052d298c838e52bff7a034143fed0fa9033ad8db9525567f222"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "6abecba9dcc385715fadb60ed658f4cdfd8c9819ec78ae0cf512032142a4e89b"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "785967e06ba8dafbb67e0c03a1b4441a6ec96dea3c84ae627c3ec6d4ba7d49ce"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "0a52593f22dd932302315b67232d60bbe01af42df433a0a60929802ae1fc2fa3"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "365af3f080908b5cf882a7a36149203db93d2c5822f4d39942de7a17fd10f725"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "115c333afe7a38774b3b8015ddfe56dc930b0cbe4b530fd7f28ffcae9742fd51"
-    },
-    {
-      "file": "client/src/pages/admin-dashboard.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "1c9757e485da8c5c858ced009ae1277120ba1da0a5dd726336d6dc71c3ec0270"
-    },
-    {
-      "file": "client/src/pages/admin-login.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "45cbd4bc45cb4279c82b4ca5f3acd92389bfaceecda51c5d85c10ad8c019ef3e"
-    },
-    {
-      "file": "client/src/pages/admin-login.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7cc0390464f3ad12cda52a96c1028e2c350d0a93169949fbe8a80782ec3e3af0"
-    },
-    {
-      "file": "client/src/pages/admin-login.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "a2bcec8081628ce9ba0464292cd3044d33ecfd21e76aceeb9ee4582e78c0fcbb"
-    },
-    {
-      "file": "client/src/pages/admin-login.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "b1647c89f9360ffa683d1a9348e0dccfe6e63b2c6d75ca04fc9851829800d5c0"
-    },
-    {
-      "file": "client/src/pages/admin-login.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "a75e0ddebdfb2b10ca355b462600280efd61a792c4e51cc6d6327db10427bb9d"
-    },
-    {
-      "file": "client/src/pages/admin-merchant-broken.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "3022c86d2bcffe183153abf206a10b2ebdf2b2b92123f4da416b83d0d5f91464"
-    },
-    {
-      "file": "client/src/pages/admin-merchant-broken.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "6c68669a36aae4938c06723cce3449b15ab4592b723ea7d9806ee9ff91838266"
-    },
-    {
-      "file": "client/src/pages/admin-merchant-broken.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "d5f556b493b18b14337ae4a85ce47a1fbe86dc82624558ecd80f335e89d0398e"
     },
     {
       "file": "client/src/pages/admin-merchant-broken.tsx",
@@ -819,101 +538,6 @@
       "file": "client/src/pages/admin-merchant-broken.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "1569af9fbaca0753edd82a42f5d905ae22a93a2db965a3a1d2281cd7cbe3c48d"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "ecfb59ad133c3c592fe8e76a3b4c0feb904c008221955f8d23129ebe1ab617a8"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "3dad4928f255c1f8b2c34701d00234329b07bce0790c913da3f77c52c0f5c072"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "3bf66d9297cb9c773dd3aa917f375445faadf575c0fe4cf4f5d7e1878cdc64d2"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "5b197b11ddaa14f5db3df9861fe7638e90e38385f3d691dc3c5b9df6c732e0e3"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "b9dabad7b2f84efc24146647bf86882a874e71cb50bec9564b355a83c05144b3"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "5076d48c7d671cf85ec49e8bc30d2aca5b0107d83447d8a42abc6badf2046890"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fe51f60e311e5b8eb4d628b2928da825e8f5f37b8ef7a826de69f77465180420"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fa38767db1dbdc710197cb34dae13d1271df798e4f25fad113630fb494e9db92"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7eba5dd6c5fadc076cdea3eebcce9fb87486417e4dbebd6824790c78154b25d8"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "41f81a54d4b9b2e6906d232df8b4418a1798fd420a8d1d2b6eca9f8d5dca54ee"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "631111c181d0faae7b7fc73b75f4132bc8051f295196491877458309f1b35792"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "396068bee7c46477b19dbec53626e48f8cef80d6a4ce39da7bed6b44984b8cbe"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "34e8329fd22a109977fa496956aa2497e7c1a91ffcfae24c689c39b5b64a35a9"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "b8c22fe5613001f7341208cc0e3150fb405e41f185e7771f782b0d87797d7d0f"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "76076e3acba696b90fc1be60d34c973caf3cdbce52929fe124b1f892aa7202ec"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "491a46b6564a4679c6e6139bf867a13c51d3ebfaa2dd72f1f42460d3fb0acd41"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "6c68669a36aae4938c06723cce3449b15ab4592b723ea7d9806ee9ff91838266"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "02771ac3a107e625e360aa17a099a93c9fee2f0d515041fec1802502fd28a444"
-    },
-    {
-      "file": "client/src/pages/admin-merchant.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "c8656fcdcd625dd095b1cd22c3ef44ff60b0a46c2d785d4c66b5aa87005de493"
     },
     {
       "file": "client/src/pages/admin-merchant.tsx",
@@ -982,26 +606,6 @@
     },
     {
       "file": "client/src/pages/checkout.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "0532930aee8a30f822edb32896dc57d9e1a53133855d68f0c2ab95a852cc8a96"
-    },
-    {
-      "file": "client/src/pages/checkout.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "00b9c9f9effcebad50dff9520d4174dffd693636b770081a84df795ffe96d2af"
-    },
-    {
-      "file": "client/src/pages/checkout.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "5f3b3ad175f2fdf893bb622228ec2fc53e97adeacdf40b7bef60de57e4956acb"
-    },
-    {
-      "file": "client/src/pages/checkout.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "495e6ca07d5286f07e90d9434882c2d0b6071167463cf3abde25a480b2bc96fb"
-    },
-    {
-      "file": "client/src/pages/checkout.tsx",
       "rule": "no-empty",
       "digest": "2c5d84ae745e0439e4c81b39b7a142ab9f0d57688bde15d51d503af59597629f"
     },
@@ -1057,53 +661,8 @@
     },
     {
       "file": "client/src/pages/customer-payment.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "390a4dd54123f296b9317baa11d26c528413a4d559cd8088858f59ac6d30e1fd"
-    },
-    {
-      "file": "client/src/pages/customer-payment.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "5582adf31439defdd5808f12e51ae8bfc6bd8e2126ea650b391fe99e4d901ad7"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "44e0737f0ccaded3f85e75d383c3403bf1a6127f9a55780cd2647218d654c6e4"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "421b294043f214c71ccc3023d07976dd4c661baf6dbd4773d62b2bc7dc719794"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "47c7931bfd7b29e66d70def6c9b0ce80c7d5dc5fa3603a52cfefda5d15787e90"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "b2dbc842ff90203b755e1e8db5d7caa7a5a5f7639a308b7245ce582b354f27ff"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "3c742971837037d41612efaef8b2aba593373fc80a434081585b9cadaecfef67"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fd6260ee9224648fceaab8c40fbf94bd4f364a81c6ca3962eecaa641b1ea5a03"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "3d3bb40d5632618f1d5311ad6cb96194bc4a6864e67ef711d41e1f508dcbad3c"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "5076d48c7d671cf85ec49e8bc30d2aca5b0107d83447d8a42abc6badf2046890"
     },
     {
       "file": "client/src/pages/demo-terminal.tsx",
@@ -1137,33 +696,8 @@
     },
     {
       "file": "client/src/pages/demo-terminal.tsx",
-      "rule": "object-shorthand",
-      "digest": "2347a9ee8fe10afa43a08aaef6fc4573f7fe74a6c829d1684b4a759db454e814"
-    },
-    {
-      "file": "client/src/pages/demo-terminal.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "5c824ba1188014893bf0d2fc274c1c39206989c3b06c7a298b3b50b221b2faeb"
-    },
-    {
-      "file": "client/src/pages/exports.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "bda589d0a6bd3072f7461a4422e5717c13e186b5cff26e43a7d225f712ac147b"
-    },
-    {
-      "file": "client/src/pages/exports.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "888663cbe9edca292d4daa3ecd3a3cdc7908eb34c72e3d22206dd966f893f190"
-    },
-    {
-      "file": "client/src/pages/exports.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "888663cbe9edca292d4daa3ecd3a3cdc7908eb34c72e3d22206dd966f893f190"
-    },
-    {
-      "file": "client/src/pages/forgot-password.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "491a46b6564a4679c6e6139bf867a13c51d3ebfaa2dd72f1f42460d3fb0acd41"
     },
     {
       "file": "client/src/pages/forgot-password.tsx",
@@ -1317,11 +851,6 @@
     },
     {
       "file": "client/src/pages/landingRuntime.ts",
-      "rule": "prefer-const",
-      "digest": "52a05eebe9cb8469fb86d45180ade1edc2ced7d8c56c454b8d4b5d7691d9f424"
-    },
-    {
-      "file": "client/src/pages/landingRuntime.ts",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "091642a4b9a28ed5baaa79bc1bafd32f151b7ceb8b35d2cbac2510bd1e4e1495"
     },
@@ -1403,16 +932,6 @@
     {
       "file": "client/src/pages/login.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "ac5db24180d9cb2c7f52bd652c325fcf544b64565823f6f3aaa84a4e59edb027"
-    },
-    {
-      "file": "client/src/pages/login.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "bf71999bee688b437175b9c2f9ca5707277cacf3775a6170b4b179edc4f845c2"
-    },
-    {
-      "file": "client/src/pages/login.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
       "digest": "12e6fcdc68603c275df6309dc78c4b34d1446e5fd779e3fe18124554db4f13b1"
     },
     {
@@ -1427,33 +946,13 @@
     },
     {
       "file": "client/src/pages/merchant-signup.test.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "797f3a7b9548e658127501f2843fba6463cf472979f19737e5a332f7cfed7bcd"
-    },
-    {
-      "file": "client/src/pages/merchant-signup.test.tsx",
       "rule": "react/jsx-no-useless-fragment",
       "digest": "5ffe52c4dc86ed1b1ef7c2d7896ab3f81b1b1a9bf410cdc94ae0a2c61e31b2f4"
     },
     {
       "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "c4eb4492735487a9992bc8a54360f3bfa7deb593b6b4195bf4f0614861e55457"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "556028aa01b23c56078db4aab3802b72eff8cae3aa6cd08405f9b1207391ab12"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile-v2.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
       "digest": "4da14e18eb9624f106f759c4c596c579509a0be0046d1474943bf1a0818c43df"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "5655ef2fd18239b89b9d8ed16b4c8a371f8ed3d63663caa7c510191674d94464"
     },
     {
       "file": "client/src/pages/merchant-terminal-mobile.tsx",
@@ -1487,31 +986,6 @@
     },
     {
       "file": "client/src/pages/merchant-terminal-mobile.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "369b24a33630b003f7add7fd3a3b37409a2e819eced7d1dc90ff2deff8627423"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "717a5749800b09bc08d0959af1e5c2a88b8409b2841419f5012d82ef946fc682"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "780f2cd8d6dab2e8a904699b647a9f48f526b06c486ef6e52c1358cf5107e0eb"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "6fc36e065df1ace88b0cac30a819e2026e5b149ae36088c3e7c711196f2b199e"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "2b7d47becbddc5e679f1c3a29210329ffbe044c7813ae578003aed108effdaf3"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal-mobile.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "6698266b6204e12cb6ab14c55fe933850b8f27d684482b304d1e341955550607"
     },
@@ -1519,81 +993,6 @@
       "file": "client/src/pages/merchant-terminal-mobile.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "555d3cbed9f9425592f1a8ced961b972b3fe9230cff3ba983761d5ed0597029d"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7cc0390464f3ad12cda52a96c1028e2c350d0a93169949fbe8a80782ec3e3af0"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "a2bcec8081628ce9ba0464292cd3044d33ecfd21e76aceeb9ee4582e78c0fcbb"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "8aa3d8228172673ea7d81a07d022de43de40a4a9c8829ce399169d318f9253dc"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "78e55ea9b0f93831bb7ee2ae081dba81ed82fad574ab204088df43b42b31ebe3"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7f9bd2b0ca5951dc007c4871a04dbf0996164f4e1e77068cb39a6294270414db"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "67b1efc28b3f5e7eae5320e8b3bf8540535d4a33554717e2c938b4d185a92c18"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "a59aebc6d0a6e6d2924d5fa5f6fa23ae83c9a493e89e71672ce721ea257190b8"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "547f319188213bf938d4fdce3fafc97e594e86f5e563da3c83e68e36d219ff8e"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fbf90a3157c2a4eb19027e8b9cbb5def6bc76d05afa6c9646f1d2bfd9e587f03"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "35e33cf47c334b053fade02c7ac5c5ea71745b6e08d5de79a1726f4fcd870ee4"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "a8fb90ed9f6f8ffff8fa7dadabd3f2c907175661d9505c9e68665145914dd154"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "63ef2e596cb61f79563fa934884d80a4858e5f26e23d7f0c2b07dd23763aede4"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "f52ed14e06be84bfe042e954c7df365da06e816d924ad5c4eb5bbb7e4c7d0b88"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "354301c1ad940ef8f6c298a747bb450c045a68356a7e164cac669cd1f5824845"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "5655ef2fd18239b89b9d8ed16b4c8a371f8ed3d63663caa7c510191674d94464"
     },
     {
       "file": "client/src/pages/merchant-terminal.tsx",
@@ -1667,11 +1066,6 @@
     },
     {
       "file": "client/src/pages/merchant-terminal.tsx",
-      "rule": "object-shorthand",
-      "digest": "2347a9ee8fe10afa43a08aaef6fc4573f7fe74a6c829d1684b4a759db454e814"
-    },
-    {
-      "file": "client/src/pages/merchant-terminal.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "2be4703112e770f279194e8c1f1c12ea193b792a418f8d914ef32d378f6883c3"
     },
@@ -1701,11 +1095,6 @@
       "digest": "538287d209a0b3377bd84662727320e90b6ca55b0322fd2291edc276060e577d"
     },
     {
-      "file": "client/src/pages/payment-stack.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fe47387de2bbc890c8482badaef726114f5dbc8424d48033edead1a97ad250fb"
-    },
-    {
       "file": "client/src/pages/property/tenant-profile.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "d5843e0dfc6eaf9ecc3d640ef862972b997da7eb3c5bfe2928eefb6945816991"
@@ -1717,58 +1106,8 @@
     },
     {
       "file": "client/src/pages/reset-password.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "ff57cafcda54631393017f9d13bfd91c09136564b1d1e9cf041076b072d35346"
-    },
-    {
-      "file": "client/src/pages/reset-password.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "491a46b6564a4679c6e6139bf867a13c51d3ebfaa2dd72f1f42460d3fb0acd41"
-    },
-    {
-      "file": "client/src/pages/reset-password.tsx",
       "rule": "react/no-unescaped-entities",
       "digest": "232ff378435df3b93ee44fcfb5a214efb4e227a397d3e264df4089c7582ba3f8"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "fccc5886818484e8462b01d9345907642c0b7135c3a05a38b555ea6f5d6542b4"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "43b63442ac351ab21203f035afebc483e79d50eedcf5e00e195ff5b8024a0f05"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "2d640df101b737e842ecb775b22f3fdaa58f4bec65efc4a70fa6e2671840c4a4"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "6f16f1df4285a653e9df47e32815bd7eabcf8aa6c9c6d0e9f0dd25a52db726ff"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "0a57dae359b94ccad2454ef82670f5e8e7db80106d864e0cc6e5f4c10167ed00"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "202a9a2055a4986cd049b2e060c3b71fbe65f89bc0389a0efda70ae9016caeca"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7ea3daf4f9b1a6b6b303d44fc518b8223ce42a633cced02b03b4736ed57bf386"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "46b0479f5bb9c78b5bf9dec96d7b2ea04ba7c6f059d2b51a431ca7251f07539a"
     },
     {
       "file": "client/src/pages/settings.tsx",
@@ -1789,11 +1128,6 @@
       "file": "client/src/pages/settings.tsx",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "e2302dc920cbb5df8f287559a155614b136672bce563d51f05ce5bfc96c7f7dd"
-    },
-    {
-      "file": "client/src/pages/settings.tsx",
-      "rule": "react/self-closing-comp",
-      "digest": "787bf1f8974915dbe8d21f2511059d9412dbbcab3dcdc5456c34c9e189221706"
     },
     {
       "file": "client/src/pages/settings.tsx",
@@ -2429,11 +1763,6 @@
       "file": "server/storage.ts",
       "rule": "@typescript-eslint/no-unused-vars",
       "digest": "6060753d858321c3e24e9777e7a8fe7c396bd281648bdb355be255043fecc71b"
-    },
-    {
-      "file": "server/storage.ts",
-      "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7f357f9d6cd3f9e42dd39655c6c7f8b562db453ca0eeeca10f2d2edecebf10c8"
     },
     {
       "file": "server/storage.ts",
@@ -3333,11 +2662,6 @@
     {
       "file": "server/storage.ts",
       "rule": "@typescript-eslint/no-unused-vars",
-      "digest": "7f357f9d6cd3f9e42dd39655c6c7f8b562db453ca0eeeca10f2d2edecebf10c8"
-    },
-    {
-      "file": "server/storage.ts",
-      "rule": "@typescript-eslint/no-unused-vars",
       "digest": "ec1b20b1e3fa9a28e3a46e8d4d877b956a950aa187646f7f9ee6329124d9e76d"
     },
     {
@@ -3401,16 +2725,6 @@
       "digest": "d0d43f8e7309b978c1312c554372ec6e1e3656bb8b43a5e0e5559a5d8e9f6fab"
     },
     {
-      "file": "scripts/deploy.js",
-      "rule": "no-unused-vars",
-      "digest": "dbe561775b165b7f8346482e822bec0ea54301af4ad4b0a31d47f89670b17c35"
-    },
-    {
-      "file": "scripts/deploy.js",
-      "rule": "no-unused-vars",
-      "digest": "23104f2ae9c06ee29ff39bda5ab8ef06a9480f55b9665e0e0910062af41f57cf"
-    },
-    {
       "file": "scripts/inventory-44px.mjs",
       "rule": "no-unused-vars",
       "digest": "f2f7f6c339de8d7e696e356e275c607ebaa93712059db45350ea96f813d9706b"
@@ -3441,11 +2755,6 @@
       "digest": "cd81e6406edf785ba070947b4e9a7d0e6209a30409ff953b7fec6a326c4483c3"
     },
     {
-      "file": "scripts/tutorial-geometry.mjs",
-      "rule": "prefer-const",
-      "digest": "ffcbd89ed735e2d860ecdb4f5b65ac22db3b486b0ffd1758f8f598301f33d45e"
-    },
-    {
       "file": "scripts/verify-accessibility-audit.mjs",
       "rule": "no-useless-escape",
       "digest": "74771aceb7213ce310d743d4dcb33c9c68a9ac928398e4dfc3bd5767b0307313"
@@ -3464,11 +2773,6 @@
       "file": "scripts/verify-r1-t10-tutorial-accessibility.ts",
       "rule": "no-duplicate-imports",
       "digest": "90d528d2adcbf89cfd380531b780a526924e730bd492f316a2995b5db1ff16bb"
-    },
-    {
-      "file": "scripts/verify-r1-t4-sessions-browser.ts",
-      "rule": "prefer-const",
-      "digest": "ebbb5ca88c82265cd2fd997cf6e57e43a01435e262b40a258335fa666f75f892"
     },
     {
       "file": "scripts/verify-r1-t5-apple-browser.ts",
@@ -3509,11 +2813,6 @@
       "file": "scripts/verify-terminal-dock.mjs",
       "rule": "no-unused-vars",
       "digest": "df81b0346ffbd9624b904d661978edec1c3fd49fc7f672e287b934035c41c345"
-    },
-    {
-      "file": "scripts/verify-terminal-dock.mjs",
-      "rule": "prefer-const",
-      "digest": "bc2551d885bf3386eb7af389878b8b0b9160853df49113ba6f4f803b8269fe1d"
     }
   ]
 }

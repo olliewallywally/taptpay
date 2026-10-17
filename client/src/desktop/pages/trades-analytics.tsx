@@ -22,19 +22,7 @@ import {
   buildAnalyticsAreaChart,
   clampAnalyticsChipCenter,
 } from "../data/analytics-chart";
-import {
-  TRADES_HOME_RANGES,
-  buildTradesRevenueBuckets,
-  scopeTradesData,
-  tradesPaidRevenueCents,
-  tradesPeriodWindow,
-  useTradesClientsQuery,
-  useTradesInvoicesQuery,
-  useTradesQuotesQuery,
-  type TradesClient,
-  type TradesHomeRange,
-  type TradesInvoice,
-} from "../data/trades-data";
+import { buildTradesRevenueBuckets, scopeTradesData, tradesPaidRevenueCents, tradesPeriodWindow, useTradesClientsQuery, useTradesInvoicesQuery, useTradesQuotesQuery, type TradesClient, type TradesHomeRange, type TradesInvoice } from "../data/trades-data";
 import {
   ALL_SITES,
   TRADES_DESKTOP_REPORTS,

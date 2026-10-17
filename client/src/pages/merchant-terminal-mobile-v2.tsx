@@ -4,12 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { QRCodeDisplay } from "@/components/qr-code-display";
-import {
-  apiRequest,
-  BillingCardRequiredError,
-  isBillingCardRequired,
-  notifyIfBillingCardRequired,
-} from "@/lib/queryClient";
+import { apiRequest, isBillingCardRequired } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";

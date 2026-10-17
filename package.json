@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "taptpay",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
@@ -8,9 +8,9 @@
   },
   "packageManager": "npm@10.9.9",
   "scripts": {
-    "dev": "APP_ENV=development DATABASE_TARGET=local ENV_VALIDATION_MODE=audit NODE_ENV=development tsx server/index.ts",
+    "dev": "cross-env APP_ENV=development DATABASE_TARGET=local ENV_VALIDATION_MODE=audit NODE_ENV=development tsx watch server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "verify:ci": "node scripts/verify-ci.mjs",
     "verify:desktop": "node scripts/verify-ci.mjs --stage=browser --mode=pages",
@@ -18,7 +18,7 @@
     "verify:chunk": "node scripts/verify-ci.mjs --stage=browser --mode=chunks",
     "verify:postgres": "node --import tsx scripts/verify-ci-postgres.ts",
     "verify:build": "node scripts/verify-build.mjs",
-    "test:r8:tools": "node --test --test-concurrency=1 scripts/verify-ci-contract.test.mjs scripts/verify-build.test.mjs scripts/verify-ci-safety.test.mjs scripts/verify-lint.test.mjs scripts/verify-r8-truthfulness.test.mjs scripts/verify-matrix-readiness.test.mjs scripts/verify-browser-clean.test.mjs",
+    "test:r8:tools": "node --test --test-concurrency=1 scripts/verify-ci-contract.test.mjs scripts/verify-build.test.mjs scripts/verify-ci-safety.test.mjs scripts/verify-lint.test.mjs scripts/verify-r8-truthfulness.test.mjs scripts/verify-matrix-readiness.test.mjs scripts/verify-browser-clean.test.mjs scripts/verify-r8-package-contracts.test.mjs scripts/verify-ci-storage-target.test.mjs",
     "check:r5": "tsc -p tsconfig.r5-scripts.json",
     "test:r5:cli": "node --import tsx --test scripts/r5-encryption-preflight.test.ts",
     "check:r6": "tsc -p tsconfig.r6-scripts.json",
@@ -29,7 +29,7 @@
     "test": "jest",
     "test:client": "jest --selectProjects client",
     "test:server": "jest --selectProjects server --runInBand",
-    "test:server:postgres": "node --test scripts/postgres-verifier-safety.test.mjs && node scripts/verify-server-postgres.mjs",
+    "test:server:postgres": "npm run verify:postgres",
     "test:server:postgres:safety": "node --test scripts/postgres-verifier-safety.test.mjs",
     "test:backup:safety": "node scripts/db-backup-safety.test.mjs",
     "test:fingerprint": "node --test scripts/schema-fingerprint.test.mjs",
@@ -48,7 +48,12 @@
     "verify:terminal": "node scripts/verify-ci.mjs --stage=browser --mode=terminal",
     "check:r8": "tsc -p tsconfig.r8-scripts.json",
     "verify:production-install": "node scripts/verify-production-install.mjs",
-    "verify:development-vite": "node --import tsx scripts/fixtures/r8-development-vite.mjs"
+    "verify:development-vite": "node --import tsx scripts/fixtures/r8-development-vite.mjs",
+    "verify:package-contracts": "node scripts/verify-r8-package-contracts.mjs",
+    "verify:map-package": "node scripts/verify-r8-map.mjs",
+    "verify:portable-scripts": "node scripts/verify-r8-scripts.mjs",
+    "verify:css-config": "node scripts/verify-r8-css-config.mjs",
+    "test:server:postgres:internal": "node --test scripts/postgres-verifier-safety.test.mjs && node scripts/verify-server-postgres.mjs"
   },
   "dependencies": {
     "@capacitor/core": "8.4.3",
@@ -58,7 +63,6 @@
     "@emotion/is-prop-valid": "^1.4.0",
     "@google-analytics/data": "^5.2.1",
     "@hookform/resolvers": "^3.10.0",
-    "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
     "@radix-ui/react-accordion": "^1.2.4",
     "@radix-ui/react-alert-dialog": "^1.1.7",
@@ -95,8 +99,9 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "compression": "1.8.2",
+    "cross-env": "10.1.0",
     "date-fns": "^3.6.0",
-    "drizzle-orm": "^0.39.1",
+    "drizzle-orm": "0.45.4",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
     "express": "4.22.3",
@@ -111,7 +116,7 @@
     "motion": "^12.23.24",
     "multer": "2.4.0",
     "next-themes": "^0.4.6",
-    "nodemailer": "^7.0.4",
+    "nodemailer": "10.1.2",
     "pg": "^8.23.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
@@ -120,14 +125,12 @@
     "react-hook-form": "^7.55.0",
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
-    "react-simple-maps": "^3.0.0",
+    "react-simple-maps": "5.0.5",
     "recharts": "^2.15.2",
     "resend": "^6.10.0",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7",
     "three": "^0.152.2",
     "topojson-client": "^3.1.0",
-    "tw-animate-css": "^1.2.5",
     "vaul": "^1.1.2",
     "web-push": "^3.6.7",
     "wouter": "^3.3.5",
@@ -146,8 +149,7 @@
     "@playwright/test": "^1.60.0",
     "@replit/vite-plugin-cartographer": "^0.2.7",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
-    "@tailwindcss/typography": "^0.5.15",
-    "@tailwindcss/vite": "^4.1.3",
+    "@tailwindcss/typography": "0.5.20",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -160,8 +162,7 @@
     "@types/jspdf": "^1.3.3",
     "@types/memoizee": "^0.4.12",
     "@types/multer": "^2.0.0",
-    "@types/node": "20.16.11",
-    "@types/nodemailer": "^6.4.17",
+    "@types/node": "22.20.5",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
@@ -171,11 +172,11 @@
     "@types/ws": "^8.5.13",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
-    "@vitejs/plugin-react": "^4.3.2",
+    "@vitejs/plugin-react": "5.2.0",
     "autoprefixer": "^10.4.20",
     "babel-jest": "^30.1.2",
-    "drizzle-kit": "^0.30.4",
-    "esbuild": "^0.25.0",
+    "drizzle-kit": "0.31.11",
+    "esbuild": "0.25.12",
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsx-a11y": "^6.10.2",
@@ -192,10 +193,11 @@
     "prettier": "^3.6.2",
     "supertest": "^7.2.2",
     "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
     "ts-jest": "29.4.15",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^5.4.19"
+    "vite": "7.3.7"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
@@ -203,6 +205,22 @@
   "overrides": {
     "handlebars": "4.7.10",
     "protobufjs": "7.6.6",
-    "tar": "7.5.22"
-  }
+    "tar": "7.5.22",
+    "@esbuild-kit/core-utils@3.3.2": {
+      "esbuild": "0.25.12"
+    },
+    "postcss-nested@6.2.0": {
+      "postcss-selector-parser": "7.1.6"
+    },
+    "@tailwindcss/typography@0.5.20": {
+      "postcss-selector-parser": "7.1.6"
+    },
+    "@istanbuljs/load-nyc-config@1.1.0": {
+      "js-yaml": "4.3.2"
+    },
+    "tailwindcss": {
+      "postcss-selector-parser": "7.1.6"
+    }
+  },
+  "private": true
 }

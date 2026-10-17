@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { MerchantGate } from "@/components/merchant-gate";
 import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, Check, CreditCard } from "lucide-react";
-import { Link } from "wouter";
+
 import { canTapToPay } from "@/lib/native";
 import { sessionFetch } from "@/lib/session";
 import { logOut } from "@/lib/log-out";
@@ -387,7 +387,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
         {status === "pending" && (
           <div className="relative w-12 h-10">
             {/* Static ring for pending */}
-            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/40"></div>
+            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/40" />
             <Clock className="absolute inset-2 w-8 h-8 text-[#00FF66]/70" />
           </div>
         )}
@@ -395,15 +395,15 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
         {status === "processing" && (
           <div className="relative w-12 h-10">
             {/* Animated ring only when processing */}
-            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/30"></div>
-            <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#00FF66] animate-spin duration-700"></div>
+            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/30" />
+            <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#00FF66] animate-spin duration-700" />
           </div>
         )}
 
         {status === "completed" && (
           <div className="relative w-12 h-10 flex items-center justify-center">
             {/* Success tick with smooth transition */}
-            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66] animate-[fadeIn_0.5s_ease-in-out]"></div>
+            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66] animate-[fadeIn_0.5s_ease-in-out]" />
             <CheckCircle className="w-6 h-6 text-[#00FF66] animate-[scaleIn_0.5s_ease-in-out]" />
           </div>
         )}
@@ -411,7 +411,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
         {status === "failed" && (
           <div className="relative w-12 h-10 flex items-center justify-center">
             {/* Failed X with smooth transition */}
-            <div className="absolute inset-0 rounded-full border-3 border-red-400 animate-[fadeIn_0.5s_ease-in-out]"></div>
+            <div className="absolute inset-0 rounded-full border-3 border-red-400 animate-[fadeIn_0.5s_ease-in-out]" />
             <XCircle className="w-6 h-6 text-red-400 animate-[scaleIn_0.5s_ease-in-out]" />
           </div>
         )}

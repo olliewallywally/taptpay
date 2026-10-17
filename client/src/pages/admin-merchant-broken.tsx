@@ -9,21 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { 
-  ArrowLeft, 
-  Building2, 
-  DollarSign, 
-  CreditCard, 
-  Users, 
-  Link as LinkIcon,
-  Edit,
-  Save,
-  X,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  LogOut
-} from "lucide-react";
+import { ArrowLeft, DollarSign, CreditCard, Link as LinkIcon, Edit, Save, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";

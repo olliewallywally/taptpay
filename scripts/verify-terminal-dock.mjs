@@ -1304,7 +1304,7 @@ async function checkMorph(browser, { goo = true, reducedMotion = false } = {}) {
       let last = started;
       let filterAttrs = null;
       let iconInsideFilter = false;
-      let iconFilters = new Set();
+      const iconFilters = new Set();
       await new Promise((resolve) => {
         const tick = () => {
           const now = performance.now();

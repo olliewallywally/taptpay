@@ -1,13 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import {
-  ArrowLeft, DollarSign, Activity, MapPin, Mail, User, Phone, Building,
-  CreditCard, CheckCircle, Send, Shield, AlertTriangle, Download, Share2,
-  Receipt, Search, Edit2, Check, X, Hash, Landmark,
-  FileText, CalendarDays, TrendingUp, BadgeCheck, BadgeX
-} from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { ArrowLeft, DollarSign, Activity, MapPin, Mail, User, Phone, Building, CheckCircle, Send, Shield, AlertTriangle, Download, Share2, Receipt, Search, Edit2, Check, X, Hash, Landmark, FileText, CalendarDays, TrendingUp, BadgeCheck, BadgeX } from 'lucide-react';
+import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';

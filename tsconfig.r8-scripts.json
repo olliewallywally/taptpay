@@ -12,6 +12,8 @@
     "scripts/ci-upload-inventory.ts",
     "scripts/verify-ci-postgres.ts",
     "scripts/verify-r8-browser.ts",
-    "scripts/verify-r1-t10-device-matrix.ts"
+    "scripts/verify-r1-t10-device-matrix.ts",
+    "scripts/r3-subscription-postgres-cases.ts",
+    "scripts/r8-subscription-plan-postgres-cases.ts"
   ]
 }

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MerchantGate } from "@/components/merchant-gate";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
+import { Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { Transaction } from "@shared/schema";
 import { businessCsrfHeader } from "@/lib/session";

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 import pg from "pg";
+import {assertCIDatabase} from './verify-ci-safety.mjs';
 
 import {
   assertSafePostgresVerifierEnvironment,
@@ -865,6 +866,7 @@ async function runStorageWorker({
           TAPTPAY_VERIFY_CONFIGURED_DATABASE_URL: configuredDatabaseUrl ?? "",
           TAPTPAY_VERIFY_SCHEMA: schemaName,
           TAPTPAY_VERIFY_PHASE: phase,
+          TAPTPAY_VERIFY_CANONICAL_CI: phase === "post-index" ? process.env.TAPTPAY_VERIFY_CANONICAL_CI ?? "0" : "0",
         },
         stdio: "inherit",
       },
@@ -888,6 +890,9 @@ async function main() {
     configuredDatabaseUrl,
     marker: process.env.TAPTPAY_TEST_DATABASE,
   });
+  if (process.env.TAPTPAY_VERIFY_CANONICAL_CI !== "1") throw Error("CURRENT_STORAGE_REQUIRES_OWNED_CI_RUNNER: npm run verify:postgres");
+  assertCIDatabase(testDatabaseUrl, {marker: process.env.TAPTPAY_TEST_DATABASE,
+    applicationUrls: [configuredDatabaseUrl, process.env.NEON_DATABASE_URL]});
   const schemaName = createVerifierSchemaName();
   const quotedSchema = quoteVerifierSchema(schemaName);
   const pool = new Pool({

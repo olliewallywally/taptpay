@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
 import {setupVite} from '../../server/vite.ts';
+const args=process.argv.slice(2);
+assert.ok(args.length===0 || (args.length===1 && args[0]==='--replit'),'INVALID_DEV_ARGUMENT');
+if(args[0]==='--replit')process.env.REPL_ID='r8-synthetic';
 const app = express(), server = http.createServer(app);
 let closeVite;
 try {

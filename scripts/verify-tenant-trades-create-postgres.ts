@@ -231,21 +231,29 @@ try {
   await check("eight balance sends at the same moment make one balance and one history line", async () => {
     const parent = await profile(); const quote = await quoteFor(parent.id); const deposit = await paidDeposit(parent.id, quote.id);
     const results = await Promise.all(Array.from({ length: 8 }, () => one.createJobBalanceInvoiceForMerchant(deposit, a, false)));
-    assert.equal(results.filter(result => result.kind === "ok").length, 1);
-    assert.equal(results.filter(result => result.kind === "conflict" && result.reason === "exists").length, 7);
+    assert.equal(results.filter(result => result.kind === "ok" && !result.reused).length, 1);
+    assert.equal(results.filter(result => result.kind === "ok" && result.reused).length, 7);
     const made = (await snapshot(parent.id)).invoices.filter(row => row.kind === "balance");
     assert.equal(made.length, 1); assert.equal(made[0].amount_cents, 80_000);
+    assert.ok(results.every(result => result.kind === "ok" && result.invoice.id === made[0].id));
     assert.equal((await events(parent.id)).filter(row => row.event_type === "balance_sent").length, 1);
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM payment_delivery_outbox o
+      JOIN job_events e ON e.id=o.job_event_id WHERE e.job_invoice_id=$1 AND e.event_type='balance_sent'`, [made[0].id])).rows[0].n, 1);
   });
   await check("balance sends through two paid deposits of one quote at the same moment still make one balance", async () => {
     for (let round = 0; round < 4; round++) {
       const parent = await profile(); const quote = await quoteFor(parent.id);
       const first = await paidDeposit(parent.id, quote.id, 20_000); const second = await paidDeposit(parent.id, quote.id, 10_000);
       const results = await Promise.all([first, second, first, second].map(deposit => one.createJobBalanceInvoiceForMerchant(deposit, a, false)));
-      assert.equal(results.filter(result => result.kind === "ok").length, 1);
-      assert.equal(results.filter(result => result.kind === "conflict" && result.reason === "exists").length, 3);
+      assert.equal(results.filter(result => result.kind === "ok" && !result.reused).length, 1);
+      assert.equal(results.filter(result => result.kind === "ok" && result.reused).length, 1);
+      assert.equal(results.filter(result => result.kind === "conflict" && result.reason === "exists").length, 2);
       const made = (await snapshot(parent.id)).invoices.filter(row => row.kind === "balance");
       assert.equal(made.length, 1); assert.equal(made[0].amount_cents, 70_000);
+      assert.ok(results.filter(result => result.kind === "ok").every(result => result.kind === "ok" && result.invoice.id === made[0].id));
+      assert.equal((await events(parent.id)).filter(row => row.event_type === "balance_sent").length, 1);
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM payment_delivery_outbox o
+        JOIN job_events e ON e.id=o.job_event_id WHERE e.job_invoice_id=$1 AND e.event_type='balance_sent'`, [made[0].id])).rows[0].n, 1);
     }
   });
   await check("eight creates for one client at the same moment each commit their own row token and history", async () => {

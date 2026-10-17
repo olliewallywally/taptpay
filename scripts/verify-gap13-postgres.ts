@@ -188,7 +188,10 @@ try {
     });
     await check("a verified inventory gives owners only where records or evidence prove it, and locks the rest", async () => {
       const verified = await draft(new Map([[doc, a], [late, b]]));
-      assert.deepEqual((await runner.runPendingMigrations(client, { ...quiet, uploadOwnershipInventory: verified })).appliedNow, [REPAIR]);
+      const expected = runner.listMigrationFiles().slice(runner.listMigrationFiles().indexOf(REPAIR));
+      assert.equal(expected[0], REPAIR);
+      assert.equal(expected.at(-1), "0049b_subscription_entitlements.sql", "review a new canonical migration boundary before advancing this verifier");
+      assert.deepEqual((await runner.runPendingMigrations(client, { ...quiet, uploadOwnershipInventory: verified })).appliedNow, expected);
       assert.deepEqual(await Promise.all([doc, late, s1, s2, s3, s4, `logos/merchant-${a}.png`].map(ownerOf)),
         [a, b, a, null, null, null, a]);
       const rows = new Map((await client.query("SELECT * FROM uploaded_file_ownership_evidence")).rows.map((r: any) => [r.file_id, r]));

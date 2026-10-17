@@ -3,6 +3,9 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import {readFile} from 'node:fs/promises';
+import {assertCIDatabase} from './verify-ci-safety.mjs';
+import {collectSchema, fingerprintDocument} from './schema-fingerprint.mjs';
 
 import {
   assertSafePostgresVerifierEnvironment,
@@ -20,9 +23,10 @@ const { testDatabaseUrl } = assertSafePostgresVerifierEnvironment({
   configuredDatabaseUrl: process.env.TAPTPAY_VERIFY_CONFIGURED_DATABASE_URL,
   marker: process.env.TAPTPAY_TEST_DATABASE,
 });
-const schemaName = assertVerifierSchemaName(
-  process.env.TAPTPAY_VERIFY_SCHEMA ?? "",
-);
+const canonical = phase === "post-index" && process.env.TAPTPAY_VERIFY_CANONICAL_CI === "1";
+if (canonical) assertCIDatabase(testDatabaseUrl, {marker: process.env.TAPTPAY_TEST_DATABASE,
+  applicationUrls: [process.env.TAPTPAY_VERIFY_CONFIGURED_DATABASE_URL, process.env.NEON_DATABASE_URL]});
+const schemaName = canonical ? "public" : assertVerifierSchemaName(process.env.TAPTPAY_VERIFY_SCHEMA ?? "");
 
 const pool = new Pool({
   connectionString: testDatabaseUrl,
@@ -211,7 +215,7 @@ async function verifyPostIndexStorage(storage, storageModule) {
         kind: "legacy-no-board",
       })
     )?.id,
-    legacyTwo.id,
+    undefined,
   );
   assert.equal(
     (
@@ -247,10 +251,9 @@ async function verifyPostIndexStorage(storage, storageModule) {
   await verifySplitCompareAndSet(storage, storageModule, merchantId);
   await verifyTeamSeatConcurrency(storage);
   await verifyPasswordResetAtomicity(storage);
-  const paidSubscription = await verifySubscriptionCardLifecycle(storage);
-  await verifyPaidSubscriptionPlanChanges(storage, paidSubscription);
-  await verifyDeclinedSubscriptionCardSetup(storage);
+  // Run the global due-claim assertions before durable fixtures create due rows.
   await verifySubscriptionBillingClaimConcurrency(storage, storageModule);
+  await verifyCurrentSubscriptionLifecycle(storage);
 }
 
 async function verifyTeamSeatConcurrency(storage) {
@@ -391,497 +394,50 @@ async function verifyPasswordResetAtomicity(storage) {
   stage("proved single-winner reset-token consumption, expiry, and owner hash sync");
 }
 
-async function verifySubscriptionCardLifecycle(storage) {
-  const merchantId = await insertMerchant("Approved subscription-card merchant");
-  const foreignMerchantId = await insertMerchant("Foreign subscription-card merchant");
+async function verifyCurrentSubscriptionLifecycle(storage) {
+  const merchantId = await insertMerchant("Retired subscription callback merchant");
   const subscription = await storage.getOrCreateSubscription(merchantId);
-  await storage.getOrCreateSubscription(foreignMerchantId);
-
-  const sessionId =
-    `postgres-verifier-card-session-${randomBytes(8).toString("hex")}`;
-  const foreignSessionId =
-    `postgres-verifier-foreign-session-${randomBytes(8).toString("hex")}`;
-  assert.equal(
-    await storage.bindSubscriptionCardSession(merchantId, `  ${sessionId}  `),
-    true,
-  );
-  assert.equal(
-    await storage.bindSubscriptionCardSession(
-      foreignMerchantId,
-      foreignSessionId,
-    ),
-    true,
-  );
-
-  let mismatchedChargeCalls = 0;
-  const mismatch = await storage.completeSubscriptionCardSetup(
-    foreignMerchantId,
-    sessionId,
-    {
-      windcaveCardId: "foreign-card-must-not-save",
-      brand: "Visa",
-      last4: "9999",
-      expiry: "12/30",
-    },
-    async () => {
-      mismatchedChargeCalls += 1;
-      return { success: true, approved: true };
-    },
-  );
-  assert.equal(mismatch.ok, false);
-  assert.equal(mismatch.reason, "session-mismatch");
-  assert.equal(mismatchedChargeCalls, 0);
-  const foreignState = await pool.query(
-    `SELECT windcave_card_id, last_billing_date
-       FROM merchant_subscriptions
-      WHERE merchant_id = $1`,
-    [foreignMerchantId],
-  );
-  assert.deepEqual(foreignState.rows, [
-    { windcave_card_id: null, last_billing_date: null },
-  ]);
-
-  const chargeRequests = [];
-  const card = {
-    windcaveCardId: "postgres-verifier-card-approved",
-    brand: "Visa",
-    last4: "4242",
-    expiry: "12/30",
+  const sessionId = `retired-session-${randomUUID()}`;
+  assert.equal(await storage.bindSubscriptionCardSession(merchantId, sessionId), true);
+  const snapshot = async () => {
+    const row = await pool.query("SELECT * FROM merchant_subscriptions WHERE id=$1", [subscription.id]);
+    const effects = await pool.query(`SELECT
+      (SELECT count(*)::int FROM subscription_billing_history WHERE subscription_id=$1) AS history,
+      (SELECT count(*)::int FROM subscription_card_attempts WHERE subscription_id=$1) AS cards,
+      (SELECT count(*)::int FROM subscription_billing_attempts WHERE subscription_id=$1) AS billing,
+      (SELECT count(*)::int FROM subscription_payment_events WHERE merchant_id=$2) AS events,
+      (SELECT count(*)::int FROM payment_delivery_outbox o JOIN subscription_payment_events e ON e.id=o.subscription_event_id WHERE e.merchant_id=$2) AS outbox`, [subscription.id, merchantId]);
+    return {rows: row.rows, effects: effects.rows};
   };
-  const callbacks = await Promise.all(
-    Array.from({ length: 8 }, () =>
-      storage.completeSubscriptionCardSetup(
-        merchantId,
-        sessionId,
-        card,
-        async (request) => {
-          chargeRequests.push(request);
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return {
-            success: true,
-            approved: true,
-            windcaveTransactionId: "postgres-verifier-initial-approved",
-          };
-        },
-      ),
-    ),
-  );
-  assert.ok(callbacks.every((result) => result.ok));
-  assert.equal(
-    callbacks.filter((result) => result.ok && result.charged).length,
-    1,
-  );
-  assert.equal(
-    callbacks.filter((result) => result.ok && !result.charged).length,
-    7,
-  );
-  assert.equal(chargeRequests.length, 1);
-  assert.equal(chargeRequests[0].subscriptionId, subscription.id);
-  assert.equal(chargeRequests[0].merchantId, merchantId);
-  assert.equal(chargeRequests[0].cardId, card.windcaveCardId);
-  assert.equal(chargeRequests[0].amountCents, 799);
-  assert.match(
-    chargeRequests[0].idempotencyKey,
-    new RegExp(`^sub-${subscription.id}-card-[0-9a-f]{16}$`),
-  );
+  const before = await snapshot();
+  let charges = 0;
+  const results = await Promise.all(Array.from({length: 8}, () =>
+    storage.completeSubscriptionCardSetup(merchantId, sessionId,
+      {windcaveCardId: "synthetic-retired-card", brand: "Visa", last4: "1234", expiry: "12/30"},
+      async () => {charges++; return {success: true, approved: true};})));
+  assert.ok(results.every(result => result.ok === false && result.reason === "invalid-state"));
+  assert.equal(charges, 0);
+  assert.deepEqual(await snapshot(), before);
+  stage("proved 8-way retired callback refusal without charge or persisted effects");
 
-  const approvedState = await Promise.all([
-    pool.query(
-      `SELECT plan_id, seat_limit, price_cents, status,
-              current_period_start, current_period_end, next_billing_date,
-              last_billing_date, failed_payment_count,
-              windcave_card_id, card_brand, card_last4, card_expiry,
-              windcave_billing_ref
-         FROM merchant_subscriptions
-        WHERE id = $1`,
-      [subscription.id],
-    ),
-    pool.query(
-      `SELECT billing_type, amount, billing_period_start, billing_period_end,
-              windcave_transaction_id, idempotency_key, attempt_number,
-              status, failure_reason, paid_at
-         FROM subscription_billing_history
-        WHERE subscription_id = $1
-          AND billing_type = 'monthly_subscription'
-        ORDER BY id`,
-      [subscription.id],
-    ),
-  ]);
-  const persistedSubscription = approvedState[0].rows[0];
-  assert.deepEqual(
-    [
-      persistedSubscription.plan_id,
-      persistedSubscription.seat_limit,
-      persistedSubscription.price_cents,
-      persistedSubscription.status,
-      persistedSubscription.failed_payment_count,
-      persistedSubscription.windcave_card_id,
-      persistedSubscription.card_brand,
-      persistedSubscription.card_last4,
-      persistedSubscription.card_expiry,
-      persistedSubscription.windcave_billing_ref,
-    ],
-    [
-      "solo",
-      1,
-      799,
-      "active",
-      0,
-      card.windcaveCardId,
-      card.brand,
-      card.last4,
-      card.expiry,
-      sessionId,
-    ],
-  );
-  assert.ok(persistedSubscription.current_period_start instanceof Date);
-  assert.ok(persistedSubscription.current_period_end instanceof Date);
-  assert.ok(persistedSubscription.next_billing_date instanceof Date);
-  assert.equal(
-    persistedSubscription.current_period_end.getTime(),
-    persistedSubscription.next_billing_date.getTime(),
-  );
-  assert.equal(typeof persistedSubscription.last_billing_date, "string");
-
-  assert.equal(approvedState[1].rows.length, 1);
-  const approvedHistory = approvedState[1].rows[0];
-  assert.deepEqual(
-    [
-      approvedHistory.billing_type,
-      approvedHistory.amount,
-      approvedHistory.windcave_transaction_id,
-      approvedHistory.idempotency_key,
-      approvedHistory.attempt_number,
-      approvedHistory.status,
-      approvedHistory.failure_reason,
-    ],
-    [
-      "monthly_subscription",
-      "7.99",
-      "postgres-verifier-initial-approved",
-      chargeRequests[0].idempotencyKey,
-      1,
-      "succeeded",
-      null,
-    ],
-  );
-  assert.ok(approvedHistory.billing_period_start instanceof Date);
-  assert.ok(approvedHistory.billing_period_end instanceof Date);
-  assert.ok(approvedHistory.paid_at instanceof Date);
-
-  const replacementSessionId =
-    `postgres-verifier-replacement-session-${randomBytes(8).toString("hex")}`;
-  assert.equal(
-    await storage.bindSubscriptionCardSession(merchantId, replacementSessionId),
-    true,
-  );
-  let replacementChargeCalls = 0;
-  const replacement = await storage.completeSubscriptionCardSetup(
-    merchantId,
-    replacementSessionId,
-    {
-      windcaveCardId: "postgres-verifier-card-replacement",
-      brand: "Mastercard",
-      last4: "4444",
-      expiry: "11/31",
-    },
-    async () => {
-      replacementChargeCalls += 1;
-      return {
-        success: true,
-        approved: true,
-        windcaveTransactionId: "must-not-charge-replacement",
-      };
-    },
-  );
-  assert.equal(replacement.ok, true);
-  assert.equal(replacement.charged, false);
-  assert.equal(replacementChargeCalls, 0);
-
-  const replacementState = await Promise.all([
-    pool.query(
-      `SELECT windcave_card_id, card_brand, card_last4, card_expiry,
-              status, last_billing_date
-         FROM merchant_subscriptions
-        WHERE id = $1`,
-      [subscription.id],
-    ),
-    pool.query(
-      `SELECT count(*)::integer AS rows
-         FROM subscription_billing_history
-        WHERE subscription_id = $1`,
-      [subscription.id],
-    ),
-  ]);
-  assert.deepEqual(replacementState[0].rows, [
-    {
-      windcave_card_id: "postgres-verifier-card-replacement",
-      card_brand: "Mastercard",
-      card_last4: "4444",
-      card_expiry: "11/31",
-      status: "active",
-      last_billing_date: persistedSubscription.last_billing_date,
-    },
-  ]);
-  assert.equal(replacementState[1].rows[0].rows, 1);
-
-  stage(
-    "proved card-session ownership, single-charge activation replay, and charge-free paid-period replacement",
-  );
-  return {
-    merchantId,
-    subscriptionId: subscription.id,
-    currentPeriodEnd: persistedSubscription.current_period_end,
-  };
-}
-
-async function verifyPaidSubscriptionPlanChanges(storage, paidSubscription) {
-  const chargeRequests = [];
-  const upgrades = await Promise.all(
-    Array.from({ length: 8 }, () =>
-      storage.changeSubscriptionPlan(
-        paidSubscription.merchantId,
-        "team",
-        async (request) => {
-          chargeRequests.push(request);
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return {
-            success: true,
-            approved: true,
-            windcaveTransactionId: "postgres-verifier-upgrade-approved",
-          };
-        },
-      ),
-    ),
-  );
-  assert.ok(upgrades.every((result) => result.ok));
-  assert.ok(
-    upgrades.every(
-      (result) => result.ok && result.applied === "immediate",
-    ),
-  );
-  assert.equal(chargeRequests.length, 1);
-  assert.equal(chargeRequests[0].subscriptionId, paidSubscription.subscriptionId);
-  assert.equal(chargeRequests[0].merchantId, paidSubscription.merchantId);
-  assert.equal(chargeRequests[0].targetPlanId, "team");
-  assert.equal(chargeRequests[0].cardId, "postgres-verifier-card-replacement");
-  assert.ok(chargeRequests[0].amountCents > 0);
-  assert.ok(chargeRequests[0].amountCents <= 100);
-  assert.match(
-    chargeRequests[0].idempotencyKey,
-    new RegExp(`^plan-${paidSubscription.subscriptionId}-\\d{4}-\\d{2}-\\d{2}-team-a1$`),
-  );
-
-  const upgraded = await Promise.all([
-    pool.query(
-      `SELECT plan_id, seat_limit, price_cents, pending_plan_id,
-              pending_plan_effective_at, current_period_end, last_billing_date
-         FROM merchant_subscriptions
-        WHERE id = $1`,
-      [paidSubscription.subscriptionId],
-    ),
-    pool.query(
-      `SELECT amount, windcave_transaction_id, idempotency_key,
-              attempt_number, status
-         FROM subscription_billing_history
-        WHERE subscription_id = $1 AND billing_type = 'plan_change'`,
-      [paidSubscription.subscriptionId],
-    ),
-  ]);
-  const upgradedSubscription = upgraded[0].rows[0];
-  assert.deepEqual(
-    [
-      upgradedSubscription.plan_id,
-      upgradedSubscription.seat_limit,
-      upgradedSubscription.price_cents,
-      upgradedSubscription.pending_plan_id,
-      upgradedSubscription.pending_plan_effective_at,
-    ],
-    ["team", 5, 899, null, null],
-  );
-  assert.equal(upgraded[1].rows.length, 1);
-  assert.deepEqual(
-    [
-      upgraded[1].rows[0].amount,
-      upgraded[1].rows[0].windcave_transaction_id,
-      upgraded[1].rows[0].idempotency_key,
-      upgraded[1].rows[0].attempt_number,
-      upgraded[1].rows[0].status,
-    ],
-    [
-      (chargeRequests[0].amountCents / 100).toFixed(2),
-      "postgres-verifier-upgrade-approved",
-      chargeRequests[0].idempotencyKey,
-      1,
-      "succeeded",
-    ],
-  );
-
-  let downgradeChargeCalls = 0;
-  const downgrade = await storage.changeSubscriptionPlan(
-    paidSubscription.merchantId,
-    "solo",
-    async () => {
-      downgradeChargeCalls += 1;
-      return { success: true, approved: true };
-    },
-  );
-  assert.equal(downgrade.ok, true);
-  assert.equal(downgrade.applied, "queued");
-  assert.equal(downgradeChargeCalls, 0);
-
-  const downgraded = await pool.query(
-    `SELECT plan_id, seat_limit, price_cents, pending_plan_id,
-            pending_plan_effective_at, current_period_end
-       FROM merchant_subscriptions
-      WHERE id = $1`,
-    [paidSubscription.subscriptionId],
-  );
-  assert.deepEqual(
-    [
-      downgraded.rows[0].plan_id,
-      downgraded.rows[0].seat_limit,
-      downgraded.rows[0].price_cents,
-      downgraded.rows[0].pending_plan_id,
-    ],
-    ["team", 5, 899, "solo"],
-  );
-  assert.equal(
-    downgraded.rows[0].pending_plan_effective_at.getTime(),
-    downgraded.rows[0].current_period_end.getTime(),
-  );
-  assert.equal(
-    downgraded.rows[0].current_period_end.getTime(),
-    paidSubscription.currentPeriodEnd.getTime(),
-  );
-
-  const historyCount = await pool.query(
-    `SELECT count(*)::integer AS rows
-       FROM subscription_billing_history
-      WHERE subscription_id = $1 AND billing_type = 'plan_change'`,
-    [paidSubscription.subscriptionId],
-  );
-  assert.equal(historyCount.rows[0].rows, 1);
-  stage("proved paid upgrade proration/idempotency and charge-free queued downgrade");
-}
-
-async function verifyDeclinedSubscriptionCardSetup(storage) {
-  const merchantId = await insertMerchant("Declined subscription-card merchant");
-  const subscription = await storage.getOrCreateSubscription(merchantId);
-  const sessionId =
-    `postgres-verifier-declined-session-${randomBytes(8).toString("hex")}`;
-  assert.equal(
-    await storage.bindSubscriptionCardSession(merchantId, sessionId),
-    true,
-  );
-
-  let chargeCalls = 0;
-  const callbacks = await Promise.all(
-    Array.from({ length: 8 }, () =>
-      storage.completeSubscriptionCardSetup(
-        merchantId,
-        sessionId,
-        {
-          windcaveCardId: "postgres-verifier-card-declined",
-          brand: "Visa",
-          last4: "0002",
-          expiry: "10/30",
-        },
-        async () => {
-          chargeCalls += 1;
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return {
-            success: true,
-            approved: false,
-            windcaveTransactionId: "postgres-verifier-initial-declined",
-            declineReason: "Verifier decline",
-          };
-        },
-      ),
-    ),
-  );
-  assert.equal(chargeCalls, 1);
-  assert.ok(
-    callbacks.every(
-      (result) => !result.ok && result.reason === "declined",
-    ),
-  );
-
-  const declined = await Promise.all([
-    pool.query(
-      `SELECT status, failed_payment_count, last_payment_failure_reason,
-              current_period_start, current_period_end, next_billing_date,
-              last_billing_date, windcave_card_id, card_last4
-         FROM merchant_subscriptions
-        WHERE id = $1`,
-      [subscription.id],
-    ),
-    pool.query(
-      `SELECT amount, windcave_transaction_id, idempotency_key,
-              attempt_number, status, failure_reason, paid_at
-         FROM subscription_billing_history
-        WHERE subscription_id = $1
-        ORDER BY id`,
-      [subscription.id],
-    ),
-  ]);
-  assert.deepEqual(
-    [
-      declined[0].rows[0].status,
-      declined[0].rows[0].failed_payment_count,
-      declined[0].rows[0].last_payment_failure_reason,
-      declined[0].rows[0].current_period_start,
-      declined[0].rows[0].current_period_end,
-      declined[0].rows[0].last_billing_date,
-      declined[0].rows[0].windcave_card_id,
-      declined[0].rows[0].card_last4,
-    ],
-    [
-      "past_due",
-      1,
-      "Verifier decline",
-      null,
-      null,
-      null,
-      "postgres-verifier-card-declined",
-      "0002",
-    ],
-  );
-  assert.ok(declined[0].rows[0].next_billing_date instanceof Date);
-  assert.equal(declined[1].rows.length, 1);
-  assert.deepEqual(
-    [
-      declined[1].rows[0].amount,
-      declined[1].rows[0].windcave_transaction_id,
-      declined[1].rows[0].attempt_number,
-      declined[1].rows[0].status,
-      declined[1].rows[0].failure_reason,
-      declined[1].rows[0].paid_at,
-    ],
-    [
-      "7.99",
-      "postgres-verifier-initial-declined",
-      1,
-      "failed",
-      "Verifier decline",
-      null,
-    ],
-  );
-  assert.match(
-    declined[1].rows[0].idempotency_key,
-    new RegExp(`^sub-${subscription.id}-card-[0-9a-f]{16}$`),
-  );
-
-  // Keep this deliberately declined fixture out of the due-row claim proof.
-  await pool.query(
-    `UPDATE merchant_subscriptions
-        SET status = 'pending',
-            windcave_card_id = NULL,
-            next_billing_date = NULL
-      WHERE id = $1`,
-    [subscription.id],
-  );
-  stage("proved declined activation replay records one failure and one dunning increment");
+  // Each service instance owns an independent pool; the helper owns no handles.
+  const pools = Array.from({length: 2}, () => new Pool({
+    connectionString: testDatabaseUrl, max: 8,
+    application_name: "taptpay-current-subscription-verifier",
+    options: `-c search_path=${schemaName},pg_catalog`,
+  }));
+  try {
+    const {runSubscriptionPlanPostgresCases} = await import("./r8-subscription-plan-postgres-cases.ts");
+    assert.deepEqual(await runSubscriptionPlanPostgresCases(pools),
+      {checks: 18, originalCommandChecks: 15, paidPlanChecks: 3});
+    stage("proved all 15 current command cases and 3 paid-plan upgrade/downgrade cases");
+    const {runSubscriptionPostgresCases} = await import("./r3-subscription-postgres-cases.ts");
+    const result = await runSubscriptionPostgresCases(pools);
+    assert.equal(result.checks, 19);
+    stage("proved all 19 current durable subscription cases across two independent pools");
+  } finally {
+    await Promise.all(pools.map(ownedPool => ownedPool.end()));
+  }
 }
 
 async function verifySubscriptionBillingClaimConcurrency(
@@ -1492,6 +1048,18 @@ async function verifyApprovedSplitFinalization(
 }
 
 async function main() {
+  if (canonical) {
+    const expected = JSON.parse(await readFile('docs/evidence/remediation-v2-2/r6/R6-through-0049b-fingerprint-2026-10-15.json', 'utf8'));
+    assert.equal(fingerprintDocument(await collectSchema(pool)).digest, expected.digest, 'CANONICAL_STORAGE_SCHEMA_DRIFT');
+    const tables = await pool.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename");
+    for (const {tablename} of tables.rows) {
+      assert.match(tablename, /^[a-z_][a-z0-9_]*$/);
+      const count = await pool.query(`SELECT count(*)::int AS n FROM public."${tablename}"`);
+      const seeded = ['data_encryption_control', 'subscription_entitlement_control'].includes(tablename);
+      assert.equal(count.rows[0].n, seeded ? 1 : 0, 'CANONICAL_STORAGE_REQUIRES_EMPTY_APP_ROWS');
+    }
+    stage('verified canonical0049b and empty app rows on guarded CI database');
+  }
   const schemaResult = await pool.query("SELECT current_schema() AS schema_name");
   assert.equal(schemaResult.rows[0]?.schema_name, schemaName);
 

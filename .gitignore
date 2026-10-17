@@ -28,3 +28,6 @@ playwright-report
 /traces/
 /logs/
 /provider-fixtures/live/
+
+# Retired local bearer-token browser probe; use isolated CI verifiers.
+/.verify1.mjs

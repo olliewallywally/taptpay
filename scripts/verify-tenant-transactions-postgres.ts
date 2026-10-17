@@ -61,6 +61,12 @@ try {
   const a = await addMerchant("s2-tenant-a");
   const b = await addMerchant("s2-tenant-b");
   const sale = (merchantId: number, status = "pending") => one.createTransaction({ merchantId, itemName: "Synthetic sale", price: "10.00", status } as any);
+  const cancellations = async (id: number) => (await pool.query(`
+    SELECT (SELECT count(*)::int FROM transaction_events
+      WHERE transaction_id=$1 AND event_type='Transaction_Cancelled') AS events,
+      (SELECT count(*)::int FROM payment_delivery_outbox o
+      JOIN transaction_events e ON e.id=o.transaction_event_id
+      WHERE e.transaction_id=$1 AND e.event_type='Transaction_Cancelled') AS outbox`, [id])).rows[0];
 
   await check("scoped transaction reads refuse the other tenant and missing rows", async () => {
     const row = await sale(b);
@@ -89,10 +95,14 @@ try {
   for (const status of ["pending", "processing", "completed", "cancelled", "failed", "refunded", "partially_refunded"]) {
     await check(`cancellation preserves the ${status} state rule and financial fields`, async () => {
       const row = await sale(a, status);
-      const allowed = status === "pending" || status === "processing";
+      // R3 permits cancelling an uncaptured failed sale and reuses cancellation.
+      const allowed = ["pending", "processing", "failed"].includes(status);
       const result = await two.cancelTransactionForMerchant(row.id, a);
-      assert.deepEqual(result, allowed ? { kind: "cancelled", transaction: { ...row, status: "cancelled" } } : { kind: "conflict", status });
+      assert.deepEqual(result, allowed ? { kind: "cancelled", transaction: { ...row, status: "cancelled" } }
+        : status === "cancelled" ? { kind: "cancelled", transaction: row, reused: true }
+        : { kind: "conflict", status });
       assert.deepEqual(await one.getTransaction(row.id), allowed ? { ...row, status: "cancelled" } : row);
+      assert.deepEqual(await cancellations(row.id), {events: allowed ? 1 : 0, outbox: allowed ? 1 : 0});
     });
   }
   await check("invalid tenants issue no query or mutation", async () => {
@@ -250,11 +260,16 @@ try {
       }
     });
   }
-  await check("two simultaneous cancellations produce one success", async () => {
+  await check("two simultaneous cancellations reuse one mutation, audit and outbox", async () => {
     const row = await sale(a);
     const results = await Promise.all([one.cancelTransactionForMerchant(row.id, a), two.cancelTransactionForMerchant(row.id, a)]);
-    assert.equal(results.filter(result => result.kind === "cancelled").length, 1);
-    assert.deepEqual(results.find(result => result.kind === "conflict"), { kind: "conflict", status: "cancelled" });
+    assert.equal(results.filter(result => result.kind === "cancelled" && !result.reused).length, 1);
+    assert.equal(results.filter(result => result.kind === "cancelled" && result.reused).length, 1);
+    for (const result of results) {
+      assert.equal(result.kind, "cancelled");
+      if (result.kind === "cancelled") assert.deepEqual(result.transaction, { ...row, status: "cancelled" });
+    }
+    assert.deepEqual(await cancellations(row.id), {events: 1, outbox: 1});
     assert.deepEqual(await one.getTransaction(row.id), { ...row, status: "cancelled" });
   });
 } finally { await Promise.all([pool.end(), writerPool.end()]); }

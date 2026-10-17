@@ -1,5 +1,18 @@
 # Claude repository handoff
 
+**R8 groups C–G, expanded CI and scoped hygiene are locally verified on
+`remediation/r8-ci-20261016`.** Read `docs/HANDOFF-2026-10-17-r8-closeout.md`
+first, then its final/independent reviews and frozen source/verification records.
+Final6772 tests,328 browser cells+4 map proofs,13 static/48 tooling checks,
+25 complete owned PG stages and198-file native parity pass. Production audit0;
+full graph39 high ratings from one unpatched development braces advisory remains
+blocked. History121 unresolved occurrences/55 review triples, email choice/real
+delivery,558 staged lint findings, asset clearance and real release gates remain.
+This is a verified repository patch, not R8 completion, merge or deployment.
+Claude retains R4. Preserve all owner decisions, existing processes/dependencies,
+frozen SQL, matched native versions, D10 feed-under-dock and locked D13.
+
+
 **R8 dependency follow-up is verified on `remediation/r8-ci-20261016`.**
 Code85e38c22 moves38 proven tooling/type/native-build declarations to development,
 patches compression/multer/ws, and bounds both real single-file upload parsers.

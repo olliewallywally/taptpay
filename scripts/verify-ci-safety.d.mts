@@ -1,6 +1,7 @@
 export type Stage = {name: string; status: 'pass' | 'fail'; exitCode: number};
 export function assertNode22(version?: string): void;
 export function assertCIDatabase(raw: string, options?: {marker?: string; applicationUrls?: (string | undefined)[]}): {url: URL; database: string};
+export function assertCIStorageDatabase(raw: string, options?: {marker?: string; applicationUrls?: (string | undefined)[]}): {url: URL; database: string};
 export function assertJestReport(report: unknown): void;
 export function sanitizedStages(stages: Stage[]): Stage[];
 export function writeCIReport(directory: string, stages: Stage[]): Promise<void>;

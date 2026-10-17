@@ -7,7 +7,7 @@
  */
 
 // Dynamic imports to test JSX syntax - syntax errors will cause import failures
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationProvider } from '@/components/notification-system';
 import { TooltipProvider } from '@/components/ui/tooltip';

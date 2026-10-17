@@ -1,0 +1,333 @@
+{
+  "version": 1,
+  "dateUTC": "2026-10-17",
+  "branch": "remediation/r8-ci-20261016",
+  "baseCommit": "87ee93e83b9ce0a1e231d61518e4ecbcd2cbe75e",
+  "sourceManifest": "R8-CLOSEOUT-SOURCE-MANIFEST-2026-10-17.json",
+  "sourceManifestSHA256": "4728470c8c15aa2aa73161ac95d3f98331c6ce47693b89f2deb788bb999b1201",
+  "lockSHA256": "d8f43cb1aa9dc93e7956d420e45e32ac9b41f69d1181fbf4f223ef586db01c5e",
+  "scope": "Reviewed local repository patch acceptance. Full CI, R8 phase exit and deployment remain blocked by the separately reported audit/history and owner/release gates.",
+  "localEngineering": {
+    "status": "pass",
+    "static": {
+      "version": 1,
+      "stages": [
+        {
+          "name": "typecheck",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "typecheck-r5",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "typecheck-r6",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "typecheck-r8",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "package-contracts",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "css-config-contracts",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "portable-scripts",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tool-contracts",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "backup-safety",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "fingerprint-safety",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "r5-cli",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "r6-cli",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "r7-artifact-safety",
+          "status": "pass",
+          "exitCode": 0
+        }
+      ]
+    },
+    "toolingTests": 48,
+    "unit": {
+      "clientTests": 1507,
+      "serverTests": 5265,
+      "totalTests": 6772,
+      "suites": 375,
+      "failed": 0,
+      "skipped": 0,
+      "openHandles": 0
+    },
+    "browser": {
+      "contexts": [
+        "phone",
+        "tablet",
+        "desktop",
+        "desktop-short"
+      ],
+      "existingCells": 328,
+      "additionalMapProofs": 4,
+      "failed": 0,
+      "actualOffMachineTraffic": 0,
+      "physicalDeviceEvidence": false
+    },
+    "postgres": {
+      "version": 1,
+      "mode": "all",
+      "stages": [
+        {
+          "name": "canonical-0049b-repeat",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "google-sessions",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "split-sessions",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "admin-delete",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "push-sessions",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "apple-identities",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "apple-connect",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "r2-t4-expected-values",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "r2-t7-processor-x-id",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-transactions",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-stock-board",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-merchant-settings",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-stragglers",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-property-profiles",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-property-invoices",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-property-invoice-send",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-property-schedules",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-trades-clients",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-trades-create",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-trades-invoices",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "tenant-trades-schedules",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "uploaded-file-scans",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "upload-lifecycle",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "upload-ownership",
+          "status": "pass",
+          "exitCode": 0
+        },
+        {
+          "name": "server-storage",
+          "status": "pass",
+          "exitCode": 0
+        }
+      ]
+    },
+    "postgresStorageCases": {
+      "durableSubscriptionCases": 19,
+      "originalCommandCases": 15,
+      "addedPaidPlanCases": 3,
+      "retiredCallbackRefusalConcurrency": 8,
+      "legacyBillingClaimProofRetained": true,
+      "ownedDatabasesRemaining": 0,
+      "canonicalThrough": "0049b",
+      "realRestoreEvidence": false
+    },
+    "buildStageCount": 5,
+    "productionEntry": "Actual npm start reaches expected missing-DATABASE_URL refusal with zero socket attempts; static HTML/JS serving passes. Full configured production boot is not claimed.",
+    "development": "Normal and Replit actual middleware/shutdown plus cross-env/tsx watch restart pass. Windows execution is unrun.",
+    "native": {
+      "files": 198,
+      "parity": "pass",
+      "matchedVersion": "8.4.3",
+      "xcodeOrPhysicalDeviceEvidence": false
+    },
+    "lint": {
+      "status": "zero-new-pass",
+      "beforeActualErrors": 680,
+      "actualErrorsFixed": 122,
+      "remainingErrors": 558,
+      "oldBaselineRows": 698,
+      "retiredBaselineRows": 140,
+      "newBaselineRows": 558,
+      "newErrors": 0,
+      "fullLintClean": false
+    },
+    "npmTreeProblems": []
+  },
+  "releaseGates": {
+    "fullDependencyAudit": {
+      "version": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 39,
+        "critical": 0,
+        "total": 39
+      },
+      "advisories": [
+        "GHSA-vfj7-8cjw-p6xm"
+      ],
+      "status": "fail",
+      "underlyingAdvisories": 1,
+      "fixAvailable": false,
+      "scope": "Unpatched braces development/test/build graph; production filtering is not a waiver."
+    },
+    "productionDependencyAudit": {
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "status": "pass"
+    },
+    "currentTreeSecrets": {
+      "status": "clean",
+      "findings": 0,
+      "scanner": "gitleaks8.30.1",
+      "scannerOrDispositionsRelaxed": false
+    },
+    "historySecrets": {
+      "status": "review-required",
+      "findings": 2327,
+      "dispositioned": 2206,
+      "unresolvedOccurrences": 121,
+      "distinctUnresolvedReviewTriples": 55,
+      "candidateNotConfirmedLiveCredentialCount": true,
+      "availableRefScope": "See metadata-only owner worklist; no rotation inferred from differences in available refs."
+    },
+    "ownerEmailChoiceAndRealDelivery": "pending",
+    "stagedLintBurn": "558 remaining actual errors; zero-new gate enforced",
+    "assetContentProvenanceAndLicense": "pending; metadata-only classification is not clearance",
+    "realTargetProviderDeviceLegalOperationsAndRelease": "pending; see operations closeout checklist"
+  },
+  "regressionEvidence": {
+    "file": "R8-FINAL-REGRESSION-2026-10-17.json",
+    "sha256": "df00ec21211d77a5b3a41e9f82b781c7df252fccfebcd0510e982413c0114919"
+  },
+  "independentReview": {
+    "file": "R8-INDEPENDENT-CLOSEOUT-REVIEW-2026-10-17.md",
+    "paidPlanCoverageFinding": "fixed, separately reviewed and actual partial/full PostgreSQL verified"
+  },
+  "limitations": [
+    "Local results are not hosted CI or branch-protection activation.",
+    "Synthetic PostgreSQL/provider/mail/browser evidence does not replace actual restore, locks, delivery, UAT, Xcode or Safari/VoiceOver.",
+    "No owner authorization, credential disposition, deployment or feature activation is inferred."
+  ],
+  "phaseExitApproved": false,
+  "deploymentApproved": false
+}

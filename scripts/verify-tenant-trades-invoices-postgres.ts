@@ -191,14 +191,20 @@ try {
       assert.deepEqual(await snapshot(id, parent.id), before);
     }
   });
-  await check("a repeated void and a repeated completion each record a new time and another history line", async () => {
+  await check("a repeated void reuses its result while completion retains its history behavior", async () => {
     const parent = await profile(); const voidId = await make(parent.id); const doneId = await make(parent.id, "paid");
     for (const [action, id, column, eventType] of [["void", voidId, "voided_at", "invoice_voided"], ["complete", doneId, "completed_at", "job_completed"]] as const) {
       assert.equal((await mutate(one, action, id)).kind, "ok"); const first = (await rawInvoice(id))[column];
+      const firstSnapshot = await snapshot(id, parent.id);
       await new Promise(resolve => setTimeout(resolve, 5));
       assert.equal((await mutate(one, action, id)).kind, "ok"); const second = (await rawInvoice(id))[column];
-      assert.ok(second.getTime() > first.getTime());
-      assert.equal((await events(parent.id)).filter(row => row.job_invoice_id === id && row.event_type === eventType).length, 2);
+      if (action === "void") {
+        assert.equal(second.getTime(), first.getTime());
+        assert.deepEqual(await snapshot(id, parent.id), firstSnapshot);
+        assert.equal((await pool.query(`SELECT count(*)::int AS n FROM payment_delivery_outbox o
+          JOIN job_events e ON e.id=o.job_event_id WHERE e.job_invoice_id=$1 AND e.event_type='invoice_voided'`, [id])).rows[0].n, 1);
+      } else assert.ok(second.getTime() > first.getTime());
+      assert.equal((await events(parent.id)).filter(row => row.job_invoice_id === id && row.event_type === eventType).length, action === "void" ? 1 : 2);
     }
   });
   await check("history failures roll back every state change and the receipt line", async () => {

@@ -9,10 +9,7 @@ import {
   ReportPage, SectionTitle, KpiRow, DataTable, Money, StatusText,
   type Column, type MerchantHeader,
 } from "../components";
-import {
-  fmtNZD, fmtDate, fmtDateTime, dateRangeLabel, dollarsToCents, calcGST,
-  inRange, sumCents, ratePct, fmtPct, buildCSV,
-} from "../../report-utils";
+import { fmtNZD, fmtDate, fmtDateTime, dateRangeLabel, dollarsToCents, calcGST, inRange, sumCents, buildCSV } from "../../report-utils";
 import { savePdf, downloadCsv } from "../savePdf";
 import type { ReportFormat, DateRange } from "./types";
 
