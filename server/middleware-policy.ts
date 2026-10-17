@@ -120,6 +120,7 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
     },
   ],
   "server/routes.ts": [],
+  "server/domains/stock/routes.ts": [], // Same guarded app; routes only.
   "server/index.ts": [
     {
       path: null,

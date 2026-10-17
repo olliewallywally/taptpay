@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "dateUTC": "2026-10-17",
+  "baseCommit": "d4803d62f9acb2338afb1a04566b2903fe518ba2",
+  "scope": "S2 four-route stock extraction, supporting source/generation gates, tests and reviewed generated policy metadata. Documentation/reviews and this manifest are excluded to avoid self-reference. The maintained generated source-location table is separately hashed.",
+  "files": [
+    {
+      "file": "scripts/generate-route-policy.ts",
+      "sha256": "a3149abe524ac0c9f309986308687987530a91afeff4170de723794752c2b808"
+    },
+    {
+      "file": "server/__tests__/route-facts-modules.test.ts",
+      "sha256": "2c928c8ccefb30aab1f59c3163802882b2efd82ba69111fcfe6a83562d41fa26"
+    },
+    {
+      "file": "server/__tests__/route-policy-boundaries.test.ts",
+      "sha256": "4d3c448961f45d3ec3ff19d6b0adb55604a608817b77627a0997490b66633ae7"
+    },
+    {
+      "file": "server/__tests__/stock-route-contract.test.ts",
+      "sha256": "22ff563368a0cb062ac9c67badd8c255aec74f380ae75546d433ff80e6a37bbe"
+    },
+    {
+      "file": "server/domains/stock/contracts.ts",
+      "sha256": "e6c088088875c91817d7522a3b88129c17452dbe567fa20c7ae028f0c2dd3c9a"
+    },
+    {
+      "file": "server/domains/stock/routes.ts",
+      "sha256": "373bf20685804a1e8473b7ce5662ae214189bb78c7c92df112f99258e25e3f0f"
+    },
+    {
+      "file": "server/middleware-policy.ts",
+      "sha256": "9a646e080b3d90393a7efaf848f5cbbb8e67149a2f40dcd87c0e9bdec6405224"
+    },
+    {
+      "file": "server/route-composition-manifest.ts",
+      "sha256": "6de8a24172a2afb4eb85ccdda3045687f38cfa0b9593c87a8691e46c8fe7ca73"
+    },
+    {
+      "file": "server/route-inventory.ts",
+      "sha256": "b12c957e731292a44c2f3cf29f367032529a0580976d26d0742bd37fd713273f"
+    },
+    {
+      "file": "server/route-policy.ts",
+      "sha256": "866319bc84bbe30ee37d6727ad2209ebd4a105538aa64c8f0e06ce6cd387b119"
+    },
+    {
+      "file": "server/routes.ts",
+      "sha256": "dbbc7075d98387304f3bde8cff1959c5a172c246a7e8ac2880bda4c2949577d2"
+    }
+  ],
+  "deleted": [],
+  "generatedDocumentation": [
+    {
+      "file": "docs/evidence/remediation-v2-2/r1/R1-T2-route-inventory-table.md",
+      "sha256": "12a4e4820e8aff19c6b43a28f89d1d4d44c5773d133eb8c0334348a3793a025a"
+    }
+  ],
+  "unchangedInputs": [
+    {
+      "file": "package.json",
+      "sha256": "51d90a90e2778481c95a3f36575e2dcd86e35d0910e43d32ef494c78246660d4"
+    },
+    {
+      "file": "package-lock.json",
+      "sha256": "d8f43cb1aa9dc93e7956d420e45e32ac9b41f69d1181fbf4f223ef586db01c5e"
+    },
+    {
+      "file": "scripts/lint-baseline.json",
+      "sha256": "930c98882aa60c34455730735886754dc5a9a2234ff67a20356c83adfb8e2bfa"
+    }
+  ],
+  "protectedPathsUnchangedFromBase": [
+    "server/app.ts",
+    "server/storage.ts",
+    "server/index.ts",
+    "server/vite.ts",
+    "server/auth.ts",
+    "server/auth-sessions.ts",
+    "server/route-facts.ts",
+    "server/route-composition.ts",
+    "server/route-analysis-functions.ts",
+    "server/route-registration-order.json",
+    "server/route-review.ts",
+    "server/route-matrix.ts",
+    "shared",
+    "client",
+    "migrations",
+    "ios",
+    "package.json",
+    "package-lock.json",
+    "scripts/lint-baseline.json"
+  ],
+  "webSnapshot": {
+    "sourceManifest": "docs/evidence/remediation-v2-2/r8/R8-CLOSEOUT-SOURCE-MANIFEST-2026-10-17.json",
+    "entries": 198,
+    "matchingCopies": [
+      "client/public/app",
+      "dist/public",
+      "dist/public/app",
+      "ios/App/App/public"
+    ]
+  }
+}

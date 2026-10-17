@@ -1,0 +1,518 @@
+{
+  "version": 1,
+  "dateUTC": "2026-10-17",
+  "baseCommit": "d4803d62f9acb2338afb1a04566b2903fe518ba2",
+  "sourceManifest": {
+    "file": "docs/evidence/structure-repair/s2/S2-SOURCE-MANIFEST-2026-10-17.json",
+    "sha256": "6adca6415ef7817bed8438e6a0b4badfa93797aa55b96c5a4e50ac9b2ad04247"
+  },
+  "scope": "S2 stock pilot. Exactly four existing handlers moved to a named synchronous same-app registrar; stock storage, auth rules and public contracts are unchanged.",
+  "baseline": {
+    "existingTestsPassed": 469,
+    "existingSuitesPassed": 12,
+    "addedHttpCharacterizationPassedBeforeMove": 15,
+    "openHandles": 0
+  },
+  "finalAffectedRegression": {
+    "command": "Jest server project --runInBand --detectOpenHandles --runTestsByPath <the 21 suites below>",
+    "passedTests": 549,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "todoTests": 0,
+    "passedSuites": 21,
+    "openHandles": 0,
+    "suites": [
+      {
+        "file": "server/__tests__/tenant-storage-inventory.test.ts",
+        "tests": 21,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-role-defaults.test.ts",
+        "tests": 18,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/c10-batch-6-business.test.ts",
+        "tests": 44,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-all-methods.test.ts",
+        "tests": 172,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/stock-route-contract.test.ts",
+        "tests": 15,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/tenant-stock-board-http.test.ts",
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/subscription-route-security.test.ts",
+        "tests": 25,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-inventory.test.ts",
+        "tests": 23,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/api-route-contract.test.ts",
+        "tests": 43,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/async-route-guard.test.ts",
+        "tests": 31,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-facts.test.ts",
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-composition.test.ts",
+        "tests": 31,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-boundaries.test.ts",
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-facts-modules.test.ts",
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/http-params.test.ts",
+        "tests": 28,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-facts.test.ts",
+        "tests": 22,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-analysis-functions.test.ts",
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/tenant-stock-board-storage.test.ts",
+        "tests": 29,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-policy-review.test.ts",
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/route-registration-source.test.ts",
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "file": "server/__tests__/http-params-source-guard.test.ts",
+        "tests": 2,
+        "status": "passed"
+      }
+    ]
+  },
+  "serverRegression": {
+    "status": "pass",
+    "command": "Jest --selectProjects server --runInBand --detectOpenHandles",
+    "timing": "Started after the handler move and retained-factory fixture repair. The final affected run above follows the last source-analysis/generator/import/metadata edits and the final executable-source hash freeze. No fresh client/browser/device/provider result is claimed.",
+    "passedTests": 5328,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "todoTests": 0,
+    "passedSuites": 246,
+    "openHandles": 0,
+    "newBoundarySuite": "Added after the full run collected files; all 3 cases pass in the final 21-suite affected run."
+  },
+  "newCases": {
+    "stockHttpCharacterization": 15,
+    "domainMarkerBoundary": 3,
+    "total": 18
+  },
+  "failFirstEvidence": {
+    "markerBoundary": {
+      "failedBefore": 1,
+      "passedBefore": 2,
+      "passedAfter": 3
+    },
+    "retainedFactoryFixture": {
+      "failedWithMissingDomainFixture": 3,
+      "passedAfterCompletingFixture": 3,
+      "originalAssertionsRemoved": 0
+    },
+    "generatorPhysicalFileGrouping": {
+      "mismatchedPositionsBeforeCompositionOrdering": 87,
+      "runtimeOrderChanged": false
+    }
+  },
+  "static": {
+    "command": "R8_REPORT_DIR=<private-directory> npm run verify:ci -- --stage=static",
+    "stages": [
+      {
+        "name": "typecheck",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "typecheck-r5",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "typecheck-r6",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "typecheck-r8",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "package-contracts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "css-config-contracts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "portable-scripts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tool-contracts",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "backup-safety",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "fingerprint-safety",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r5-cli",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r6-cli",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r7-artifact-safety",
+        "status": "pass",
+        "exitCode": 0
+      }
+    ],
+    "toolingTests": 48
+  },
+  "lint": {
+    "command": "npm run verify:lint",
+    "existingFindings": 557,
+    "newFindings": 0,
+    "baselineEdited": false,
+    "resolvedBinding": "Already-unused insertRefundSchema on the stock-edited import line; no refund handler/schema implementation change."
+  },
+  "ownedPostgres": {
+    "command": "R8_REPORT_DIR=<private-directory> npm run verify:ci -- --stage=postgres",
+    "outerExitCode": 0,
+    "stages": [
+      {
+        "name": "canonical-0049b-repeat",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "google-sessions",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "split-sessions",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "admin-delete",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "push-sessions",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "apple-identities",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "apple-connect",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r2-t4-expected-values",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "r2-t7-processor-x-id",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-transactions",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-stock-board",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-merchant-settings",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-stragglers",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-property-profiles",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-property-invoices",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-property-invoice-send",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-property-schedules",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-trades-clients",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-trades-create",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-trades-invoices",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "tenant-trades-schedules",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "uploaded-file-scans",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "upload-lifecycle",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "upload-ownership",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "server-storage",
+        "status": "pass",
+        "exitCode": 0
+      }
+    ],
+    "stockStage": "tenant-stock-board",
+    "scope": "Existing coordinator against its owned loopback PostgreSQL17 helper; fresh random databases, canonical0049b/repeat plus existing guarded verifiers and server-storage proof. Original historical guards and migration bytes unchanged; no application DB fallback."
+  },
+  "buildAndRuntime": {
+    "command": "R8_REPORT_DIR=<private-directory> npm run verify:ci -- --stage=build",
+    "stages": [
+      {
+        "name": "build-without-db",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "web-snapshot-parity",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "production-install",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "development-middleware",
+        "status": "pass",
+        "exitCode": 0
+      },
+      {
+        "name": "development-replit",
+        "status": "pass",
+        "exitCode": 0
+      }
+    ],
+    "finalGuardedBuild": "npm run verify:build passed after the final source freeze. The server bundle is byte-identical to the one used in the five-stage proof.",
+    "serverBundle": {
+      "file": "dist/index.js",
+      "sha256": "5f600b27c8cdf6bb65d380a60ac2619cae6253788755ffdc67987151c5f3e11d"
+    }
+  },
+  "behaviourPreservation": {
+    "status": "pass",
+    "routeFacts": 196,
+    "routeOrder": 196,
+    "stockRegistrationTokensUnchanged": 4,
+    "rootSource": "exact original bytes except the reviewed stock move/call/imports and one unused schema binding",
+    "runtimeSourcesFrozen": true
+  },
+  "actualGenerator": {
+    "status": "pass",
+    "generatedPolicyAfterHeader": "byte-identical",
+    "generatedTable": "byte-identical",
+    "mode": "source-windows",
+    "registrations": 196,
+    "policyEntryDifferences": [],
+    "browserApiContract": "byte-identical",
+    "privateOutputOnly": true
+  },
+  "reviewedPolicyDelta": {
+    "entry": "DELETE /api/merchants/:merchantId/stock-items/:itemId",
+    "fields": [
+      "principal",
+      "markers"
+    ],
+    "beforePrincipal": "api-key",
+    "afterPrincipal": "merchant-user",
+    "removedUnrelatedMarkers": [
+      "authenticateApiKey",
+      "requireEcommerceApi"
+    ],
+    "reason": "Pre-existing heuristic window included subsequent ecommerce helper declarations. Domain-call boundaries prevent transferring that false label to merchant refunds. Actual facts and reviewed caller matrix are unchanged.",
+    "allOtherEntriesUnchanged": true,
+    "header": "Names the working-tree base rather than claiming uncommitted source belongs to that SHA."
+  },
+  "webAndNativeParity": {
+    "status": "pass",
+    "filesPerCopy": 198,
+    "matchingCopies": [
+      "client/public/app",
+      "dist/public",
+      "dist/public/app",
+      "ios/App/App/public"
+    ],
+    "sourceManifest": "docs/evidence/remediation-v2-2/r8/R8-CLOSEOUT-SOURCE-MANIFEST-2026-10-17.json"
+  },
+  "currentTreeSecretScan": {
+    "status": "clean",
+    "mode": "tree",
+    "findings": 0,
+    "dispositioned": 0,
+    "unresolved": 0,
+    "scanner": "gitleaks8.30.1 via scripts/scan-secrets.mjs",
+    "rulesOrDispositionsRelaxed": false
+  },
+  "review": {
+    "preflight": "S2-PREFLIGHT-2026-10-17.md",
+    "preflightReread": "S2-PREFLIGHT-REREAD-2026-10-17.md",
+    "final": "S2-FINAL-REVIEW-2026-10-17.md",
+    "finalReread": "S2-FINAL-REREAD-2026-10-17.md",
+    "reviewer": "Same assistant, separately recorded rereads; no independent new human/agent code reviewer claimed."
+  },
+  "limits": [
+    "No storage implementation, frozen migration, dependency, auth/session implementation, frontend/native source or feature flag changed. The root route file is exact original bytes except the documented stock block/call/import substitutions.",
+    "Generation still uses bounded legacy heuristic marker windows outside reviewed domain-call boundaries. Actual handler facts, independent review/matrix and runtime checks remain authoritative; no whole-program security proof is claimed.",
+    "Full old client/browser/real-device/provider/UAT/restore/operations results are not relabelled. Existing R8 full-audit/history/email/assets and real release gates remain open.",
+    "Claude retains R4. S3 requires its own concrete preflight; no refund extraction or accepted R4 integration is inferred.",
+    "Commit/push is not deployment, SQL approval, payment activation or phase exit."
+  ],
+  "stockRegistrations": [
+    {
+      "key": "DELETE /api/merchants/:merchantId/stock-items/:itemId",
+      "originalFile": "server/routes.ts",
+      "currentFile": "server/domains/stock/routes.ts",
+      "sha256": "fad22f03c7e96c21c68d070a28c13cd93fc5a28a8e42dedba975f5675698bc06"
+    },
+    {
+      "key": "GET /api/merchants/:merchantId/stock-items",
+      "originalFile": "server/routes.ts",
+      "currentFile": "server/domains/stock/routes.ts",
+      "sha256": "ec866b6c0adef7bd0b01fd97fe666a8ab577d5cf459fe3082e67a944931bbe18"
+    },
+    {
+      "key": "POST /api/merchants/:merchantId/stock-items",
+      "originalFile": "server/routes.ts",
+      "currentFile": "server/domains/stock/routes.ts",
+      "sha256": "ad61a7f4ad1eb4cc7f67b5f83183158fac822abed1117d9e1c7fd7124e363f05"
+    },
+    {
+      "key": "PUT /api/merchants/:merchantId/stock-items/:itemId",
+      "originalFile": "server/routes.ts",
+      "currentFile": "server/domains/stock/routes.ts",
+      "sha256": "282de4bd58ccfe64001598259bd8720ed60711768f2eb91c1261ff57272916cf"
+    }
+  ],
+  "registrationDigestDefinition": "SHA256 of the original TypeScript lexical token sequence, excluding whitespace/comments; all four moved registrations compare equal.",
+  "publicationChecks": {
+    "localMarkdownLinksChecked": 42,
+    "brokenLinks": 0,
+    "whitespaceErrors": 0,
+    "reviewTemplates": "All four S2 reviews retain the ten required headings.",
+    "index": {
+      "status": "pass",
+      "explicitReviewedPaths": 23,
+      "unexpectedPaths": 0,
+      "indexedSourceHashesMatch": true
+    }
+  }
+}

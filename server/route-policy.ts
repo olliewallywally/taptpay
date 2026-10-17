@@ -1,8 +1,9 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 82bc816ad70817ab18b9ce7369172386e6b8dbfc on 2026-10-15.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/domains/stock/routes.ts, server/index.ts, server/vite.ts on 2026-10-17.
+ * Working-tree base: d4803d62f9acb2338afb1a04566b2903fe518ba2; use the containing commit/source manifest for exact source identity.
  *
- * 196 registrations (83 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 196 registrations (83 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) in this working tree — evidence for this snapshot, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -1625,8 +1626,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "DELETE /api/merchants/:merchantId/stock-items/:itemId": {
     method: "DELETE",
     path: "/api/merchants/:merchantId/stock-items/:itemId",
-    principal: "api-key",
-    markers: ["authenticateToken","authenticateApiKey","requireEcommerceApi","checkMerchantOwnership"],
+    principal: "merchant-user",
+    markers: ["authenticateToken","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
       params: ["itemId: strictPositiveIntegerParam","merchantId: strictPositiveIntegerParam"],

@@ -13,13 +13,16 @@ The owner authorised the reviewed structure repair plan on October 17, 2026.
 - [Execution ledger and current task ownership](docs/architecture/structure-repair-2026-10-17/EXECUTION.md)
 - [Qwen findings checked against current code](docs/architecture/structure-repair-2026-10-17/QWEN-FINDINGS-REGISTER.md)
 - [Independent planning review](docs/architecture/structure-repair-2026-10-17/PLAN-REVIEW.md)
-- [Completed S1 handoff and verification](docs/HANDOFF-2026-10-17-structure-s1.md)
+- [Completed S2 stock pilot and verification](docs/HANDOFF-2026-10-17-structure-s2.md)
+- [Route extraction recipe and rollback](docs/architecture/structure-repair-2026-10-17/EXTRACTION-RECIPE.md)
 
-**Codex has verified S1: module-aware route safety checks. Claude retains R4.**
-S1 strengthens route inventory, registration order and security/effect checks
-before any business routes move. The next package, S2, will trial the four stock
-routes. Coordinate before editing shared routes/storage/policy files. Keep the existing customer
-flows, cookie/CSRF/tenant controls, durable payment semantics and owner decisions.
+**Codex has completed S2: the four-route stock pilot. Claude retains R4.**
+Stock routes now have their own module with typed dependencies. All 196 route
+facts and registration order remain unchanged; stock storage and customer
+behaviour are preserved. S3 is next, beginning with a concrete preflight for
+property profiles and schedules. Coordinate before editing shared routes/storage/
+policy files. Keep existing customer flows, cookie/CSRF/tenant controls, durable
+payment semantics and owner decisions.
 
 Read [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md) and the ledger before changing
 code. The September29 snapshot described by Qwen is older than the current code;

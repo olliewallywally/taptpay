@@ -16,6 +16,7 @@ export const HARNESS_ROUTE_ROOTS = [
   },
 ] as const satisfies readonly RouteRegistrar[];
 
-/** S2 adds an exact file/export only after its concrete extraction review. */
-export const DOMAIN_ROUTE_REGISTRARS =
-  [] as const satisfies readonly RouteRegistrar[];
+/** Each domain file/export is reviewed with its actual composition call. */
+export const DOMAIN_ROUTE_REGISTRARS = [
+  { file: 'server/domains/stock/routes.ts', name: 'registerStockRoutes', app: 'app' },
+] as const satisfies readonly RouteRegistrar[];

@@ -1,13 +1,15 @@
 # Claude repository handoff
 
-**Structure repair: Codex has verified S1; Claude retains R4.**
+**Structure repair: Codex has completed S2; Claude retains R4.**
 Read README.md and `docs/architecture/structure-repair-2026-10-17/EXECUTION.md`
-first, then its plan, Qwen disposition register and planning review. S1 verifies
-module-aware source/runtime route order and guard/effect checks before any domain
-move; its 436 fresh affected tests, 13 static stages and 5 build/install stages pass.
-Read `docs/HANDOFF-2026-10-17-structure-s1.md` for the source-bound evidence.
-S2, the four-stock-route pilot, is next with its own preflight. Coordinate shared
-routes/storage/policy edits. Preserve all frozen SQL, owner/feature decisions and open R8/release gates.
+first, then its plan, Qwen disposition register and planning review. The four stock
+routes now live in `server/domains/stock/routes.ts`, with the same guarded app,
+shared typed dependencies and unchanged 196 route facts/order. Read
+`docs/HANDOFF-2026-10-17-structure-s2.md` for source-bound evidence: 5,328 server
+tests and a separate 549-test final affected run, 13 static stages, 25 owned PG stages and
+5 build/install stages pass; lint is 557 existing/0 new. S3 property profiles and
+schedules are next with their own concrete preflight. Coordinate shared routes/
+storage/policy edits. Preserve all frozen SQL, owner/feature decisions and open R8/release gates.
 The older R8 passes below remain bound to their dated source, not later code.
 
 

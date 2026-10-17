@@ -24,6 +24,7 @@ import {
   type RouteRegistration,
 } from "../server/route-inventory";
 import { compactFacts, currentRouteFacts, type RecordedRouteFacts } from "../server/route-facts";
+import { currentRouteComposition } from "../server/route-composition";
 import { MATRIX_CALLER_MEANING, describeMatrixRow, matrixRowFor } from "../server/route-matrix";
 import { REVIEW_PENDING, ROUTE_REVIEW, type RouteReview } from "../server/route-review";
 import { API_ROUTES_FILE, browserApiRoutes, renderApiRoutes } from "../server/api-route-list";
@@ -160,15 +161,31 @@ function main() {
   const sha = execSync("git rev-parse HEAD", { cwd: process.cwd() }).toString().trim();
   const generatedAt = new Date().toISOString().slice(0, 10);
 
-  // Every file that registers on the app (server/route-inventory.ts,
-  // REGISTRATION_FILES); business routes currently remain in server/routes.ts.
+  // Read each actual handler in its registration file, then emit at its reviewed
+  // composition position. File grouping would reorder an extracted domain.
   const inventory = extractRegistrationInventory();
-  const registrations: Array<RouteRegistration & { file: string; body: string }> = REGISTRATION_FILES.flatMap((file) => {
+  const composition = currentRouteComposition();
+  const sourceRegistrations: Array<RouteRegistration & { file: string; body: string }> = REGISTRATION_FILES.flatMap((file) => {
     const sourceText = fs.readFileSync(path.join(process.cwd(), file), "utf8");
     const fileRegistrations = inventory[file].registrations;
-    const bodies = sliceHandlerBodies(sourceText, fileRegistrations);
+    // A domain call is a boundary too: its preceding root route must not inherit
+    // marker text from helpers belonging to a later registration group.
+    const domainCallLines = [...composition.invocations.values()].flatMap(({ call }) => {
+      if (!call || call.getSourceFile().fileName !== file) return [];
+      return [call.getSourceFile().getLineAndCharacterOfPosition(call.getStart()).line + 1];
+    });
+    const bodies = sliceHandlerBodies(sourceText, fileRegistrations, domainCallLines);
     return fileRegistrations.map((reg, i) => ({ ...reg, file, body: bodies[i] }));
   });
+  const byKey = new Map(sourceRegistrations.map(reg => [registrationKey(reg.method, reg.path), reg]));
+  const registrations = composition.registrations.map(reg => {
+    const source = byKey.get(registrationKey(reg.method, reg.path));
+    if (!source || source.file !== reg.file) throw new Error("route_generation_inventory_drift");
+    return source;
+  });
+  if (byKey.size !== sourceRegistrations.length || registrations.length !== sourceRegistrations.length) {
+    throw new Error("route_generation_inventory_drift");
+  }
 
   // What each handler does, read from its syntax tree (server/route-facts.ts).
   const allFacts = currentRouteFacts();
@@ -196,11 +213,12 @@ function main() {
 
   const policySource = `/**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from ${REGISTRATION_FILES.join(", ")} @ ${sha} on ${generatedAt}.
+ * scripts/generate-route-policy.ts from ${REGISTRATION_FILES.join(", ")} on ${generatedAt}.
+ * Working-tree base: ${sha}; use the containing commit/source manifest for exact source identity.
  *
  * ${rows.length} registrations (${Object.entries(byMethod)
     .map(([m, c]) => `${c} ${m}`)
-    .join(", ")}) on this SHA — evidence for THIS commit, not a timeless
+    .join(", ")}) in this working tree — evidence for this snapshot, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -303,10 +321,11 @@ ${suspectedGaps.map((r) => `- **${r.method} ${r.path}** (line ${r.line})`).join(
 `
     : "";
 
-  const table = `# R1-T2 route inventory — generated ${generatedAt} @ \`${sha}\`
+  const table = `# R1-T2 route inventory — generated ${generatedAt} (working-tree base \`${sha}\`)
 
 Regenerate with \`npx tsx scripts/generate-route-policy.ts\`. This table is
-evidence for the SHA named above, not a timeless constant — see
+evidence for the working tree when generated. The base SHA alone does not identify
+uncommitted changes; use the containing commit/source manifest — see
 docs/evidence/remediation-v2-2/r1/ for the task record.
 
 Total registrations: **${rows.length}** (${Object.entries(byMethod)
@@ -375,8 +394,9 @@ middleware, how each path and query value is parsed ("raw": no parser), body
 validation, authorization checks and tenant/role comparisons, storage methods,
 calls that leave the process, statuses, response projections (DTOs), error text
 put into responses, and capability, entitlement, rate-limit and idempotency
-calls. Helpers in the same file are followed; imported functions are not (they
-are classified by name). Facts, not judgments.
+calls. Supported named helpers and injected functions in the explicitly reviewed
+composition sources are followed across files. Other external/package functions
+retain name/status classification. This is bounded source analysis; facts, not judgments.
 
 ${rows.map(renderFactsSection).join("\n")}`;
 

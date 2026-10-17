@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { currentRouteFacts } from '../route-facts';
+import { DOMAIN_ROUTE_REGISTRARS } from '../route-composition-manifest';
 
 describe('S1 retained factory facts follow the real registration file', () => {
   let directory: string;
   beforeEach(() => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'taptpay-s1-facts-'));
     fs.mkdirSync(path.join(directory, 'server'));
-    const files = {
+    const files: Record<string, string> = {
       'app.ts': `export function createApp() {
         const app = express();
         const retailCheckoutHandlers = createRetailCheckoutHandlers({checkRateLimit: async () => {
@@ -34,8 +35,26 @@ describe('S1 retained factory facts follow the real registration file', () => {
         return {session};
       }`,
     };
-    for (const [name, source] of Object.entries(files))
-      fs.writeFileSync(path.join(directory, 'server', name), source);
+    // Keep this synthetic factory fixture complete as real domain sources are
+    // added. Empty named registrars satisfy composition without importing or
+    // executing the application; all factory/guard/effect assertions stay below.
+    const imports: string[] = [];
+    const calls: string[] = [];
+    for (const [index, registrar] of DOMAIN_ROUTE_REGISTRARS.entries()) {
+      const name = registrar.file.replace(/^server\//, '');
+      const alias = `fixtureDomain${index}`;
+      imports.push(`import { ${registrar.name} as ${alias} } from './${name.replace(/\.ts$/, '')}';`);
+      calls.push(`${alias}(app, {});`);
+      files[name] = (files[name] ?? '') + `export function ${registrar.name}(${registrar.app}: Express) {}`;
+    }
+    files['routes.ts'] = imports.join('\n') + `\nexport function registerRoutes(app: Express) {
+      installAsyncRouteGuard(app); ${calls.join(' ')}
+    }`;
+    for (const [name, source] of Object.entries(files)) {
+      const file = path.join(directory, 'server', name);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, source);
+    }
   });
   afterEach(() => fs.rmSync(directory, { recursive: true, force: true }));
 

@@ -186,14 +186,17 @@ export function extractSourceInventoryFromFile(filePath: string, appIdentifier?:
 
 /**
  * Every file that registers a route or middleware on the app production
- * serves, repo-relative, in the order the app is assembled: the pipeline
- * (createApp), the routes, then what server/index.ts adds after them and the
+ * serves, repo-relative: the pipeline (createApp), root/domain route sources,
+ * then what server/index.ts adds after them and the
  * Vite/static serving it calls. route-policy-inventory.test.ts proves no other
- * server file registers anything (discoverRegistrationFiles).
+ * server file registers anything (discoverRegistrationFiles). Actual route
+ * order comes from the reviewed call positions in route-composition.ts, not
+ * grouping registrations by their physical source files.
  */
 export const REGISTRATION_FILES = [
   "server/app.ts",
   "server/routes.ts",
+  "server/domains/stock/routes.ts",
   "server/index.ts",
   "server/vite.ts",
 ] as const;
@@ -508,11 +511,14 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
  */
 export const SUSPECTED_GAP_ROUTES: Record<string, string> = {};
 
-/** Slices from one registration's start line to just before the next `app.` call, for marker detection. */
-export function sliceHandlerBodies(sourceText: string, registrations: RouteRegistration[]): string[] {
+/** Legacy marker windows, bounded by the next route or reviewed domain call.
+ * Semantic route facts are analysed separately from the actual handler AST.
+ */
+export function sliceHandlerBodies(
+  sourceText: string, registrations: RouteRegistration[], stopBeforeLines: readonly number[] = [],
+): string[] {
   const lines = sourceText.split("\n");
-  const starts = registrations
-    .map((r) => r.line - 1)
+  const starts = [...registrations.map((r) => r.line - 1), ...stopBeforeLines.map(line => line - 1)]
     .sort((a, b) => a - b);
   return registrations.map((r) => {
     const startLine = r.line - 1;
