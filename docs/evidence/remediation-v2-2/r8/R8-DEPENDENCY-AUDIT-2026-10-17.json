@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "date": "2026-10-17",
+  "baseCommit": "4c2f1b203b2da3f8f81ec901635592935dc7fff3",
+  "fullAuditBefore": {
+    "info": 0,
+    "low": 2,
+    "moderate": 17,
+    "high": 61,
+    "critical": 0,
+    "total": 80
+  },
+  "productionAuditBefore": {
+    "info": 0,
+    "low": 2,
+    "moderate": 12,
+    "high": 58,
+    "critical": 0,
+    "total": 72
+  },
+  "productionAuditAfterRelocation": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 21,
+    "critical": 0,
+    "total": 30
+  },
+  "targetAdvisories": {
+    "compression": [
+      {
+        "id": "GHSA-vc2v-76pw-4v95",
+        "range": "<1.8.2"
+      }
+    ],
+    "multer": [
+      {
+        "id": "GHSA-72gw-mp4g-v24j",
+        "range": ">=1.0.0 <2.2.0"
+      },
+      {
+        "id": "GHSA-3p4h-7m6x-2hcm",
+        "range": ">=2.0.0-alpha.1 <2.2.0"
+      },
+      {
+        "id": "GHSA-wc9g-mqfw-jrwm",
+        "range": "<2.3.0"
+      },
+      {
+        "id": "GHSA-qvfw-j98x-7q72",
+        "range": "<2.3.0"
+      },
+      {
+        "id": "GHSA-535w-7cp7-47q4",
+        "range": "<2.3.0"
+      }
+    ],
+    "ws": [
+      {
+        "id": "GHSA-58qx-3vcg-4xpx",
+        "range": ">=8.0.0 <8.20.1"
+      },
+      {
+        "id": "GHSA-96hv-2xvq-fx4p",
+        "range": ">=8.0.0 <8.21.0"
+      }
+    ]
+  },
+  "fullAuditAfter": {
+    "info": 0,
+    "low": 2,
+    "moderate": 17,
+    "high": 58,
+    "critical": 0,
+    "total": 77
+  },
+  "productionAuditAfter": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 18,
+    "critical": 0,
+    "total": 27
+  },
+  "fullAdvisoryIdsBefore": 139,
+  "fullAdvisoryIdsAfter": 131,
+  "removedAdvisories": [
+    "GHSA-3p4h-7m6x-2hcm",
+    "GHSA-535w-7cp7-47q4",
+    "GHSA-58qx-3vcg-4xpx",
+    "GHSA-72gw-mp4g-v24j",
+    "GHSA-96hv-2xvq-fx4p",
+    "GHSA-qvfw-j98x-7q72",
+    "GHSA-vc2v-76pw-4v95",
+    "GHSA-wc9g-mqfw-jrwm"
+  ],
+  "highCriticalGate": "blocked",
+  "waivers": []
+}

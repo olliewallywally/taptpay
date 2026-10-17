@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "date": "2026-10-17",
+  "baseCommit": "4c2f1b203b2da3f8f81ec901635592935dc7fff3",
+  "scope": "Group B after separately verified group A; not a phase exit",
+  "sourceManifest": "R8-DEPENDENCY-SOURCE-2026-10-17.sha256",
+  "lockSHA256": "79a947d5979672cd85e7491825622e76963c4478e6bcad4b13b712f8239a15ad",
+  "versions": {
+    "compression": "1.8.2",
+    "multer": "2.4.0",
+    "ws": "8.22.0"
+  },
+  "lockDeltaFromRelocation": {
+    "added": [],
+    "removed": [
+      "node_modules/concat-stream",
+      "node_modules/typedarray"
+    ],
+    "changed": [
+      {
+        "path": "node_modules/buffer-from",
+        "before": "1.1.2",
+        "after": "1.1.2",
+        "keys": [
+          "dev"
+        ]
+      },
+      {
+        "path": "node_modules/compression",
+        "before": "1.8.1",
+        "after": "1.8.2",
+        "keys": [
+          "dependencies",
+          "version",
+          "funding",
+          "resolved",
+          "integrity"
+        ]
+      },
+      {
+        "path": "node_modules/multer",
+        "before": "2.1.1",
+        "after": "2.4.0",
+        "keys": [
+          "dependencies",
+          "version",
+          "resolved",
+          "integrity"
+        ]
+      },
+      {
+        "path": "node_modules/ws",
+        "before": "8.18.0",
+        "after": "8.22.0",
+        "keys": [
+          "version",
+          "resolved",
+          "integrity"
+        ]
+      }
+    ]
+  },
+  "failFirst": {
+    "newTests": 12,
+    "failed": 8,
+    "passedControls": 4,
+    "failuresWereHTTP200InsteadOf400": true,
+    "openHandles": 0
+  },
+  "finalServerRegression": {
+    "suites": 16,
+    "tests": 468,
+    "failed": 0,
+    "openHandles": 0,
+    "selection": [
+      "r8-multipart-bounds",
+      "config",
+      "config-source-guard",
+      "live-updates-compression",
+      "c10-batch-6c-property",
+      "property-invoice-document-upload",
+      "route-policy-role-defaults",
+      "upload-lifecycle-passes",
+      "upload-lifecycle-storage",
+      "upload-ownership-inventory",
+      "upload-policy",
+      "uploaded-file-scan-http",
+      "uploaded-file-scan-storage",
+      "uploaded-file-storage",
+      "uploaded-file-tenancy",
+      "uploaded-files-schema"
+    ]
+  },
+  "multipartCasesPassed": 12,
+  "staticStages": [
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck-r5",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck-r6",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck-r8",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "tool-contracts",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "backup-safety",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "fingerprint-safety",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "r5-cli",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "r6-cli",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "r7-artifact-safety",
+      "status": "pass",
+      "exitCode": 0
+    }
+  ],
+  "buildStages": [
+    {
+      "name": "build-without-db",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "web-snapshot-parity",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "production-install",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "development-middleware",
+      "status": "pass",
+      "exitCode": 0
+    }
+  ],
+  "lint": {
+    "existingErrors": 680,
+    "newErrors": 0
+  },
+  "nativeParity": {
+    "webFiles": 198,
+    "nativeChecked": true,
+    "unsupportedPaymentMarkers": 0
+  },
+  "webIndexSHA256": "752b816726ceed8973211e93f1d755e6e07a884f45093a4b032949c064412e8d",
+  "webSocketOwnedLoopback": "text/fragmented/binary/close passed before and after",
+  "npmTreeProblems": [],
+  "freshProductionPackages": {
+    "before": 1314,
+    "afterRelocation": 629,
+    "afterSecurityFixes": 626
+  },
+  "fullUnitRerunAfterGroupB": false,
+  "fullUnitEvidence": "R8-TOOL-RELOCATION-VERIFICATION-2026-10-17.json",
+  "fullBrowserRerunThisSlice": false,
+  "browserRationale": "No client/bundled package versions or generated web bytes changed; all198 files remain equal to the prior verified snapshot. This does not assert physical-device/UAT acceptance.",
+  "releaseApproved": false,
+  "sourceSecrets": {
+    "status": "clean",
+    "findings": 0
+  }
+}

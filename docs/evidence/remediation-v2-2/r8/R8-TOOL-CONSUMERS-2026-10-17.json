@@ -1,0 +1,1251 @@
+{
+  "version": 1,
+  "baseCommit": "4c2f1b203b2da3f8f81ec901635592935dc7fff3",
+  "candidates": [
+    {
+      "name": "@babel/core",
+      "version": "^7.28.4"
+    },
+    {
+      "name": "@babel/preset-env",
+      "version": "^7.28.3"
+    },
+    {
+      "name": "@babel/preset-react",
+      "version": "^7.27.1"
+    },
+    {
+      "name": "@babel/preset-typescript",
+      "version": "^7.27.1"
+    },
+    {
+      "name": "@capacitor/cli",
+      "version": "8.4.3"
+    },
+    {
+      "name": "@capacitor/ios",
+      "version": "8.4.3"
+    },
+    {
+      "name": "@eslint/js",
+      "version": "^9.35.0"
+    },
+    {
+      "name": "@testing-library/jest-dom",
+      "version": "^6.8.0"
+    },
+    {
+      "name": "@testing-library/react",
+      "version": "^16.3.0"
+    },
+    {
+      "name": "@testing-library/user-event",
+      "version": "^14.6.1"
+    },
+    {
+      "name": "@types/bcrypt",
+      "version": "^5.0.2"
+    },
+    {
+      "name": "@types/compression",
+      "version": "^1.8.1"
+    },
+    {
+      "name": "@types/helmet",
+      "version": "^0.0.48"
+    },
+    {
+      "name": "@types/jest",
+      "version": "^30.0.0"
+    },
+    {
+      "name": "@types/jsonwebtoken",
+      "version": "^9.0.10"
+    },
+    {
+      "name": "@types/jspdf",
+      "version": "^1.3.3"
+    },
+    {
+      "name": "@types/memoizee",
+      "version": "^0.4.12"
+    },
+    {
+      "name": "@types/multer",
+      "version": "^2.0.0"
+    },
+    {
+      "name": "@types/nodemailer",
+      "version": "^6.4.17"
+    },
+    {
+      "name": "@types/qrcode",
+      "version": "^1.5.5"
+    },
+    {
+      "name": "@types/topojson-client",
+      "version": "^3.1.5"
+    },
+    {
+      "name": "@types/web-push",
+      "version": "^3.6.4"
+    },
+    {
+      "name": "@typescript-eslint/eslint-plugin",
+      "version": "^8.44.0"
+    },
+    {
+      "name": "@typescript-eslint/parser",
+      "version": "^8.44.0"
+    },
+    {
+      "name": "babel-jest",
+      "version": "^30.1.2"
+    },
+    {
+      "name": "eslint",
+      "version": "^9.35.0"
+    },
+    {
+      "name": "eslint-config-prettier",
+      "version": "^10.1.8"
+    },
+    {
+      "name": "eslint-plugin-jsx-a11y",
+      "version": "^6.10.2"
+    },
+    {
+      "name": "eslint-plugin-prettier",
+      "version": "^5.5.4"
+    },
+    {
+      "name": "eslint-plugin-react",
+      "version": "^7.37.5"
+    },
+    {
+      "name": "eslint-plugin-react-hooks",
+      "version": "^5.2.0"
+    },
+    {
+      "name": "globals",
+      "version": "^16.4.0"
+    },
+    {
+      "name": "identity-obj-proxy",
+      "version": "^3.0.0"
+    },
+    {
+      "name": "jest",
+      "version": "^30.1.3"
+    },
+    {
+      "name": "jest-environment-jsdom",
+      "version": "^30.1.2"
+    },
+    {
+      "name": "jest-transform-stub",
+      "version": "^2.0.0"
+    },
+    {
+      "name": "prettier",
+      "version": "^3.6.2"
+    },
+    {
+      "name": "ts-jest",
+      "version": "29.4.15"
+    }
+  ],
+  "trackedCodeFilesScanned": 1160,
+  "uses": [
+    {
+      "package": "@capacitor/cli",
+      "path": "capacitor.config.ts",
+      "kind": "import",
+      "typeOnly": true,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/admin-session.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/auth-outage-resilience.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 28
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/bottom-navigation-adapter.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/checkout-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "eslint",
+      "path": "client/src/__tests__/hooks-order-guard.test.ts",
+      "kind": "load",
+      "typeOnly": false,
+      "line": 20
+    },
+    {
+      "package": "@typescript-eslint/parser",
+      "path": "client/src/__tests__/hooks-order-guard.test.ts",
+      "kind": "load",
+      "typeOnly": false,
+      "line": 21
+    },
+    {
+      "package": "eslint-plugin-react-hooks",
+      "path": "client/src/__tests__/hooks-order-guard.test.ts",
+      "kind": "load",
+      "typeOnly": false,
+      "line": 22
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/keyboard-inset-contract.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/mobile-quote-flow.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/property-dashboard-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/property-terminal-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/__tests__/property-terminal-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/push-resync-on-open.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 23
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/r1-t3-route-guards.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 71
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/retail-dashboard-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 4
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/retail-terminal-share-sales.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/retail-terminal-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/split-payment-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/terminal-dock-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/trades-dashboard-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/trades-terminal-view-boundary.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/tutorial-accessibility.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/tutorial-lifecycle.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/use-device-class.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/__tests__/zz-review-hooks-repro.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/components/AnimatedScrollList.accessibility.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/components/Stepper.accessibility.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/components/__tests__/qr-code-display.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/components/checkout/tapt-wordmark.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/components/merchant-gate.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/components/reports/ReportModal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/DesktopSettingsPage.apple.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/DesktopSettingsPage.apple.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/DesktopSettingsPage.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/DesktopSettingsPage.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 4
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/client-directory-boundaries.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/client-directory-boundaries.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/client-directory-boundaries.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 4
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/desktop-keypad.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/desktop-keypad.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/desktop-keypad.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/desktop-settings-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/desktop-settings-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/desktop-settings-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 14
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/property-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/property-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/property-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 14
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/property-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/property-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/property-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/property-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/property-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/property-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 4
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/r1-malformed-response.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/r1-malformed-response.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/retail-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/retail-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 14
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/retail-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 15
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/retail-stock-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/retail-stock-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/retail-stock-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/retail-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/retail-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/retail-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/retail-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/retail-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/retail-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 4
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/trades-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/trades-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 14
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/trades-analytics-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 15
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/trades-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/trades-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/trades-terminal-failure.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 14
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/desktop/trades-terminal-quick-invoice.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 7
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/desktop/trades-terminal-quick-invoice.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/desktop/trades-terminal-quick-invoice.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/features/terminal/inert-when.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/hooks/use-accessible-modal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/hooks/use-apple-connection.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/hooks/use-push-notifications-native.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/lib/billing-required.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/lib/billing-required.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/lib/merchant.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/board-builder-qr.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/board-sale-leave-links.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/__tests__/board-sale-leave-links.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/__tests__/board-sale-leave-links.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/business-details-with-sale.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/__tests__/business-details-with-sale.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/checkout-durability.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/customer-payment-flow.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/invoice-split-wallet-session.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/__tests__/invoice-split-wallet-session.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/jsx-syntax-smoke.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/merchant-pages-session.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/payment-result-durability.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/payment-stack.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/quote-accept-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/__tests__/quote-accept-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/__tests__/quote-accept-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/smoke-tests.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/split-payment-exact-share.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/split-payment-stream.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/__tests__/token-payment-flow.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/accept-invite.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/admin/GridDashboard.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/admin/GridDashboard.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/admin/GridDashboard.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/admin/__tests__/merchant-detail-payment-url.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/check-email.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/confirm-email.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/login-apple.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/login-google-handoff.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/login-session.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 6
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/login-slow-down.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 6
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/merchant-signup.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/merchant-signup.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/merchant-terminal-mobile-v2.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/merchant-terminal-mobile-v2.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/merchant-terminal-mobile.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/merchant-terminal-mobile.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/merchant-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/merchant-terminal.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/password-rule-forms.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/password-rule-forms.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/property/property-terminal-automations.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 15
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/property/property-terminal-automations.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 16
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/property/property-terminal-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 11
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/property/property-terminal-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 12
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/reset-password-check.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/reset-password-check.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/settings-apple-connection.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 7
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/settings-apple-connection.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/settings-customer-page-button.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 7
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/settings-customer-page-button.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/settings-sign-out-everywhere.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 9
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/settings-sign-out-everywhere.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 10
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/settings-tutorial-restart.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@testing-library/user-event",
+      "path": "client/src/pages/settings-tutorial-restart.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@testing-library/react",
+      "path": "client/src/pages/trades/trades-terminal-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 13
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "client/src/pages/trades/trades-terminal-billing.test.tsx",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 14
+    },
+    {
+      "package": "@eslint/js",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "@typescript-eslint/eslint-plugin",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 2
+    },
+    {
+      "package": "@typescript-eslint/parser",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "eslint-plugin-react",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 4
+    },
+    {
+      "package": "eslint-plugin-react-hooks",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 5
+    },
+    {
+      "package": "eslint-plugin-jsx-a11y",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 6
+    },
+    {
+      "package": "eslint-config-prettier",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 7
+    },
+    {
+      "package": "globals",
+      "path": "eslint.config.js",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 8
+    },
+    {
+      "package": "@testing-library/jest-dom",
+      "path": "jest.setup.js",
+      "kind": "load",
+      "typeOnly": false,
+      "line": 3
+    },
+    {
+      "package": "eslint",
+      "path": "scripts/verify-lint.mjs",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 1
+    },
+    {
+      "package": "eslint",
+      "path": "scripts/verify-lint.test.mjs",
+      "kind": "import",
+      "typeOnly": false,
+      "line": 3
+    }
+  ],
+  "productionSourceValueImports": [],
+  "extraConsumers": {
+    "jest": [
+      "babel.config.cjs",
+      "jest.client.config.cjs",
+      "jest.server.config.cjs",
+      "jest.setup.js"
+    ],
+    "lint": [
+      "eslint.config.js",
+      "scripts/verify-lint.mjs"
+    ],
+    "native": [
+      "capacitor.config.ts",
+      ".github/workflows/verify.yml",
+      "ios/App/CapApp-SPM/Package.swift"
+    ]
+  },
+  "limitation": "AST literal source inventory plus manual config/native/script review; not a universal dynamic-loader or uninstall proof."
+}

@@ -292,6 +292,10 @@ const logoUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 20 * 1024 * 1024, // 20MB max
+    // These file-only endpoints must not parse nested/sparse text fields.
+    fields: 0,
+    files: 1,
+    parts: 1,
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'image/png') {
@@ -311,7 +315,12 @@ const INVOICE_DOC_MIME = new Set([
 
 const invoiceDocUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB max
+    fields: 0,
+    files: 1,
+    parts: 1,
+  },
   fileFilter: (_req, file, cb) => {
     if (INVOICE_DOC_MIME.has(file.mimetype)) cb(null, true);
     else cb(new UploadTypeError('Only PDF or image files are allowed'));

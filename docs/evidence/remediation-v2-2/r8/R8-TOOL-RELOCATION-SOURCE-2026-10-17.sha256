@@ -1,0 +1,3 @@
+7c1d1f707ab7a00342cba8b94c78a5905f35ef43f94f029fff9623705f287f61  package.json
+fea3f852525a39e2c5dfe9503f29349fa1bee41caacc228102ff669dc6068ecb  package-lock.json
+55ee002790a1dd8ceee5e8e08273b1ed743f66264709e379543a56b2e9d078af  scripts/verify-ci-contract.test.mjs

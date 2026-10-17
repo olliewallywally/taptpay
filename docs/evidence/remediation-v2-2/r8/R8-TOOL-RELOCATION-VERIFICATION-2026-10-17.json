@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "baseCommit": "4c2f1b203b2da3f8f81ec901635592935dc7fff3",
+  "lockSHA256": "fea3f852525a39e2c5dfe9503f29349fa1bee41caacc228102ff669dc6068ecb",
+  "movedDirectPackages": 38,
+  "packageVersionsAndIntegrityUnchanged": true,
+  "lockClassificationChanges": {
+    "dev": 707,
+    "devOptional": 2
+  },
+  "tests": {
+    "client": {
+      "numPassedTestSuites": 134,
+      "numPassedTests": 1507,
+      "numFailedTestSuites": 0,
+      "numFailedTests": 0,
+      "openHandles": 0
+    },
+    "server": {
+      "numPassedTestSuites": 238,
+      "numPassedTests": 5249,
+      "numFailedTestSuites": 0,
+      "numFailedTests": 0,
+      "openHandles": 0
+    }
+  },
+  "staticStages": [
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck-r5",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck-r6",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck-r8",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "tool-contracts",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "backup-safety",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "fingerprint-safety",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "r5-cli",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "r6-cli",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "r7-artifact-safety",
+      "status": "pass",
+      "exitCode": 0
+    }
+  ],
+  "buildStages": [
+    {
+      "name": "build-without-db",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "web-snapshot-parity",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "production-install",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "development-middleware",
+      "status": "pass",
+      "exitCode": 0
+    }
+  ],
+  "postgres": "pass",
+  "lint": {
+    "existingErrors": 680,
+    "newErrors": 0
+  },
+  "native": {
+    "sync": "pass",
+    "webFiles": 198,
+    "swiftMetadataUnchanged": true
+  },
+  "sourceSecrets": {
+    "findings": 0
+  },
+  "freshProductionPackages": {
+    "before": 1314,
+    "afterRelocation": 629
+  },
+  "fullAuditUnchanged": {
+    "info": 0,
+    "low": 2,
+    "moderate": 17,
+    "high": 61,
+    "critical": 0,
+    "total": 80
+  },
+  "releaseApproved": false
+}

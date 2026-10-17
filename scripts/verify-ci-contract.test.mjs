@@ -30,10 +30,11 @@ test('failure artifact upload accepts only the sanitized report directory',()=>{
 test('native dependency versions, lock and Swift metadata stay in agreement',()=>{
   const pkg=JSON.parse(read('package.json')),lock=JSON.parse(read('package-lock.json'));
   const names=['@capacitor/core','@capacitor/cli','@capacitor/ios'];
-  const versions=names.map(name=>pkg.dependencies[name]);
+  const versionOf = name => pkg.dependencies[name] ?? pkg.devDependencies[name];
+  const versions=names.map(versionOf);
   assert.equal(new Set(versions).size,1);
   assert.match(versions[0],/^8\.\d+\.\d+$/);
-  for(const name of names)assert.equal(lock.packages['node_modules/'+name].version,pkg.dependencies[name]);
+  for(const name of names)assert.equal(lock.packages['node_modules/'+name].version,versionOf(name));
   assert.ok(read('ios/App/CapApp-SPM/Package.swift').includes(`exact: "${versions[0]}"`));
 });
 test('browser CI schedules every device separately without dropping tutorial coverage',()=>{

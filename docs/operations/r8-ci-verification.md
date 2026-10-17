@@ -125,3 +125,28 @@ existing grace. Invalid grace values fail before any command/file action. An
 actual canceled installer and39 tooling regressions passed. Raw logs stay private.
 These checks establish dependency resolution and local serving, not a production
 SQL/Neon boot, real-data restore or provider/professional release acceptance.
+
+## Tool relocation and compatible server repairs (October17)
+
+Build, tests, lint, native sync and operator tools use a full frozen `npm ci`.
+The38 reviewed tooling/type packages, including Capacitor CLI/iOS, now reside in
+devDependencies; Capacitor core stays runtime and all three stay8.4.3. A prebuilt
+production daemon uses `npm ci --omit=dev` with the committed lock. Do not run a
+native build from a production-only install or replace a running owner's tree.
+
+The fresh production install now contains626 packages, versus1314 before this
+slice. Relocation alone fixes no advisory. Compression1.8.2, multer2.4.0 and
+ws8.22.0 remove8 targeted advisory IDs; full audit remains77 affected /58 high /
+17 moderate /2 low /0 critical, so the security gate remains blocked. Both upload
+APIs accept one file and no multipart text fields, with the existing20MiB cap.
+This prevents unneeded append-field nesting/array allocation; all existing
+source callers send that shape. Eight negative HTTP cases failed before the
+bounds; all12 new cases and468 affected regressions passed after the repair.
+
+R8-TOOL-RELOCATION-VERIFICATION-2026-10-17.json records the full6756 unit tests on
+the unchanged-version relocation. R8-DEPENDENCY-VERIFICATION-2026-10-17.json records
+the subsequent runtime patches and targeted regression. Full unit/browser counts
+are not relabelled as a new full run after those patches. All198 web bytes remain
+unchanged, full native parity passes, and the actual fresh production entry/static
+serving and development middleware checks pass. Source manifests and separate
+final review/reread are under docs/evidence/remediation-v2-2/r8. No release approval.
